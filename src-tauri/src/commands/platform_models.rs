@@ -15,7 +15,7 @@ use std::sync::LazyLock;
 use tauri::{Manager, State};
 use tokio::sync::Mutex;
 
-// 同步、退出清理和历史还原共用操作锁；涉及供应商时按操作锁、切换锁的顺序获取。
+// 同步、退出登录和历史还原共用操作锁；涉及供应商时按操作锁、切换锁的顺序获取。
 pub(super) static APPLY_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -58,6 +58,8 @@ fn local_error<T>(result: Result<T, impl std::fmt::Display>) -> Result<T, Platfo
     })
 }
 
+// 保留显式凭证清理能力；退出登录不再调用。
+#[allow(dead_code)]
 pub(super) fn clear_account_credentials(
     state: &AppState,
     origin: &str,
@@ -74,7 +76,7 @@ pub(super) fn clear_account_credentials(
                     .as_ref()
                     .and_then(|meta| meta.platform_managed.as_ref())
                 else {
-                    // 退出清理仅处理平台托管项，用户自建供应商保持不变。
+                    // 显式清理仅处理平台托管项，用户自建供应商保持不变。
                     continue;
                 };
                 if managed.origin != origin || managed.user_id != user_id {
@@ -146,6 +148,8 @@ struct DesiredProvider {
     provider: Provider,
 }
 
+// 保留显式目录凭证清理能力及旧快照兼容；退出登录不再调用。
+#[allow(dead_code)]
 pub(super) fn clear_cached_catalog_credentials(
     handle: &tauri::AppHandle,
 ) -> Result<(), PlatformAuthError> {
@@ -845,7 +849,7 @@ mod tests {
 
     #[test]
     #[serial_test::serial]
-    fn logout_clears_managed_keys_from_all_agent_configs_and_keeps_other_accounts() {
+    fn logout_preserves_all_agent_keys_and_explicit_cleanup_keeps_other_accounts() {
         let _home = SyncTestHome::new();
         use std::sync::Arc;
         fn model(agent: &str, name: &str) -> AgentModel {
@@ -880,6 +884,50 @@ mod tests {
             crate::services::ProviderService::switch(&store, app.clone(), &id).unwrap();
             adapter::select_default(&app, &id, &m.model).unwrap();
         }
+        let providers_before: HashMap<_, _> = adapter::AGENTS
+            .iter()
+            .map(|agent| {
+                (
+                    *agent,
+                    serde_json::to_value(store.db.get_all_providers(agent).unwrap()).unwrap(),
+                )
+            })
+            .collect();
+        let files_before: HashMap<_, _> = adapter::AGENTS
+            .iter()
+            .flat_map(|agent| sync_report::paths(&adapter::app(agent).unwrap()).unwrap())
+            .map(|path| {
+                let bytes = crate::live::engine::read_current(&path).unwrap();
+                (path, bytes)
+            })
+            .collect();
+        let auth = PlatformAuthState::for_test("https://example.test".into(), 1);
+        tauri::async_runtime::block_on(async {
+            auth.logout().await.unwrap();
+            assert!(matches!(
+                auth.with_local_identity(|_, _| Ok(())).await,
+                Err(err) if err.code == "UNAUTHORIZED"
+            ));
+            // A repeated logout must also leave provider rows and native files untouched.
+            auth.logout().await.unwrap();
+        });
+        for agent in adapter::AGENTS {
+            assert_eq!(
+                serde_json::to_value(store.db.get_all_providers(agent).unwrap()).unwrap(),
+                providers_before[agent],
+                "{agent}"
+            );
+        }
+        for (path, before) in files_before {
+            assert_eq!(
+                crate::live::engine::read_current(&path).unwrap(),
+                before,
+                "{}",
+                path.display()
+            );
+        }
+
+        // Explicit cleanup remains available independently of logout.
         clear_account_credentials(&store, "https://example.test", 1).unwrap();
         for agent in adapter::AGENTS {
             let app = adapter::app(agent).unwrap();
@@ -1169,7 +1217,7 @@ mod tests {
                 0o600
             );
         }
-        // Logout invalidates even corrupted data without parsing credentials.
+        // Explicit cleanup invalidates even corrupted data without parsing credentials.
         std::fs::write(&path, b"broken snapshot with key-42").unwrap();
         assert!(restarted.read("https://platform.test", 1).is_err());
         restarted.clear_credentials().unwrap();
@@ -1181,8 +1229,8 @@ mod tests {
         assert!(restarted.group_key("https://platform.test", 1, 42).is_err());
     }
 
-    #[test]
-    fn logout_keeps_account_catalog_metadata_but_scrubs_all_group_keys() {
+    #[tokio::test]
+    async fn logout_preserves_catalog_keys_and_explicit_cleanup_retains_metadata() {
         let temp = tempfile::tempdir().unwrap();
         let path = temp.path().join("catalog.json");
         let store = base_data::CatalogStore::for_test(path.clone());
@@ -1196,7 +1244,7 @@ mod tests {
         discovery.catalogs[0].models[0]["echoedCredential"] = json!("key-42");
         discovery
             .warnings
-            .push("Credential key-42 must not survive logout".into());
+            .push("Credential key-42 must not survive explicit cleanup".into());
         let before = serde_json::to_value(store.save(discovery).unwrap().summary()).unwrap();
         // Existing v1 snapshots do not have the new lifecycle flag.
         let mut legacy: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
@@ -1210,6 +1258,28 @@ mod tests {
             .unwrap()
             .unwrap()
             .credentials_cleared());
+        let before_logout = std::fs::read(&path).unwrap();
+        let auth = PlatformAuthState::for_test("https://platform.test".into(), 1);
+        auth.logout().await.unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), before_logout);
+        assert!(matches!(
+            auth.with_local_identity(|origin, user_id| store.group_key(origin, user_id, 42)).await,
+            Err(err) if err.code == "UNAUTHORIZED"
+        ));
+        let relogged = PlatformAuthState::for_test("https://platform.test".into(), 1);
+        assert_eq!(
+            relogged
+                .with_local_identity(|origin, user_id| store.group_key(origin, user_id, 42))
+                .await
+                .unwrap(),
+            Some("key-42".into())
+        );
+        let other = PlatformAuthState::for_test("https://platform.test".into(), 2);
+        assert!(matches!(
+            other.with_local_identity(|origin, user_id| store.group_key(origin, user_id, 42)).await,
+            Err(err) if err.code == "CATALOG_REQUIRED"
+        ));
+        // Retain compatibility with snapshots explicitly cleared by older versions.
         store.clear_credentials().unwrap();
         // Reopening the file models a new login / process with an empty query cache.
         let restarted = base_data::CatalogStore::for_test(path.clone());
@@ -1234,7 +1304,7 @@ mod tests {
             .unwrap()
             .is_none());
         assert!(restarted.read("https://other.test", 1).unwrap().is_none());
-        // Cleanup is idempotent and does not turn logout into a new synchronization.
+        // Explicit cleanup is idempotent and does not trigger a new synchronization.
         restarted.clear_credentials().unwrap();
         assert_eq!(
             serde_json::to_value(
@@ -1251,7 +1321,7 @@ mod tests {
 
     #[test]
     #[serial_test::serial]
-    fn provider_sync_waits_for_credentials_to_be_restored_after_logout() {
+    fn provider_sync_waits_for_credentials_to_be_restored_after_legacy_cleanup() {
         use crate::{app_config::AppType, database::Database};
         use std::sync::Arc;
         let home = SyncTestHome::new();

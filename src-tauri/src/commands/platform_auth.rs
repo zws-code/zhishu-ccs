@@ -914,44 +914,8 @@ async fn get_account_with_activity(
 }
 
 #[tauri::command]
-pub async fn platform_logout(
-    handle: tauri::AppHandle,
-    state: State<'_, PlatformAuthState>,
-) -> Result<(), PlatformAuthError> {
-    let _operation = super::platform_models::APPLY_LOCK.lock().await;
-    let identity = {
-        let auth = state.0.lock().await;
-        if let Some(session) = &auth.session {
-            Some((session.base_url.clone(), session.user_id))
-        } else if let Some(store) = &auth.store {
-            // A locked vault can prevent restoration; explicit logout must still
-            // clean the saved account's managed CLI credentials.
-            store.identity().await.ok().flatten()
-        } else {
-            None
-        }
-    };
-    let result = logout(&state.0).await;
-    // Catalog credentials are device-local too, including when CLI cleanup fails.
-    let catalog_cleanup = super::platform_models::clear_cached_catalog_credentials(&handle);
-    if let Some((origin, user_id)) = identity {
-        let cleaned = tauri::async_runtime::spawn_blocking(move || {
-            super::platform_models::clear_account_credentials(
-                handle.state::<crate::store::AppState>().inner(),
-                &origin,
-                user_id,
-            )
-        })
-        .await;
-        if !matches!(cleaned, Ok(Ok(()))) {
-            return Err(error(
-                "LOGOUT_CLEANUP",
-                "已退出登录，但工具配置中的凭证未能完全清除，请在高级配置中检查平台托管项",
-            ));
-        }
-    }
-    catalog_cleanup?;
-    result
+pub async fn platform_logout(state: State<'_, PlatformAuthState>) -> Result<(), PlatformAuthError> {
+    state.logout().await
 }
 
 async fn logout(state: &Mutex<AuthState>) -> Result<(), PlatformAuthError> {
@@ -1161,6 +1125,30 @@ async fn create_group_key(
 }
 
 impl PlatformAuthState {
+    pub(super) async fn logout(&self) -> Result<(), PlatformAuthError> {
+        let _operation = super::platform_models::APPLY_LOCK.lock().await;
+        // 退出只清理登录会话；保留本机目录、供应商和工具配置中的 API Key。
+        logout(&self.0).await
+    }
+
+    #[cfg(test)]
+    pub(super) fn for_test(base_url: String, user_id: i64) -> Self {
+        Self(Mutex::new(AuthState {
+            session: Some(Session {
+                base_url,
+                user_id,
+                tokens: TokenPair {
+                    access_token: "test-access-token".into(),
+                    refresh_token: String::new(),
+                },
+                persistence: None,
+                persistence_dirty: false,
+                last_used_at: now(),
+            }),
+            ..AuthState::default()
+        }))
+    }
+
     /// 持有会话锁校验本机身份；不刷新令牌、不请求 /auth/me，使已登录用户断网时仍能本地同步。
     pub(super) async fn with_local_identity<T>(
         &self,
@@ -2451,27 +2439,44 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn logout_clears_saved_credentials_even_when_offline() {
-        let (base, server) = mock_server(vec![
-            (
-                "POST /api/v1/auth/refresh ",
-                200,
-                json!({"code":0,"data":{"access_token":"access","refresh_token":"refresh"}}),
-            ),
-            ("GET /api/v1/auth/me ", 200, profile()),
-            ("POST /api/v1/auth/logout ", 503, json!({})),
-        ]);
-        let (_dir, store, _vault) =
-            super::super::platform_session::tests::saved_store(&base, now()).await;
-        let state = Mutex::new(AuthState {
-            store: Some(store.clone()),
-            ..AuthState::default()
-        });
-        assert!(get_account(&state).await.unwrap().is_some());
-        assert!(logout(&state).await.is_err());
-        assert!(store.load().await.unwrap().is_none());
-        assert!(get_account(&state).await.unwrap().is_none());
-        server.join().unwrap();
+    async fn logout_clears_saved_session_for_successful_and_failed_revocation() {
+        for status in [200, 503] {
+            let (base, server) = mock_server(vec![
+                (
+                    "POST /api/v1/auth/refresh ",
+                    200,
+                    json!({"code":0,"data":{"access_token":"access","refresh_token":"refresh"}}),
+                ),
+                ("GET /api/v1/auth/me ", 200, profile()),
+                (
+                    "POST /api/v1/auth/logout ",
+                    status,
+                    json!({"code":0,"data":{}}),
+                ),
+            ]);
+            let (_dir, store, _vault) =
+                super::super::platform_session::tests::saved_store(&base, now()).await;
+            let state = PlatformAuthState(Mutex::new(AuthState {
+                store: Some(store.clone()),
+                ..AuthState::default()
+            }));
+            assert!(get_account(&state.0).await.unwrap().is_some());
+            state.0.lock().await.pending = Some(PendingLogin {
+                base_url: base,
+                temp_token: "pending-2fa-token".into(),
+                remembered: None,
+            });
+            assert_eq!(state.logout().await.is_ok(), status == 200);
+            assert!(state.0.lock().await.pending.is_none());
+            assert!(store.load().await.unwrap().is_none());
+            assert!(get_account(&state.0).await.unwrap().is_none());
+            let restarted = Mutex::new(AuthState {
+                store: Some(store),
+                ..AuthState::default()
+            });
+            assert!(get_account(&restarted).await.unwrap().is_none());
+            server.join().unwrap();
+        }
     }
 
     #[tokio::test]

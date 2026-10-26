@@ -275,7 +275,7 @@ impl CatalogStore {
             catalog.credential.key.clear();
         }
         retained.credentials_cleared = true;
-        // Keep the original sync time: logout did not refresh platform data.
+        // Explicit credential cleanup does not refresh platform data.
         let bytes = serde_json::to_vec(&retained).map_err(|_| storage_error())?;
         crate::config::atomic_write_private(&self.path, &bytes).map_err(|_| storage_error())
     }
