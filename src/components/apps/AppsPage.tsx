@@ -17,7 +17,7 @@ import type { AppId } from "@/lib/api";
 import { providersApi } from "@/lib/api/providers";
 import type { ToolInstallationReport } from "@/lib/api/settings";
 import type { VisibleApps } from "@/types";
-import { DEFAULT_VISIBLE_APPS } from "@/config/appConfig";
+import { APP_IDS, DEFAULT_VISIBLE_APPS } from "@/config/appConfig";
 import { useSettings } from "@/hooks/useSettings";
 import { isUpdateAvailable } from "@/lib/version";
 import { cn } from "@/lib/utils";
@@ -78,15 +78,17 @@ const SOURCE_LABEL: Record<string, string> = {
   pip: "pip",
 };
 
-type Row = { kind: "tool"; tool: ToolName } | { kind: "desktop" };
+type Row =
+  | { kind: "tool"; tool: ToolName }
+  | { kind: "desktop" }
+  | { kind: "manual"; app: AppId };
 
-const ROWS: Row[] = [
-  { kind: "tool", tool: "claude" },
-  { kind: "desktop" },
-  ...TOOL_NAMES.filter((tool) => tool !== "claude").map(
-    (tool): Row => ({ kind: "tool", tool }),
-  ),
-];
+// 应用目录决定展示范围；安装管理能力只决定每行提供哪些操作。
+const ROWS: Row[] = APP_IDS.map((app): Row => {
+  if (app === "claude-desktop") return { kind: "desktop" };
+  const tool = TOOL_NAMES.find((name) => TOOL_APP_IDS[name] === app);
+  return tool ? { kind: "tool", tool } : { kind: "manual", app };
+});
 
 // 表头和应用行共用列宽；操作列宽取各行按钮和表头量宽按钮的最大值，最后一列是行尾的「⋯」菜单。
 const APP_ROW_GRID =
@@ -373,6 +375,22 @@ export function AppsPage() {
                     </span>
                   }
                   visibility={visibilitySwitch("claude-desktop")}
+                />
+              ) : row.kind === "manual" ? (
+                <AppRow
+                  key={row.app}
+                  app={row.app}
+                  name={
+                    <span className="truncate">
+                      {APP_DISPLAY_NAME[row.app]}
+                    </span>
+                  }
+                  version={
+                    <span className="text-caption text-fg-2">
+                      {t("appsPage.manuallyManaged")}
+                    </span>
+                  }
+                  visibility={visibilitySwitch(row.app)}
                 />
               ) : (
                 <ToolRow

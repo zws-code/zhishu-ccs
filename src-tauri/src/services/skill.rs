@@ -691,6 +691,8 @@ impl SkillService {
             AppType::Pi => {
                 return Ok(crate::pi_config::get_pi_agent_dir()?.join("skills"));
             }
+            AppType::DeepSeekHarness => {}
+            AppType::WorkBuddy => {}
             AppType::Agy => {
                 return Ok(crate::config::get_home_dir()
                     .join(".gemini")
@@ -716,6 +718,10 @@ impl SkillService {
             AppType::OpenClaw => home.join(".openclaw").join("skills"),
             AppType::Hermes => crate::hermes_config::get_hermes_dir().join("skills"),
             AppType::Pi => crate::pi_config::get_pi_agent_dir()?.join("skills"),
+            AppType::DeepSeekHarness => {
+                crate::deepseek_harness_config::get_dsh_home().join("skills")
+            }
+            AppType::WorkBuddy => crate::workbuddy_config::get_workbuddy_home().join("skills"),
             AppType::Agy => home.join(".gemini").join("config").join("skills"),
         })
     }
@@ -2922,7 +2928,7 @@ impl SkillService {
     fn is_sync_managed_app(app: &AppType) -> bool {
         !matches!(
             app,
-            AppType::ClaudeDesktop | AppType::OpenClaw | AppType::Pi
+            AppType::ClaudeDesktop | AppType::OpenClaw | AppType::Pi | AppType::DeepSeekHarness
         )
     }
 

@@ -69,6 +69,7 @@ export function AddProviderDialog({
     appId !== "openclaw" &&
     appId !== "hermes" &&
     appId !== "pi" &&
+    appId !== "workbuddy" &&
     appId !== "mcode" &&
     appId !== "kimi" &&
     appId !== "grokbuild" &&
@@ -292,6 +293,7 @@ export function AddProviderDialog({
           appId === "openclaw" ||
           appId === "hermes" ||
           appId === "pi" ||
+          appId === "workbuddy" ||
           appId === "mcode" ||
           appId === "kimi") &&
         values.providerKey

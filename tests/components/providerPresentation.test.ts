@@ -653,6 +653,66 @@ describe("buildAdditiveSections", () => {
     );
   });
 
+  it("allows removing or deleting the active DeepSeek Harness provider", () => {
+    const current = provider("current");
+    const inactive = provider("inactive");
+    const sections = buildAdditiveSections({
+      app: "deepseek-harness",
+      t,
+      providers: [current, inactive],
+      isInConfig: () => true,
+      dshCurrent: {
+        currentProviderId: current.id,
+        currentModel: "deepseek-v4-pro",
+      },
+      actions: additiveActions(),
+    });
+
+    expect(
+      button(sections, "current", "remove").disabledReason,
+    ).toBeUndefined();
+    expect(item(sections, "current").deleteDisabledReason).toBeUndefined();
+    expect(item(sections, "inactive").deleteDisabledReason).toBeUndefined();
+  });
+
+  it("protects the official DeepSeek Harness card from removal and deletion", () => {
+    const officialCard = provider("deepseek-official");
+    const sections = buildAdditiveSections({
+      app: "deepseek-harness",
+      t,
+      providers: [officialCard],
+      isInConfig: () => true,
+      dshCurrent: {
+        currentProviderId: officialCard.id,
+        currentModel: "deepseek-v4-pro",
+      },
+      actions: additiveActions(),
+    });
+
+    expect(button(sections, "deepseek-official", "remove").disabledReason).toBe(
+      "providerCard.reason.dshOfficialProtected",
+    );
+    expect(item(sections, "deepseek-official").deleteDisabledReason).toBe(
+      "providerCard.reason.dshOfficialProtected",
+    );
+  });
+
+  it("protects a db-only official DeepSeek Harness card from deletion", () => {
+    const officialCard = provider("deepseek-official");
+    const sections = buildAdditiveSections({
+      app: "deepseek-harness",
+      t,
+      providers: [officialCard],
+      isInConfig: () => false,
+      dshCurrent: null,
+      actions: additiveActions(),
+    });
+
+    expect(item(sections, "deepseek-official").deleteDisabledReason).toBe(
+      "providerCard.reason.dshOfficialProtected",
+    );
+  });
+
   it("protects every official Kimi OAuth provider, including inactive accounts", () => {
     const accounts = ["managed:kimi-code", "kimi-code-ccs-second"].map((id) =>
       provider(id, {

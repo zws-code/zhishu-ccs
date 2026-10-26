@@ -15,6 +15,7 @@ mod commands;
 mod config;
 mod database;
 mod deeplink;
+mod deepseek_harness_config;
 mod error;
 mod gemini_config;
 mod gemini_mcp;
@@ -49,6 +50,7 @@ mod tray;
 mod tray_panel;
 mod usage_events;
 mod usage_script;
+mod workbuddy_config;
 
 pub use app_config::{AppType, InstalledSkill, McpApps, McpServer, MultiAppConfig, SkillApps};
 pub use codex_config::{
@@ -60,6 +62,9 @@ pub use commands::*;
 pub use config::{get_claude_mcp_path, get_claude_settings_path, read_json_file};
 pub use database::{Database, Profile};
 pub use deeplink::{import_provider_from_deeplink, parse_deeplink_url, DeepLinkImportRequest};
+pub use deepseek_harness_config::{
+    get_credentials_path, get_dsh_home, get_profile_dir, get_profile_patch_path,
+};
 pub use error::AppError;
 pub use grok_config::get_grok_config_path;
 pub use mcp::{
@@ -981,6 +986,22 @@ pub fn run() {
                 Ok(_) => log::debug!("○ No Pi provider changes from native config"),
                 Err(e) => log::warn!("✗ Failed to import Pi providers: {e}"),
             }
+            match crate::services::provider::import_deepseek_harness_providers_from_live(
+                &app_state,
+            ) {
+                Ok(count) if count > 0 => {
+                    log::info!("✓ Synced {count} DeepSeek Harness provider(s) from native config");
+                }
+                Ok(_) => log::debug!("○ No DeepSeek Harness provider changes from native config"),
+                Err(e) => log::warn!("✗ Failed to import DeepSeek Harness providers: {e}"),
+            }
+            match crate::services::provider::import_workbuddy_providers_from_live(&app_state) {
+                Ok(count) if count > 0 => {
+                    log::info!("✓ Synced {count} WorkBuddy provider(s) from models.json");
+                }
+                Ok(_) => log::debug!("○ No WorkBuddy provider changes from models.json"),
+                Err(e) => log::warn!("✗ Failed to import WorkBuddy providers: {e}"),
+            }
 
             // 2. OMO 配置导入（当数据库中无 OMO provider 时，从本地文件导入）
             {
@@ -1099,6 +1120,7 @@ pub fn run() {
                     crate::app_config::AppType::OpenClaw,
                     crate::app_config::AppType::Hermes,
                     crate::app_config::AppType::Pi,
+                    crate::app_config::AppType::DeepSeekHarness,
                     crate::app_config::AppType::Mcode,
                 ] {
                     match crate::services::prompt::PromptService::import_from_file_on_first_launch(
@@ -1828,6 +1850,10 @@ pub fn run() {
             commands::delete_custom_icon,
             // OpenCode specific
             commands::import_opencode_providers_from_live,
+            commands::import_deepseek_harness_providers_from_live,
+            commands::import_workbuddy_providers_from_live,
+            commands::get_dsh_current_state,
+            commands::set_dsh_current_model,
             commands::get_opencode_live_provider_ids,
             commands::get_opencode_default_model,
             commands::set_opencode_default_model,

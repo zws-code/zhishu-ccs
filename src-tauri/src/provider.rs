@@ -231,6 +231,18 @@ impl Provider {
                 crate::pi_config::provider_base_url(settings).unwrap_or_default(),
                 str_at(settings.get("apiKey")),
             ),
+            AppType::WorkBuddy => (str_at(settings.get("url")), str_at(settings.get("apiKey"))),
+            AppType::DeepSeekHarness => (
+                {
+                    let base_url = str_at(settings.get("baseURL"));
+                    if base_url.is_empty() {
+                        str_at(settings.get("baseUrl"))
+                    } else {
+                        base_url
+                    }
+                },
+                str_at(settings.get("apiKey")),
+            ),
             // OpenCode (OMO) nests credentials under `options` (the SDK options object).
             AppType::OpenCode | AppType::Mcode => {
                 let options = settings.get("options");
@@ -474,6 +486,9 @@ impl LocalProxyRequestOverrides {
 /// 供应商元数据
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProviderMeta {
+    /// System-owned platform row. Never attach this identity to user providers.
+    #[serde(rename = "platformManaged", skip_serializing_if = "Option::is_none")]
+    pub platform_managed: Option<PlatformManagedProvider>,
     /// 自定义端点列表（按 URL 去重存储）
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub custom_endpoints: HashMap<String, crate::settings::CustomEndpoint>,
@@ -605,6 +620,9 @@ pub struct ProviderMeta {
     /// - "github_copilot": GitHub Copilot 供应商
     #[serde(rename = "providerType", skip_serializing_if = "Option::is_none")]
     pub provider_type: Option<String>,
+    /// Active model for a mirrored DeepSeek Harness native provider.
+    #[serde(rename = "dshCurrentModel", skip_serializing_if = "Option::is_none")]
+    pub dsh_current_model: Option<String>,
     /// GitHub Copilot 关联账号 ID（仅 github_copilot 供应商使用）
     /// 用于多账号支持，关联到特定的 GitHub 账号
     #[serde(rename = "githubAccountId", skip_serializing_if = "Option::is_none")]
@@ -655,6 +673,26 @@ pub fn parse_custom_user_agent(
         Some(ua) => HeaderValue::from_str(ua).map(Some),
         None => Ok(None),
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformManagedProvider {
+    pub origin: String,
+    pub user_id: i64,
+    pub entry_id: String,
+    pub model: String,
+    pub key_id: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_id: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_platform: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subscription_type: Option<String>,
 }
 
 impl ProviderMeta {

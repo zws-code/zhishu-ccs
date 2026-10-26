@@ -1378,6 +1378,8 @@ function App() {
               activeApp === "openclaw" ||
               activeApp === "hermes" ||
               activeApp === "pi" ||
+              activeApp === "deepseek-harness" ||
+              activeApp === "workbuddy" ||
               activeApp === "mcode" ||
               activeApp === "kimi"
                 ? (provider) => setConfirmAction({ provider, action: "remove" })

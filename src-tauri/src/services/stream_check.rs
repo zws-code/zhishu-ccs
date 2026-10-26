@@ -177,6 +177,15 @@ impl StreamCheckService {
             AppType::OpenClaw => Self::extract_openclaw_base_url(provider),
             AppType::Hermes => Self::extract_hermes_base_url(provider),
             AppType::Pi => crate::pi_config::provider_base_url(&provider.settings_config),
+            AppType::WorkBuddy => provider
+                .settings_config
+                .get("url")
+                .and_then(serde_json::Value::as_str)
+                .map(str::trim)
+                .filter(|url| !url.is_empty())
+                .map(str::to_string)
+                .ok_or_else(|| AppError::Message("WorkBuddy endpoint URL is missing".into())),
+            AppType::DeepSeekHarness => Self::extract_dsh_base_url(provider),
             AppType::ClaudeDesktop => ClaudeAdapter::new()
                 .extract_base_url(provider)
                 .map_err(|e| AppError::Message(format!("Failed to extract base_url: {e}"))),
@@ -332,6 +341,20 @@ impl StreamCheckService {
                     "Hermes 供应商缺少 base_url",
                     "Hermes provider is missing `base_url`",
                 )
+            })
+    }
+
+    fn extract_dsh_base_url(provider: &Provider) -> Result<String, AppError> {
+        provider
+            .settings_config
+            .get("baseURL")
+            .or_else(|| provider.settings_config.get("baseUrl"))
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned)
+            .ok_or_else(|| {
+                AppError::Message("DeepSeek Harness provider has no baseURL".to_string())
             })
     }
 

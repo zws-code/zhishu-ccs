@@ -43,6 +43,7 @@ pub fn reset_test_fs() {
         ".claude",
         ".codex",
         ".cc-switch",
+        ".zhishu-ccs",
         ".gemini",
         ".grok",
         ".config",

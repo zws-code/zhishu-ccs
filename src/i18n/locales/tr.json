@@ -369,7 +369,9 @@
       "title": "Otomatik Eşitlemeu Etkinleştir",
       "message": "Otomatik eşitleme etkinleştirildiğinde, her veritabanı değişikliği otomatik olarak WebDAV sunucusuna yüklenecektir.\n\nBu, önemli miktarda ağ trafiğine neden olabilir. Lütfen ağınızın ve WebDAV hizmetinizin sık veri aktarımlarını gerçekleştirebildiğinden emin olun.",
       "confirm": "Anladım, etkinleştir"
-    }
+    },
+    "dshCurrentProviderDeleteWarning": "Bu sağlayıcı şu anda DeepSeek Harness'ta kullanımda. Silindiğinde varsayılan model ayarı olduğu gibi kalır; DSH içinde silmekle aynıdır.",
+    "dshCurrentProviderRemoveWarning": "Bu sağlayıcı şu anda DeepSeek Harness'ta kullanımda. Kaldırıldığında varsayılan model ayarı olduğu gibi kalır."
   },
   "settings": {
     "title": "Ayarlar",
@@ -1048,7 +1050,10 @@
     },
     "data": {
       "location": "Konum"
-    }
+    },
+    "workbuddyConfigDir": "WorkBuddy Yapılandırma Dizini",
+    "workbuddyConfigDirDescription": "WorkBuddy yapılandırma dizinini (models.json) geçersiz kılın.",
+    "browsePlaceholderWorkbuddy": "ör. /home/<your-username>/.workbuddy"
   },
   "apps": {
     "claude": "Claude",
@@ -1062,7 +1067,8 @@
     "openclaw": "OpenClaw",
     "hermes": "Hermes",
     "pi": "Pi",
-    "mcode": "MiniMax Code"
+    "mcode": "MiniMax Code",
+    "workbuddy": "WorkBuddy"
   },
   "mcode": {
     "empty": {
@@ -4110,7 +4116,8 @@
       "hermes": "Resmi komut dosyasıyla yüklenir",
       "pi": "Npm ile yüklenir",
       "mcode": "Resmi komut dosyasıyla yüklenir, npm'ye geri döner"
-    }
+    },
+    "manuallyManaged": "Kurulum ve güncellemeleri elle yönetin"
   },
   "appPage": {
     "moreActions": "{{name}} için diğer işlemler",
@@ -4251,7 +4258,8 @@
       "defaultCannotRemove": "Varsayılan kaldırılamaz. Önce başka bir sağlayıcıyı varsayılan yapın.",
       "currentCannotRemove": "Kullanılan sağlayıcı kaldırılamaz. Önce başka birini etkinleştirin.",
       "inUseCannotDelete": "Kullanılan sağlayıcı silinemez. Önce diğerine geçin.",
-      "noFailover": "Resmi hesaplar yedek sağlayıcıya geçiş kuyruğuna katılamaz: İstemcinin kendi oturum açma bilgilerini kullanırlar ve diğer sağlayıcılarla dönüşümlü olarak çalışamazlar."
+      "noFailover": "Resmi hesaplar yedek sağlayıcıya geçiş kuyruğuna katılamaz: İstemcinin kendi oturum açma bilgilerini kullanırlar ve diğer sağlayıcılarla dönüşümlü olarak çalışamazlar.",
+      "dshOfficialProtected": "Resmi kart, DeepSeek hesabının kendisidir. Kaldırmak veya silmek DSH hesap yapılandırmasını sileceği için burada işlem yapılamaz."
     },
     "section": {
       "queue": "Sıra · önceliğe göre ({{count}})",

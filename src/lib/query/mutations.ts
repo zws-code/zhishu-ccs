@@ -18,6 +18,7 @@ import { proxyKeys } from "@/lib/query/proxy";
 import { usageKeys } from "@/lib/query/usage";
 import { sessionKeys } from "@/lib/query/sessions";
 import { invalidatePiProviderCaches } from "@/lib/query/pi";
+import { invalidateDshProviderCaches } from "@/lib/query/dsh";
 import { GROKBUILD_OFFICIAL_PROVIDER_ID } from "@/utils/providerCapabilities";
 
 export const useAddProviderMutation = (appId: AppId) => {
@@ -70,6 +71,7 @@ export const useAddProviderMutation = (appId: AppId) => {
         appId === "openclaw" ||
         appId === "hermes" ||
         appId === "pi" ||
+        appId === "workbuddy" ||
         appId === "mcode" ||
         appId === "kimi"
       ) {
@@ -167,6 +169,14 @@ export const useAddProviderMutation = (appId: AppId) => {
       if (appId === "pi") {
         await invalidatePiProviderCaches(queryClient);
       }
+      if (appId === "deepseek-harness") {
+        await invalidateDshProviderCaches(queryClient);
+      }
+      if (appId === "workbuddy") {
+        await queryClient.invalidateQueries({
+          queryKey: ["providers", "workbuddy"],
+        });
+      }
     },
   });
 };
@@ -240,6 +250,14 @@ export const useUpdateProviderMutation = (appId: AppId) => {
         // 默认模型可能在 Kimi Code 里改过：失败时也重读，页面上的「默认」才跟得上
         await queryClient.invalidateQueries({
           queryKey: ["providers", "kimi"],
+        });
+      }
+      if (appId === "deepseek-harness") {
+        await invalidateDshProviderCaches(queryClient);
+      }
+      if (appId === "workbuddy") {
+        await queryClient.invalidateQueries({
+          queryKey: ["providers", "workbuddy"],
         });
       }
     },
@@ -325,6 +343,14 @@ export const useDeleteProviderMutation = (appId: AppId) => {
           queryKey: ["providers", "kimi"],
         });
       }
+      if (appId === "deepseek-harness") {
+        await invalidateDshProviderCaches(queryClient);
+      }
+      if (appId === "workbuddy") {
+        await queryClient.invalidateQueries({
+          queryKey: ["providers", "workbuddy"],
+        });
+      }
     },
   });
 };
@@ -407,6 +433,14 @@ export const useSwitchProviderMutation = (appId: AppId) => {
     onSettled: async () => {
       if (appId === "pi") {
         await invalidatePiProviderCaches(queryClient);
+      }
+      if (appId === "deepseek-harness") {
+        await invalidateDshProviderCaches(queryClient);
+      }
+      if (appId === "workbuddy") {
+        await queryClient.invalidateQueries({
+          queryKey: ["providers", "workbuddy"],
+        });
       }
     },
   });

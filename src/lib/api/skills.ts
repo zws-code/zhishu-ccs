@@ -18,6 +18,8 @@ export type AppType =
 
 /** Skill 应用启用状态 */
 export interface SkillApps {
+  "deepseek-harness"?: boolean;
+  workbuddy?: boolean;
   claude: boolean;
   "claude-desktop"?: boolean;
   codex: boolean;

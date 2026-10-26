@@ -399,7 +399,9 @@
       "title": "開啟自動同步",
       "message": "開啟自動同步後，每次資料庫變更都會自動上傳至 WebDAV 伺服器。\n\n這可能會產生較高的網路流量消耗，請確保您的網路環境和 WebDAV 服務支援頻繁的資料傳輸。",
       "confirm": "我已了解，繼續開啟"
-    }
+    },
+    "dshCurrentProviderDeleteWarning": "該供應商正在 DeepSeek Harness 中使用，刪除後預設模型設定會保留，與在 DSH 中直接刪除一致。",
+    "dshCurrentProviderRemoveWarning": "該供應商正在 DeepSeek Harness 中使用，移除後預設模型設定會保留原樣。"
   },
   "settings": {
     "title": "設定",
@@ -1084,7 +1086,13 @@
     },
     "data": {
       "location": "儲存位置"
-    }
+    },
+    "dshConfigDir": "DSH 設定目錄",
+    "dshConfigDirDescription": "覆寫 DeepSeek Harness 設定目錄（settings.yaml、憑據與 profiles）。",
+    "workbuddyConfigDir": "WorkBuddy 設定目錄",
+    "workbuddyConfigDirDescription": "覆寫 WorkBuddy 設定目錄（models.json）。",
+    "browsePlaceholderDsh": "例如：/home/<您的帳號>/.dsh",
+    "browsePlaceholderWorkbuddy": "例如：/home/<您的帳號>/.workbuddy"
   },
   "apps": {
     "claude": "Claude",
@@ -1099,7 +1107,9 @@
     "hermes": "Hermes",
     "pi": "Pi",
     "mcode": "MiniMax Code",
-    "agy": "Antigravity"
+    "agy": "Antigravity",
+    "deepseek-harness": "DeepSeek Harness",
+    "workbuddy": "WorkBuddy"
   },
   "mcode": {
     "empty": {
@@ -4203,7 +4213,8 @@
       "pi": "透過 npm 安裝",
       "mcode": "安裝時執行官方安裝腳本，失敗時改用 npm",
       "agy": "安裝時執行官方安裝腳本"
-    }
+    },
+    "manuallyManaged": "手動管理安裝與更新"
   },
   "appPage": {
     "moreActions": "{{name}} 的更多操作",
@@ -4376,7 +4387,8 @@
       "currentCannotRemove": "正在用的這家不能移除，先啟用別家。",
       "inUseCannotDelete": "正在用的這家不能刪除，先切到別家。",
       "directDefaultCannotDelete": "退出路由後會回到這家，所以不能刪除。先在直連頁對別家點「回到直連並使用」，再刪除。",
-      "noFailover": "官方帳號不進故障轉移佇列：它用客戶端自己的登入，不能和別家輪換。"
+      "noFailover": "官方帳號不進故障轉移佇列：它用客戶端自己的登入，不能和別家輪換。",
+      "dshOfficialProtected": "官方卡片就是 DeepSeek 帳號本身，移除或刪除會清空 DSH 的帳號設定，不能在這裡操作。"
     },
     "section": {
       "queue": "佇列 · 依優先順序（{{count}}）",
@@ -4968,5 +4980,38 @@
       "defaultModelInUse": "Kimi Code 正在使用此供應商的模型，請先在 Kimi Code 中用 /model 切換到其他模型",
       "secondaryModelInUse": "Kimi Code 的子代理模型正在使用此供應商的模型，請先在 Kimi Code 中用 /secondary-model 更換"
     }
+  },
+  "deepseekHarness": {
+    "desktopProfileHint": "僅管理桌面版的 desktop 設定。執行中的 DSH 需啟用 HMR 或重新啟動後載入檔案修改；不會修改 CLI 的其他設定。",
+    "providerKey": "供應商識別碼",
+    "providerKeyRequired": "請填寫供應商識別碼",
+    "providerKeyDuplicate": "此供應商識別碼已存在",
+    "providerKeyPlaceholder": "my-provider",
+    "providerKeyInvalid": "標識格式無效，只能使用小寫字母、數字和連字號",
+    "providerKeyOfficialHint": "官方 DeepSeek 路由使用固定的 deepseek-official 標識。",
+    "officialApiKeyPlaceholder": "輸入 DeepSeek API Key（將寫入 ~/.dsh/.credentials.yaml）",
+    "officialDuplicate": "官方 DeepSeek 路由已存在，無法重複新增",
+    "officialNotCopyable": "官方 DeepSeek 路由無法複製",
+    "providerKeyLockedHint": "此供應商已存在於 DSH 設定中，識別碼不可修改。",
+    "providerKeyHint": "只能使用小寫字母、數字和連字號。",
+    "modelsRequired": "請至少新增一個模型",
+    "credentialRef": "憑證參照",
+    "credentialRefHint": "用於在 DSH 憑證中儲存 API Key 的大寫識別碼。",
+    "credentialRefInvalid": "Credential Ref 必須為大寫識別碼，只能使用字母、數字與底線。",
+    "baseUrl": "Base URL",
+    "baseUrlHint": "API 端點的基礎位址。",
+    "apiFormat": "API 格式",
+    "api_openai_completions": "OpenAI Chat Completions",
+    "api_openai_responses": "OpenAI Responses",
+    "api_anthropic_messages": "Anthropic Messages",
+    "modelCatalog": "模型目錄",
+    "modelId": "模型 ID",
+    "modelName": "顯示名稱",
+    "contextWindow": "上下文視窗",
+    "addModel": "新增",
+    "noModels": "尚無模型，點擊「新增」建立。",
+    "defaultModel": "預設模型",
+    "defaultModelHint": "DSH 預設使用的模型。",
+    "defaultModelBackgroundHint": "該供應商不是 DSH 目前使用的路由，預設模型修改不會生效。"
   }
 }

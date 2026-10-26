@@ -41,6 +41,11 @@ describe("extractProviderBaseUrl", () => {
       { base_url: "https://hermes.example.com/v1" },
       "https://hermes.example.com/v1",
     ],
+    [
+      "workbuddy",
+      { url: "https://workbuddy.example.com/v1" },
+      "https://workbuddy.example.com/v1",
+    ],
   ])("reads the %s shape", (_app, settingsConfig, expected) => {
     expect(extractProviderBaseUrl(settingsConfig)).toBe(expected);
   });

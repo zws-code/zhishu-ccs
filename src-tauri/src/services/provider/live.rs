@@ -30,11 +30,17 @@ pub(crate) fn provider_exists_in_live_config(
         AppType::Hermes => crate::hermes_config::get_providers()
             .map(|providers| providers.contains_key(provider_id)),
         AppType::Pi => crate::pi_config::pi_provider_exists(provider_id),
+        // WorkBuddy groups several native model entries under one provider. The
+        // provider ID is a cc-switch identity and is not stored in models.json.
+        AppType::WorkBuddy => Ok(false),
         AppType::Kimi => {
             crate::kimi_config::get_providers().map(|providers| providers.contains_key(provider_id))
         }
         AppType::Mcode => crate::mcode_config::get_providers()
             .map(|providers| providers.contains_key(provider_id)),
+        AppType::DeepSeekHarness => {
+            crate::deepseek_harness_config::provider_exists_in_live_config()
+        }
         _ => Ok(false),
     }
 }
@@ -303,7 +309,9 @@ fn settings_contain_common_config(app_type: &AppType, settings: &Value, snippet:
         | AppType::OpenClaw
         | AppType::Hermes
         | AppType::Pi
+        | AppType::WorkBuddy
         | AppType::Mcode
+        | AppType::DeepSeekHarness
         | AppType::Kimi
         | AppType::Agy
         | AppType::ClaudeDesktop => false,
@@ -381,7 +389,9 @@ pub(crate) fn remove_common_config_from_settings(
         | AppType::OpenClaw
         | AppType::Hermes
         | AppType::Pi
+        | AppType::WorkBuddy
         | AppType::Mcode
+        | AppType::DeepSeekHarness
         | AppType::Kimi
         | AppType::ClaudeDesktop
         | AppType::Agy => Ok(settings.clone()),
@@ -606,10 +616,10 @@ pub(crate) fn write_live_snapshot(app_type: &AppType, provider: &Provider) -> Re
                 && !opencode_config::get_providers()?.contains_key(&provider.id)
             {
                 return Err(AppError::localized(
-                    "provider.opencode.custom_definition_required",
-                    "新的 OpenCode 供应商标识需要填写 npm 包和至少一个模型；只有配置中已有的同名供应商可以沿用默认定义",
-                    "A new OpenCode provider ID requires an npm package and at least one model; only an existing ID in the live config may inherit defaults",
-                ));
+                "provider.opencode.custom_definition_required",
+                "新的 OpenCode 供应商标识需要填写 npm 包和至少一个模型；只有配置中已有的同名供应商可以沿用默认定义",
+                "A new OpenCode provider ID requires an npm package and at least one model; only an existing ID in the live config may inherit defaults",
+            ));
             }
 
             // Validate with the existing type, but persist the original fragment:
@@ -646,9 +656,9 @@ pub(crate) fn write_live_snapshot(app_type: &AppType, provider: &Provider) -> Re
                         );
                     } else {
                         return Err(AppError::Message(format!(
-                            "OpenCode provider '{}' has invalid config structure for live config (must contain 'npm' or 'options')",
-                            provider.id
-                        )));
+                        "OpenCode provider '{}' has invalid config structure for live config (must contain 'npm' or 'options')",
+                        provider.id
+                    )));
                     }
                 }
             }
@@ -659,8 +669,9 @@ pub(crate) fn write_live_snapshot(app_type: &AppType, provider: &Provider) -> Re
             use crate::openclaw_config::OpenClawProviderConfig;
 
             // Convert settings_config to OpenClawProviderConfig
-            let openclaw_config_result =
-                serde_json::from_value::<OpenClawProviderConfig>(provider.settings_config.clone());
+            let openclaw_config_result = serde_json::from_value::<OpenClawProviderConfig>(
+                provider.settings_config.clone(),
+            );
 
             match openclaw_config_result {
                 Ok(config) => {
@@ -688,9 +699,9 @@ pub(crate) fn write_live_snapshot(app_type: &AppType, provider: &Provider) -> Re
                         );
                     } else {
                         return Err(AppError::Message(format!(
-                            "OpenClaw provider '{}' has invalid config structure for live config (must contain 'baseUrl', 'api', or 'models')",
-                            provider.id
-                        )));
+                        "OpenClaw provider '{}' has invalid config structure for live config (must contain 'baseUrl', 'api', or 'models')",
+                        provider.id
+                    )));
                     }
                 }
             }
@@ -705,9 +716,26 @@ pub(crate) fn write_live_snapshot(app_type: &AppType, provider: &Provider) -> Re
         AppType::Mcode => {
             crate::mcode_config::set_provider(&provider.id, provider.settings_config.clone())?
         }
+        AppType::DeepSeekHarness => {
+            let config = serde_json::from_value::<
+                crate::deepseek_harness_config::DeepSeekHarnessProviderConfig,
+            >(provider.settings_config.clone())
+            .map_err(|error| {
+                AppError::Config(format!(
+                    "Invalid DeepSeek Harness provider '{}': {error}",
+                    provider.id
+                ))
+            })?;
+            crate::deepseek_harness_config::set_provider(&provider.id, &config)?;
+        }
         AppType::Pi => {
             return Err(AppError::InvalidInput(
                 "Pi providers use the Pi provider service".to_string(),
+            ));
+        }
+        AppType::WorkBuddy => {
+            return Err(AppError::InvalidInput(
+                "WorkBuddy providers use the WorkBuddy provider service".to_string(),
             ));
         }
         AppType::Agy => {
@@ -757,6 +785,9 @@ pub(crate) fn sync_additive_app_to_live(
     state: &AppState,
     app_type: &AppType,
 ) -> Result<(), AppError> {
+    if matches!(app_type, AppType::DeepSeekHarness | AppType::WorkBuddy) {
+        return Ok(());
+    }
     sync_all_providers_to_live(state, app_type)?;
 
     // 本函数语义是"把这个应用同步到 live"，MCP 重投影也只针对该应用；
@@ -845,7 +876,14 @@ pub fn sync_current_to_live(state: &AppState) -> Result<(), AppError> {
 
     // Sync providers based on mode
     for app_type in AppType::all() {
-        if matches!(app_type, AppType::Pi | AppType::Mcode | AppType::Kimi) {
+        if matches!(
+            app_type,
+            AppType::Pi
+                | AppType::DeepSeekHarness
+                | AppType::WorkBuddy
+                | AppType::Mcode
+                | AppType::Kimi
+        ) {
             continue;
         }
         let result = if app_type.is_additive_mode() {
@@ -1002,8 +1040,15 @@ pub fn read_live_settings(app_type: AppType) -> Result<Value, AppError> {
         }
         AppType::Mcode => Ok(json!(crate::mcode_config::get_providers()?)),
         AppType::Kimi => Ok(json!(crate::kimi_config::get_providers()?)),
+        AppType::DeepSeekHarness => Err(AppError::InvalidInput(
+            "DeepSeek Harness settings are read through its dedicated configuration module"
+                .to_string(),
+        )),
         AppType::Pi => Err(AppError::InvalidInput(
             "Pi providers are read from Pi's native models file".to_string(),
+        )),
+        AppType::WorkBuddy => Err(AppError::InvalidInput(
+            "WorkBuddy providers are read from WorkBuddy's native models file".to_string(),
         )),
         AppType::Agy => crate::agy_config::read_live_settings(),
     }
@@ -1124,6 +1169,8 @@ pub fn import_default_config(state: &AppState, app_type: AppType) -> Result<bool
         | AppType::OpenClaw
         | AppType::Hermes
         | AppType::Pi
+        | AppType::DeepSeekHarness
+        | AppType::WorkBuddy
         | AppType::Mcode
         | AppType::Kimi => {
             unreachable!("additive mode apps are handled by early return")

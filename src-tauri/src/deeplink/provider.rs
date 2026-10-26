@@ -350,6 +350,16 @@ pub(crate) fn build_provider_from_request(
                 "Add MCode providers from the MCode page".into(),
             ))
         }
+        AppType::DeepSeekHarness => {
+            return Err(AppError::InvalidInput(
+                "Add DeepSeek Harness providers from the DeepSeek Harness page".into(),
+            ))
+        }
+        AppType::WorkBuddy => {
+            return Err(AppError::InvalidInput(
+                "Add WorkBuddy providers from the WorkBuddy page".into(),
+            ))
+        }
         AppType::Agy => {
             let mut settings = build_gemini_settings(request);
             settings["env"]

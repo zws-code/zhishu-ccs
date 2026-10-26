@@ -287,6 +287,8 @@ describe("SessionManagerPage", () => {
         openclaw: false,
         hermes: false,
         pi: false,
+        "deepseek-harness": false,
+        workbuddy: false,
         mcode: false,
         kimi: false,
         agy: false,

@@ -363,6 +363,8 @@ describe("UsageDashboard", () => {
         openclaw: true,
         hermes: true,
         pi: false,
+        "deepseek-harness": false,
+        workbuddy: false,
         mcode: false,
         kimi: false,
         agy: false,

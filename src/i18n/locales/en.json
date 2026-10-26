@@ -399,7 +399,9 @@
       "title": "Enable Auto Sync",
       "message": "When auto sync is enabled, every database change will be automatically uploaded to the WebDAV server.\n\nThis may result in significant network traffic. Please ensure your network and WebDAV service can handle frequent data transfers.",
       "confirm": "I understand, enable"
-    }
+    },
+    "dshCurrentProviderDeleteWarning": "This provider is currently active in DeepSeek Harness. Deleting it keeps the default model setting untouched, the same as deleting it in DSH.",
+    "dshCurrentProviderRemoveWarning": "This provider is currently active in DeepSeek Harness. Removing it keeps the default model setting untouched."
   },
   "settings": {
     "title": "Settings",
@@ -1083,7 +1085,13 @@
     },
     "data": {
       "location": "Location"
-    }
+    },
+    "dshConfigDir": "DSH Configuration Directory",
+    "dshConfigDirDescription": "Override the DeepSeek Harness directory (settings.yaml, credentials, and profiles).",
+    "workbuddyConfigDir": "WorkBuddy Configuration Directory",
+    "workbuddyConfigDirDescription": "Override the WorkBuddy configuration directory (models.json).",
+    "browsePlaceholderDsh": "e.g., /home/<your-username>/.dsh",
+    "browsePlaceholderWorkbuddy": "e.g., /home/<your-username>/.workbuddy"
   },
   "apps": {
     "claude": "Claude",
@@ -1098,7 +1106,9 @@
     "hermes": "Hermes",
     "pi": "Pi",
     "mcode": "MiniMax Code",
-    "agy": "Antigravity"
+    "agy": "Antigravity",
+    "deepseek-harness": "DeepSeek Harness",
+    "workbuddy": "WorkBuddy"
   },
   "mcode": {
     "empty": {
@@ -4202,7 +4212,8 @@
       "pi": "Installs with npm",
       "mcode": "Installs with the official script, falls back to npm",
       "agy": "Installs with the official script"
-    }
+    },
+    "manuallyManaged": "Install and update manually"
   },
   "appPage": {
     "moreActions": "More actions for {{name}}",
@@ -4375,7 +4386,8 @@
       "currentCannotRemove": "The provider in use can't be removed. Enable another one first.",
       "inUseCannotDelete": "The provider in use can't be deleted. Switch to another one first.",
       "directDefaultCannotDelete": "Leaving routing switches back to this provider, so it can't be deleted. On the direct page, choose \"Back to direct and use\" on another provider first.",
-      "noFailover": "Official accounts can't join the failover queue: they use the client's own login and can't rotate with other providers."
+      "noFailover": "Official accounts can't join the failover queue: they use the client's own login and can't rotate with other providers.",
+      "dshOfficialProtected": "The official card is the DeepSeek account itself. Removing or deleting it would wipe the DSH account configuration, so it is not allowed here."
     },
     "section": {
       "queue": "Queue · by priority ({{count}})",
@@ -4967,5 +4979,38 @@
       "defaultModelInUse": "Kimi Code is using a model from this provider. Switch to another model with /model in Kimi Code first.",
       "secondaryModelInUse": "Kimi Code's subagent model uses a model from this provider. Change it with /secondary-model in Kimi Code first."
     }
+  },
+  "deepseekHarness": {
+    "desktopProfileHint": "Manages the Desktop profile only. A running DSH needs HMR or a restart to load file changes; other CLI profiles are not changed.",
+    "providerKey": "Provider Key",
+    "providerKeyRequired": "Provider Key is required",
+    "providerKeyDuplicate": "This Provider Key already exists",
+    "providerKeyPlaceholder": "my-provider",
+    "providerKeyInvalid": "Invalid format. Use lowercase letters, numbers, and hyphens only.",
+    "providerKeyOfficialHint": "The official DeepSeek route uses the fixed deepseek-official key.",
+    "officialApiKeyPlaceholder": "Enter the DeepSeek API key (stored in ~/.dsh/.credentials.yaml)",
+    "officialDuplicate": "The official DeepSeek route already exists and cannot be added twice.",
+    "officialNotCopyable": "The official DeepSeek route cannot be duplicated.",
+    "providerKeyLockedHint": "This provider is in the DSH config; the key is locked.",
+    "providerKeyHint": "Lowercase letters, numbers, and hyphens only.",
+    "modelsRequired": "Add at least one model",
+    "credentialRef": "Credential Ref",
+    "credentialRefHint": "Uppercase identifier used to store the API key in DSH credentials.",
+    "credentialRefInvalid": "Credential Ref must be an uppercase identifier using letters, digits, and underscores.",
+    "baseUrl": "Base URL",
+    "baseUrlHint": "The base URL for the API endpoint.",
+    "apiFormat": "API Format",
+    "api_openai_completions": "OpenAI Chat Completions",
+    "api_openai_responses": "OpenAI Responses",
+    "api_anthropic_messages": "Anthropic Messages",
+    "modelCatalog": "Model Catalog",
+    "modelId": "Model ID",
+    "modelName": "Display Name",
+    "contextWindow": "Context Window",
+    "addModel": "Add",
+    "noModels": "No models configured. Click Add to add a model.",
+    "defaultModel": "Default Model",
+    "defaultModelHint": "The model DSH uses by default.",
+    "defaultModelBackgroundHint": "This provider is not the route DSH currently uses; default-model changes would not apply."
   }
 }

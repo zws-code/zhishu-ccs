@@ -1927,6 +1927,22 @@ describe("AppsPage concurrent CLI upgrades", () => {
 });
 
 describe("AppsPage visibility column", () => {
+  it("includes every registered app even without installation management", async () => {
+    vi.resetModules();
+    await renderApps();
+    const { APP_IDS } = await import("@/config/appConfig");
+    expect(
+      screen.getAllByRole("switch", { name: /appsPage\.showInSidebar/ }),
+    ).toHaveLength(APP_IDS.length);
+    for (const name of ["DeepSeek Harness", "WorkBuddy"]) {
+      expect(card(name).getByRole("switch")).toBeEnabled();
+      expect(
+        card(name).getByText("appsPage.manuallyManaged"),
+      ).toBeInTheDocument();
+      expect(card(name).queryByRole("button")).toBeNull();
+    }
+  });
+
   it("renders the sidebar visibility switches small with the action color", async () => {
     vi.resetModules();
     await renderApps();

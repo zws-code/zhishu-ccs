@@ -99,6 +99,8 @@ impl Database {
             AppType::Kimi => Some("enabled_kimi"),
             AppType::Pi => Some("enabled_pi"),
             AppType::ClaudeDesktop | AppType::OpenClaw => None,
+            AppType::DeepSeekHarness => None,
+            AppType::WorkBuddy => None,
             AppType::Agy => Some("enabled_agy"),
         };
 

@@ -694,6 +694,11 @@ export interface AdditiveInput {
   defaultModelOptions?: (provider: Provider) => { id: string; name?: string }[];
   /** Hermes：model.provider 指向的那家 */
   hermesCurrentId?: string | null;
+  /** DeepSeek Harness：原生 agent-default-model 指向的那家 */
+  dshCurrent?: {
+    currentProviderId?: string | null;
+    currentModel?: string | null;
+  } | null;
   isHermesManaged?: (provider: Provider) => boolean;
   /** Pi：读不到当前配置时一律不能改 */
   piStateUnavailable?: boolean;
@@ -821,6 +826,13 @@ export function buildAdditiveSections(input: AdditiveInput): ProviderSection[] {
       continue;
     }
 
+    // DSH 官方卡片就是 DeepSeek 账号本身：移除会连官方段和凭据一起清空，
+    // DB-only 状态下的删除也被后端拒绝，两个分区的按钮保持一致
+    const dshOfficialReason =
+      app === "deepseek-harness" && p.id === "deepseek-official"
+        ? t("providerCard.reason.dshOfficialProtected")
+        : undefined;
+
     const managed = app === "hermes" && (input.isHermesManaged?.(p) ?? false);
     if (managed) {
       chips.push({
@@ -841,7 +853,8 @@ export function buildAdditiveSections(input: AdditiveInput): ProviderSection[] {
           chips,
           dim: managed,
           editDisabledReason: readOnlyReason,
-          deleteDisabledReason: readOnlyReason ?? piBlocked,
+          deleteDisabledReason:
+            readOnlyReason ?? dshOfficialReason ?? piBlocked,
           buttons: [
             {
               key: "add",
@@ -864,6 +877,7 @@ export function buildAdditiveSections(input: AdditiveInput): ProviderSection[] {
     let status: CardPresentation["status"];
     let isDefault = false;
     let removeReason: string | undefined = piBlocked;
+    let deleteReason: string | undefined;
 
     // OpenCode 的顶层 model 一直允许移走所指的那家，这里不改；OpenClaw 不能
     if (app === "openclaw" || app === "opencode") {
@@ -924,6 +938,32 @@ export function buildAdditiveSections(input: AdditiveInput): ProviderSection[] {
       }
     }
 
+    if (app === "deepseek-harness") {
+      if (p.id === input.dshCurrent?.currentProviderId) {
+        isDefault = true;
+        status = { label: t("providerCard.status.current"), dot: "muted" };
+        if (input.dshCurrent?.currentModel) {
+          chips.push({
+            key: "defaultModel",
+            label: input.dshCurrent.currentModel,
+            tone: "outline",
+          });
+        }
+        // 移除/删除当前供应商是允许的：移除会清掉 agent-default-model，删除时后端
+        // 先自动切到备用路由再删，后果都在确认弹窗里说明
+      } else {
+        buttons.push({
+          key: "use",
+          label: t("providerCard.action.enable"),
+          onClick: () => actions.add(p),
+        });
+      }
+      if (dshOfficialReason) {
+        removeReason = dshOfficialReason;
+        deleteReason = dshOfficialReason;
+      }
+    }
+
     buttons.push({
       key: "remove",
       label: t("providerCard.action.remove"),
@@ -939,7 +979,7 @@ export function buildAdditiveSections(input: AdditiveInput): ProviderSection[] {
         chips,
         dim: managed,
         editDisabledReason: readOnlyReason,
-        deleteDisabledReason: readOnlyReason ?? piBlocked,
+        deleteDisabledReason: readOnlyReason ?? deleteReason ?? piBlocked,
         buttons,
         menuItems: menuItems.length ? menuItems : undefined,
       },
