@@ -591,6 +591,7 @@ const SETTINGS_ITEMS: { section: SettingsSection; icon: IconComponent }[] = [
   { section: "routing", icon: Route },
   { section: "network", icon: Globe },
   { section: "data", icon: Database },
+  { section: "configHistory", icon: History },
   { section: "about", icon: Info },
 ];
 

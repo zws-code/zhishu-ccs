@@ -613,6 +613,7 @@ pub(crate) fn stage_write(
 /// 失败时临时文件留在原处：写入引擎的 pending 指着它，下次恢复要靠它前滚（目标文件被
 /// 占用、只读这类失败，过后多半能补完）。只做一次性原子写的调用方自己删。
 pub(crate) fn commit_staged(tmp: &Path, path: &Path) -> Result<(), AppError> {
+    let history = crate::config_history::capture_before(path);
     #[cfg(windows)]
     {
         use std::os::windows::ffi::OsStrExt;
@@ -708,6 +709,9 @@ pub(crate) fn commit_staged(tmp: &Path, path: &Path) -> Result<(), AppError> {
                 source,
             });
         }
+    }
+    if let Some(history) = history {
+        history.finish(fs::read(path).ok());
     }
     Ok(())
 }
@@ -1152,7 +1156,11 @@ pub fn copy_file(from: &Path, to: &Path) -> Result<(), AppError> {
 /// 删除文件
 pub fn delete_file(path: &Path) -> Result<(), AppError> {
     if path.exists() {
+        let history = crate::config_history::capture_before(path);
         fs::remove_file(path).map_err(|e| AppError::io(path, e))?;
+        if let Some(history) = history {
+            history.finish(None);
+        }
     }
     Ok(())
 }

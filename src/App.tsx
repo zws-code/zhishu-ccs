@@ -87,6 +87,7 @@ import { EditProviderDialog } from "@/components/providers/EditProviderDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { OpenTerminalDialog } from "@/components/providers/OpenTerminalDialog";
 import { discardUnsavedChanges, hasUnsavedChanges } from "@/lib/unsavedChanges";
+import { AppConfigHistoryButton } from "@/components/settings/AppConfigHistoryButton";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { AuthCenterPanel } from "@/components/settings/AuthCenterPanel";
 import { AppsPage } from "@/components/apps/AppsPage";
@@ -1211,6 +1212,7 @@ function App() {
       }
       actions={
         <>
+          <AppConfigHistoryButton key={activeApp} app={activeApp} />
           {currentView === "providers" &&
             activeApp !== "mcode" &&
             activeApp !== "kimi" &&

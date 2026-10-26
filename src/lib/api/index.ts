@@ -1,6 +1,7 @@
 export type { AppId } from "./types";
 export { piApi } from "./pi";
 export { dshApi } from "./dsh";
+export { configHistoryApi } from "./configHistory";
 export { providersApi, universalProvidersApi } from "./providers";
 export { settingsApi } from "./settings";
 export { backupsApi } from "./settings";
@@ -18,6 +19,11 @@ export { workspaceApi } from "./workspace";
 export * as authApi from "./auth";
 export * as copilotApi from "./copilot";
 export type { ProviderSwitchEvent } from "./providers";
+export type {
+  ConfigChangeDetail,
+  ConfigChangeFileSummary,
+  ConfigChangeGroup,
+} from "./configHistory";
 export type { Prompt } from "./prompts";
 export type { Profile, ProfilePayload, ProfilesResponse } from "./profiles";
 export type {

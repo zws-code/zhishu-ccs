@@ -1309,6 +1309,7 @@ async fn set_stack_member_locked(
 ) -> Result<(), String> {
     let current = settled_stack(app)?;
     let mut next = current.clone();
+    let mut roster = None;
     if enabled {
         let target = provider(state, app, provider_id)?
             .ok_or_else(|| format!("供应商不存在: {provider_id}"))?;
@@ -1316,6 +1317,10 @@ async fn set_stack_member_locked(
         stack::allocate_key(&mut next, &target);
         if !next.is_member(provider_id) {
             next.members.push(provider_id.to_string());
+            roster = Some(crate::config_history::ConfigOperationSummary {
+                added: vec![target.name.clone()],
+                removed: Vec::new(),
+            });
         }
     } else {
         let mode = current::mode_state(app);
@@ -1325,7 +1330,20 @@ async fn set_stack_member_locked(
                     .to_string(),
             );
         }
+        let was_member = next.members.iter().any(|id| id == provider_id);
         next.members.retain(|id| id != provider_id);
+        if was_member {
+            // 删除供应商会先移出名单再删行，这里通常还能查到名字。
+            let name = provider(state, app, provider_id)
+                .ok()
+                .flatten()
+                .map(|target| target.name)
+                .unwrap_or_else(|| provider_id.to_string());
+            roster = Some(crate::config_history::ConfigOperationSummary {
+                added: Vec::new(),
+                removed: vec![name],
+            });
+        }
     }
     if next == current {
         return Ok(());
@@ -1346,6 +1364,33 @@ async fn set_stack_member_locked(
                 ..PendingTarget::default()
             },
         ),
+    }?;
+
+    // 名单变了就要留下记录，即使没有可见的文件差异：Codex 只改派生的模型目录（只记
+    // 指纹），契约没变时甚至一个文件都不写。摘要是独立记录，不能作为单文件还原。
+    if let Some(summary) = roster {
+        if let Err(error) = crate::config_history::record_operation_summary(
+            app.as_str(),
+            op::STACK,
+            &stack_summary_path(app),
+            summary,
+        ) {
+            log::warn!("记录 {} 的聚合名单变更失败: {error}", app.as_str());
+        }
+    }
+    Ok(())
+}
+
+/// 聚合名单摘要记录展示用的主文件：Codex 是派生的模型目录，其他应用是客户端配置。
+fn stack_summary_path(app: &AppType) -> std::path::PathBuf {
+    match app {
+        AppType::Claude => crate::config::get_claude_settings_path(),
+        AppType::Codex => crate::codex_config::get_codex_model_catalog_path(),
+        AppType::ClaudeDesktop => crate::claude_desktop_config::live_file_paths()
+            .ok()
+            .and_then(|paths| paths.into_iter().next())
+            .unwrap_or_default(),
+        _ => std::path::PathBuf::new(),
     }
 }
 
