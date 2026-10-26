@@ -30,6 +30,17 @@ pub fn get_home_dir() -> PathBuf {
     })
 }
 
+/// The isolated development launcher sets this explicitly. Only CC Switch's
+/// application data and Codex are redirected; every other CLI keeps using the
+/// production user home.
+pub(crate) fn isolated_dev_home() -> Option<PathBuf> {
+    std::env::var_os("ZHISHU_CCS_DEV_HOME").map(|home| {
+        let path = PathBuf::from(home);
+        assert!(path.is_absolute(), "ZHISHU_CCS_DEV_HOME must be absolute");
+        path
+    })
+}
+
 /// 检测路径是否为 WSL 网络路径（如 \\wsl$\Ubuntu\... 或 \\wsl.localhost\Ubuntu\...）
 /// 注意：仅检测直接 UNC 路径，映射磁盘符（如 Z: -> \\wsl$\...）无法检测
 #[cfg(windows)]
@@ -311,6 +322,9 @@ pub fn get_claude_settings_path() -> PathBuf {
 
 /// 获取应用配置目录路径 (~/.zhishu-ccs)
 pub fn get_app_config_dir() -> PathBuf {
+    if let Some(home) = isolated_dev_home() {
+        return home.join(".zhishu-ccs");
+    }
     if let Some(custom) = crate::app_store::get_app_config_dir_override() {
         return custom;
     }
@@ -353,6 +367,15 @@ pub fn get_app_config_dir() -> PathBuf {
     }
 
     default_dir
+}
+
+/// Device-local CC Switch state. Unlike a user-configured app data override,
+/// this path must follow the isolated development home during `pnpm dev`.
+pub fn get_device_data_dir() -> PathBuf {
+    if let Some(home) = isolated_dev_home() {
+        return home.join(".zhishu-ccs");
+    }
+    get_home_dir().join(".zhishu-ccs")
 }
 
 /// 获取应用配置文件路径
@@ -705,6 +728,70 @@ mod tests {
         use std::sync::OnceLock;
         static LOCK: OnceLock<std::sync::Mutex<()>> = OnceLock::new();
         LOCK.get_or_init(|| std::sync::Mutex::new(()))
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn isolated_dev_only_redirects_app_and_codex_paths() {
+        struct RestoreEnv(Vec<(&'static str, Option<std::ffi::OsString>)>);
+        impl Drop for RestoreEnv {
+            fn drop(&mut self) {
+                for (key, value) in &self.0 {
+                    match value {
+                        Some(value) => std::env::set_var(key, value),
+                        None => std::env::remove_var(key),
+                    }
+                }
+                let _ = crate::settings::reload_settings();
+            }
+        }
+
+        let temp = tempfile::tempdir().unwrap();
+        let dev_home = temp.path().join("development");
+        let working_home = temp.path().join("working");
+        let working_codex = working_home.join(".codex");
+        fs::create_dir_all(&working_codex).unwrap();
+        let working_config = working_codex.join("config.toml");
+        fs::write(&working_config, "model = \"working\"\n").unwrap();
+        let _restore = RestoreEnv(
+            ["ZHISHU_CCS_DEV_HOME", "CC_SWITCH_TEST_HOME"]
+                .into_iter()
+                .map(|key| (key, std::env::var_os(key)))
+                .collect(),
+        );
+        std::env::set_var("CC_SWITCH_TEST_HOME", &working_home);
+        std::env::set_var("ZHISHU_CCS_DEV_HOME", &dev_home);
+        crate::settings::reload_settings().unwrap();
+        crate::settings::update_settings(crate::settings::AppSettings {
+            codex_config_dir: Some(working_codex.to_string_lossy().into_owned()),
+            ..Default::default()
+        })
+        .unwrap();
+
+        assert_eq!(get_home_dir(), working_home);
+        assert_eq!(get_app_config_dir(), dev_home.join(".zhishu-ccs"));
+        assert_eq!(get_device_data_dir(), dev_home.join(".zhishu-ccs"));
+        assert_eq!(get_claude_config_dir(), working_home.join(".claude"));
+        assert_eq!(
+            crate::gemini_config::get_gemini_dir(),
+            working_home.join(".gemini")
+        );
+        assert_eq!(
+            crate::codex_config::get_codex_config_dir(),
+            dev_home.join(".codex")
+        );
+        write_text_file_private(
+            &crate::codex_config::get_codex_config_path(),
+            "model = \"testing\"\n",
+        )
+        .unwrap();
+        assert_eq!(
+            fs::read_to_string(working_config).unwrap(),
+            "model = \"working\"\n"
+        );
+        std::env::remove_var("ZHISHU_CCS_DEV_HOME");
+        assert_eq!(get_app_config_dir(), working_home.join(".zhishu-ccs"));
+        assert_eq!(get_device_data_dir(), working_home.join(".zhishu-ccs"));
     }
 
     fn assert_atomic_write_replaces_existing_file(dir: &Path) {

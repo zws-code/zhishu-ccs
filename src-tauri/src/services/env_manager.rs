@@ -67,8 +67,7 @@ fn create_backup(conflicts: &[EnvConflict]) -> Result<BackupInfo, String> {
 
 /// Get backup directory path
 pub(crate) fn backup_dir() -> Result<PathBuf, String> {
-    let home = dirs::home_dir().ok_or("无法获取用户主目录")?;
-    Ok(home.join(".zhishu-ccs").join("backups"))
+    Ok(crate::config::get_device_data_dir().join("backups"))
 }
 
 /// Delete a single environment variable

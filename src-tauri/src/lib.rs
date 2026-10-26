@@ -728,6 +728,14 @@ pub fn run() {
                 }
             }
 
+            if crate::config::isolated_dev_home().is_some() {
+                log::info!(
+                    "[DEV] App data: {}; Codex: {}; other CLI paths use production HOME",
+                    crate::config::get_app_config_dir().display(),
+                    crate::codex_config::get_codex_config_dir().display()
+                );
+            }
+
             let app_state = AppState::new(db);
 
             // 设置 AppHandle 用于代理故障转移时的 UI 更新
