@@ -19,6 +19,16 @@ import {
 import { emitTauriEvent } from "../msw/tauriMocks";
 import { server } from "../msw/server";
 
+const platformDeletion = vi.hoisted(() => ({
+  visible: false,
+  disabled: false,
+  pending: false,
+  remove: vi.fn(),
+}));
+vi.mock("@/hooks/usePlatformProviderDeletion", () => ({
+  usePlatformProviderDeletion: () => platformDeletion,
+}));
+
 const toastSuccessMock = vi.fn();
 const toastErrorMock = vi.fn();
 const skillsPanelMocks = vi.hoisted(() => ({
@@ -208,11 +218,31 @@ const renderApp = (AppComponent: ComponentType) => {
 describe("App integration with MSW", () => {
   beforeEach(() => {
     resetProviderState();
+    platformDeletion.visible = false;
+    platformDeletion.remove.mockReset();
     toastSuccessMock.mockReset();
     toastErrorMock.mockReset();
     skillsPanelMocks.initialViews = [];
     localStorage.setItem("cc-switch-last-view", "providers");
     localStorage.removeItem("cc-switch-last-app");
+  });
+
+  it("offers one-click platform provider deletion in the app's more menu", async () => {
+    platformDeletion.visible = true;
+    const { default: App } = await import("@/App");
+    renderApp(App);
+    await screen.findByTestId("provider-list");
+    const trigger = screen.getByRole("button", {
+      name: /更多操作|moreActions/,
+      hidden: true,
+    });
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    const item = await screen.findByRole("menuitem", {
+      name: /一键删除平台供应商|deleteProviders/,
+      hidden: true,
+    });
+    fireEvent.click(item);
+    expect(platformDeletion.remove).toHaveBeenCalledTimes(1);
   });
 
   it("covers basic provider flows via real hooks", async () => {

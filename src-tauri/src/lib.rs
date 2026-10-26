@@ -1552,6 +1552,7 @@ pub fn run() {
             commands::platform_get_account,
             commands::platform_get_subscription_usage,
             commands::platform_sync_providers,
+            commands::platform_delete_providers,
             commands::platform_get_catalog,
             commands::platform_get_catalog_key,
             commands::platform_sync_catalog,

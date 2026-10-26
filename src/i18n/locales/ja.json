@@ -1,5 +1,9 @@
 {
   "platformCatalog": {
+    "deleteProviders": "プラットフォームプロバイダーを一括削除",
+    "deletingProviders": "プラットフォームプロバイダーを削除中…",
+    "deleteAction": "プラットフォームプロバイダーの削除",
+    "deleteCompleted": "{{removed}} 件のプラットフォームプロバイダーを削除し、{{skipped}} 件を保持しました",
     "syncAction": "プラットフォームのプロバイダー同期",
     "syncResult": "プロバイダー同期結果",
     "syncResultDescription": "同期結果、ネイティブ設定ファイルの変更とバックアップ先を確認します。",

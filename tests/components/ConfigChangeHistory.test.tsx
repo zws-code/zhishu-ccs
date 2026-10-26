@@ -369,6 +369,19 @@ describe("app configuration history", () => {
     ).toBeInTheDocument();
   });
 
+  it("labels platform deletion separately from synchronization", async () => {
+    i18n.addResource(
+      "zh",
+      "translation",
+      "platformCatalog.deleteAction",
+      "平台供应商删除",
+    );
+    records = [{ ...group, action: "platform_delete" }];
+    mount(<ConfigChangeHistoryPanel app="codex" />);
+    expect(await screen.findByText("平台供应商删除")).toBeInTheDocument();
+    expect(screen.queryByText("platform_delete")).not.toBeInTheDocument();
+  });
+
   it("labels provider add and remove operations instead of the underlying switch", async () => {
     // The test i18n instance starts empty; register the two action labels the
     // panel is expected to map, so a missing mapping shows the raw action.

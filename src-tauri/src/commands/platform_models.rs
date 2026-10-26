@@ -4,6 +4,7 @@ mod adapter;
 mod base_data;
 mod catalog;
 mod connection;
+mod delete;
 mod sync_report;
 
 use super::platform_auth::{error as fail, GroupDiscovery, PlatformAuthError, PlatformAuthState};
@@ -251,6 +252,28 @@ pub async fn platform_sync_providers(
         })
     })
     .await?;
+    crate::tray::refresh_tray_menu(&handle);
+    Ok(summary)
+}
+
+/// 显式批量删除当前应用的平台供应商；按请求时的身份校验，避免迟到操作删除新账户。
+#[tauri::command]
+pub async fn platform_delete_providers(
+    handle: tauri::AppHandle,
+    agent: String,
+    base_url: String,
+    user_id: i64,
+) -> Result<delete::PlatformDeleteSummary, PlatformAuthError> {
+    let _operation = APPLY_LOCK.lock().await;
+    let app = adapter::app(&agent)?;
+    let worker_handle = handle.clone();
+    let summary = tauri::async_runtime::spawn_blocking(move || {
+        let state = worker_handle.state::<AppState>();
+        let auth = worker_handle.state::<PlatformAuthState>();
+        delete::delete_for_identity(auth.inner(), state.inner(), &app, &base_url, user_id)
+    })
+    .await
+    .map_err(|_| fail("CONFIG", "平台供应商删除任务未能完成，请重试"))??;
     crate::tray::refresh_tray_menu(&handle);
     Ok(summary)
 }
@@ -958,6 +981,280 @@ mod tests {
                 }
             }
         }
+    }
+
+    fn deletion_provider(agent: &str, id: &str, origin: &str, user_id: i64) -> Provider {
+        let model: AgentModel = serde_json::from_value(json!({
+            "id": "model", "agent": agent, "model": "claude-sonnet-5", "name": "Test",
+            "protocol": match agent { "claude" | "claude-desktop" => "anthropic", "gemini" => "gemini", "workbuddy" => "chat", _ => "responses" },
+            "category": "available", "available": true, "supportsTools": true, "supportsStreaming": true
+        })).unwrap();
+        let mut provider =
+            adapter::provider(&model, origin, user_id, "test-only-key", 42, None).unwrap();
+        provider.id = id.into();
+        provider.name = id.into();
+        provider
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn platform_deletion_is_local_account_scoped_and_supported_for_every_agent() {
+        let home = SyncTestHome::new();
+        let state = AppState::new(std::sync::Arc::new(
+            crate::database::Database::memory().unwrap(),
+        ));
+        let origin = "https://platform.test";
+        let auth = PlatformAuthState::for_test(origin.into(), 1);
+        let catalog_path = home._temp.path().join("catalog.json");
+        base_data::CatalogStore::for_test(catalog_path.clone())
+            .save(test_discovery(Vec::new()))
+            .unwrap();
+        let catalog_before = std::fs::read(&catalog_path).unwrap();
+        for agent in adapter::AGENTS {
+            for (id, base, user) in [
+                ("target", origin, 1),
+                ("other-user", origin, 2),
+                ("other-platform", "https://other.test", 1),
+            ] {
+                state
+                    .db
+                    .save_provider(agent, &deletion_provider(agent, id, base, user))
+                    .unwrap();
+            }
+            let mut manual = deletion_provider(agent, "manual", origin, 1);
+            manual.meta.as_mut().unwrap().platform_managed = None;
+            state.db.save_provider(agent, &manual).unwrap();
+        }
+        for agent in adapter::AGENTS {
+            let app = adapter::app(agent).unwrap();
+            let before = state.db.get_all_providers(agent).unwrap();
+            let result = delete::delete_for_identity(&auth, &state, &app, origin, 1).unwrap();
+            assert_eq!(
+                (result.removed, result.skipped),
+                (1, 0),
+                "{agent}: {:?}",
+                result.warnings
+            );
+            let after = state.db.get_all_providers(agent).unwrap();
+            assert!(!after.contains_key("target"), "{agent}");
+            for id in ["manual", "other-user", "other-platform"] {
+                assert_eq!(
+                    serde_json::to_value(&before[id]).unwrap(),
+                    serde_json::to_value(&after[id]).unwrap(),
+                    "{agent}: {id}"
+                );
+            }
+            let record = crate::config_history::list(Some(agent.to_string()))
+                .unwrap()
+                .into_iter()
+                .find(|record| record.action == "platform_delete" && record.sync.is_some())
+                .unwrap();
+            assert_eq!(record.sync.unwrap().removed, 1);
+            let repeated = delete::delete_for_identity(&auth, &state, &app, origin, 1).unwrap();
+            assert_eq!((repeated.removed, repeated.skipped), (0, 0));
+        }
+        assert_eq!(std::fs::read(catalog_path).unwrap(), catalog_before);
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn platform_deletion_rejects_stale_and_missing_identity_without_writes() {
+        let _home = SyncTestHome::new();
+        let state = AppState::new(std::sync::Arc::new(
+            crate::database::Database::memory().unwrap(),
+        ));
+        let app = adapter::app("claude").unwrap();
+        state
+            .db
+            .save_provider(
+                "claude",
+                &deletion_provider("claude", "target", "https://platform.test", 1),
+            )
+            .unwrap();
+        for auth in [
+            PlatformAuthState::default(),
+            PlatformAuthState::for_test("https://platform.test".into(), 2),
+            PlatformAuthState::for_test("https://other.test".into(), 1),
+        ] {
+            assert!(
+                matches!(delete::delete_for_identity(&auth, &state, &app, "https://platform.test", 1), Err(err) if err.code == "UNAUTHORIZED")
+            );
+        }
+        assert!(state
+            .db
+            .get_provider_by_id("target", "claude")
+            .unwrap()
+            .is_some());
+        assert!(crate::config_history::list(Some("claude".into()))
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn platform_deletion_switches_to_manual_fallback_and_keeps_backups() {
+        let _home = SyncTestHome::new();
+        let state = AppState::new(std::sync::Arc::new(
+            crate::database::Database::memory().unwrap(),
+        ));
+        let app = adapter::app("claude").unwrap();
+        let target = deletion_provider("claude", "target", "https://platform.test", 1);
+        ProviderService::add_without_switching(&state, app.clone(), target).unwrap();
+        ProviderService::switch(&state, app.clone(), "target").unwrap();
+        let mut manual = deletion_provider("claude", "manual", "https://platform.test", 1);
+        manual.meta.as_mut().unwrap().platform_managed = None;
+        manual.settings_config["env"]["ANTHROPIC_AUTH_TOKEN"] = json!("manual-key");
+        ProviderService::add_without_switching(&state, app.clone(), manual).unwrap();
+        let result =
+            delete::delete_account_providers(&state, &app, "https://platform.test", 1).unwrap();
+        assert_eq!(
+            (result.removed, result.skipped),
+            (1, 0),
+            "{:?}",
+            result.warnings
+        );
+        assert_eq!(ProviderService::current(&state, app).unwrap(), "manual");
+        assert!(state
+            .db
+            .get_provider_by_id("target", "claude")
+            .unwrap()
+            .is_none());
+        let live: Value = serde_json::from_slice(
+            &std::fs::read(crate::config::get_claude_settings_path()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(live["env"]["ANTHROPIC_AUTH_TOKEN"], "manual-key");
+        assert!(crate::live::engine::DeviceStore::for_device()
+            .first_write_backup_dir()
+            .is_dir());
+        assert!(result.native_files_changed > 0);
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn platform_deletion_retains_current_without_fallback_and_reports_partial_success() {
+        let _home = SyncTestHome::new();
+        let state = AppState::new(std::sync::Arc::new(
+            crate::database::Database::memory().unwrap(),
+        ));
+        let app = adapter::app("claude").unwrap();
+        for id in ["current", "unused"] {
+            ProviderService::add_without_switching(
+                &state,
+                app.clone(),
+                deletion_provider("claude", id, "https://platform.test", 1),
+            )
+            .unwrap();
+        }
+        ProviderService::switch(&state, app.clone(), "current").unwrap();
+        let before = std::fs::read(crate::config::get_claude_settings_path()).unwrap();
+        let result =
+            delete::delete_account_providers(&state, &app, "https://platform.test", 1).unwrap();
+        assert_eq!((result.removed, result.skipped), (1, 1));
+        assert!(result.warnings[0].contains("备用供应商"));
+        assert_eq!(
+            std::fs::read(crate::config::get_claude_settings_path()).unwrap(),
+            before
+        );
+        assert!(state
+            .db
+            .get_provider_by_id("current", "claude")
+            .unwrap()
+            .is_some());
+        assert!(state
+            .db
+            .get_provider_by_id("unused", "claude")
+            .unwrap()
+            .is_none());
+        let report = crate::config_history::list(Some("claude".into()))
+            .unwrap()
+            .into_iter()
+            .find(|record| record.action == "platform_delete" && record.sync.is_some())
+            .unwrap()
+            .sync
+            .unwrap();
+        assert_eq!(report.removed, 1);
+        assert_eq!(report.warnings, result.warnings);
+        assert!(report.changed_files.is_empty());
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn platform_deletion_removes_live_workbuddy_models_and_preserves_other_settings() {
+        let _home = SyncTestHome::new();
+        let state = AppState::new(std::sync::Arc::new(
+            crate::database::Database::memory().unwrap(),
+        ));
+        let app = adapter::app("workbuddy").unwrap();
+        ProviderService::add_without_switching(
+            &state,
+            app.clone(),
+            deletion_provider("workbuddy", "target", "https://platform.test", 1),
+        )
+        .unwrap();
+        ProviderService::switch(&state, app.clone(), "target").unwrap();
+        let path = crate::workbuddy_config::get_workbuddy_models_path();
+        let native: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let models = if native.is_array() {
+            native
+        } else {
+            native["models"].clone()
+        };
+        assert!(!models.as_array().unwrap().is_empty());
+        std::fs::write(
+            &path,
+            serde_json::to_vec(&json!({ "models": models, "userPreference": "keep" })).unwrap(),
+        )
+        .unwrap();
+        let result =
+            delete::delete_account_providers(&state, &app, "https://platform.test", 1).unwrap();
+        assert_eq!(
+            (result.removed, result.skipped),
+            (1, 0),
+            "{:?}",
+            result.warnings
+        );
+        let after: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        assert_eq!(after["models"], json!([]));
+        assert_eq!(after["userPreference"], "keep");
+        assert!(state
+            .db
+            .get_provider_by_id("target", "workbuddy")
+            .unwrap()
+            .is_none());
+        let result = serde_json::to_value(result).unwrap();
+        assert_eq!(result["nativeFilesChanged"], 1);
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn platform_deletion_preserves_malformed_native_config_and_provider_row() {
+        let _home = SyncTestHome::new();
+        let state = AppState::new(std::sync::Arc::new(
+            crate::database::Database::memory().unwrap(),
+        ));
+        let app = adapter::app("workbuddy").unwrap();
+        let provider = deletion_provider("workbuddy", "target", "https://platform.test", 1);
+        state.db.save_provider("workbuddy", &provider).unwrap();
+        let path = crate::workbuddy_config::get_workbuddy_models_path();
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, b"{broken JSON").unwrap();
+        let result =
+            delete::delete_account_providers(&state, &app, "https://platform.test", 1).unwrap();
+        assert_eq!((result.removed, result.skipped), (0, 1));
+        assert!(!result.warnings.is_empty());
+        assert_eq!(std::fs::read(&path).unwrap(), b"{broken JSON");
+        assert_eq!(
+            serde_json::to_value(
+                state
+                    .db
+                    .get_provider_by_id("target", "workbuddy")
+                    .unwrap()
+                    .unwrap()
+            )
+            .unwrap(),
+            serde_json::to_value(provider).unwrap()
+        );
     }
 
     fn test_discovery(groups: Vec<super::super::platform_auth::AvailableGroup>) -> GroupDiscovery {

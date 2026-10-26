@@ -1,5 +1,9 @@
 {
   "platformCatalog": {
+    "deleteProviders": "Tüm platform sağlayıcılarını sil",
+    "deletingProviders": "Platform sağlayıcıları siliniyor…",
+    "deleteAction": "Platform sağlayıcılarını silme",
+    "deleteCompleted": "{{removed}} platform sağlayıcısı silindi; {{skipped}} tanesi korundu",
     "syncAction": "Platform sağlayıcı eşitlemesi",
     "syncResult": "Sağlayıcı eşitleme sonucu",
     "syncResultDescription": "Eşitleme sonucunu, yerel yapılandırma değişikliklerini ve yedek konumunu görüntüleyin.",

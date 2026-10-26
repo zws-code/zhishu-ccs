@@ -1,5 +1,9 @@
 {
   "platformCatalog": {
+    "deleteProviders": "一鍵刪除平台供應商",
+    "deletingProviders": "正在刪除平台供應商…",
+    "deleteAction": "平台供應商刪除",
+    "deleteCompleted": "已刪除 {{removed}} 個平台供應商，保留 {{skipped}} 個",
     "syncAction": "平台供應商同步",
     "syncResult": "供應商同步結果",
     "syncResultDescription": "查看本次同步結果、原生設定檔變更與備份位置。",

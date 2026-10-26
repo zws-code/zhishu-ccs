@@ -1,5 +1,9 @@
 {
   "platformCatalog": {
+    "deleteProviders": "Delete all platform providers",
+    "deletingProviders": "Deleting platform providers…",
+    "deleteAction": "Platform provider deletion",
+    "deleteCompleted": "Deleted {{removed}} platform providers; kept {{skipped}}",
     "syncAction": "Platform provider sync",
     "syncResult": "Provider sync result",
     "syncResultDescription": "View this sync's results, native file changes, and backup location.",

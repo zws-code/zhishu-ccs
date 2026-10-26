@@ -32,6 +32,29 @@ describe("platform synchronization IPC layers", () => {
     });
   });
 
+  it("scopes explicit deletion to one app and the requested account without syncing", async () => {
+    const result = {
+      removed: 2,
+      skipped: 1,
+      warnings: ["in use"],
+      nativeFilesChanged: 0,
+    };
+    vi.mocked(invoke).mockResolvedValue(result);
+    expect(
+      await platformModelsApi.deleteProviders(
+        "codex",
+        "https://platform.test",
+        1,
+      ),
+    ).toEqual(result);
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke).toHaveBeenCalledWith("platform_delete_providers", {
+      agent: "codex",
+      baseUrl: "https://platform.test",
+      userId: 1,
+    });
+  });
+
   it("keeps the Agent sync contract including the all-Agents scope", async () => {
     await platformModelsApi.sync("codex");
     expect(invoke).toHaveBeenLastCalledWith("platform_sync_providers", {

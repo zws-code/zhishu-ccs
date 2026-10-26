@@ -13,6 +13,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ExternalLink,
   KeyRound,
+  Loader2,
+  Trash2,
   MoreHorizontal,
   Plus,
   Search,
@@ -37,6 +39,7 @@ import {
 } from "@/lib/api";
 import { checkAllEnvConflicts, checkEnvConflicts } from "@/lib/api/env";
 import { useProviderActions } from "@/hooks/useProviderActions";
+import { usePlatformProviderDeletion } from "@/hooks/usePlatformProviderDeletion";
 import { openclawKeys, useOpenClawHealth } from "@/hooks/useOpenClaw";
 import { hermesKeys, useOpenHermesWebUI } from "@/hooks/useHermes";
 import { hermesApi } from "@/lib/api/hermes";
@@ -323,6 +326,7 @@ function App() {
   });
   const { data: piCurrentState } = usePiCurrentState(activeApp === "pi");
   const providers = useMemo(() => data?.providers ?? {}, [data]);
+  const platformDeletion = usePlatformProviderDeletion(activeApp, providers);
   const currentProviderId = data?.currentProviderId ?? "";
   const isOpenClawView = activeApp === "openclaw" && isAppPage(currentView);
   const { data: openclawHealthWarnings = [] } =
@@ -1156,6 +1160,27 @@ function App() {
         <DropdownMenuItem onSelect={() => openPage("apps")}>
           {t("appPage.installAndUpgrade")}
         </DropdownMenuItem>
+        {platformDeletion.visible && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              disabled={platformDeletion.disabled}
+              onSelect={platformDeletion.remove}
+              className="text-destructive focus:text-destructive"
+            >
+              {platformDeletion.pending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="mr-2 h-4 w-4" />
+              )}
+              {t(
+                platformDeletion.pending
+                  ? "platformCatalog.deletingProviders"
+                  : "platformCatalog.deleteProviders",
+              )}
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           disabled={Object.values(visibleApps).filter(Boolean).length <= 1}
@@ -1237,7 +1262,10 @@ function App() {
             )}
           {currentView === "providers" && (
             <>
-              <PlatformConnectButton app={activeApp} />
+              <PlatformConnectButton
+                app={activeApp}
+                disabled={platformDeletion.pending}
+              />
               <PlatformBulkSyncButtons
                 app={activeApp}
                 modeView={modeAppId ? (currentModeView ?? null) : null}
