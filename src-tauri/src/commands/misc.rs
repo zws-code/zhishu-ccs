@@ -90,6 +90,7 @@ pub async fn check_for_updates(handle: AppHandle) -> Result<bool, String> {
 /// 便携版新版本压缩包的下载地址，命名与 release.yml 的「Prepare Windows Assets」一致：
 /// `CC-Switch-v<版本>-Windows[-arm64]-Portable.zip`。版本号不像版本号时返回 None。
 fn portable_zip_url(version: &str, arm64: bool) -> Option<String> {
+    // TODO(zhishu): Replace upstream portable release URLs with Zhishu-hosted release assets.
     let version = version.trim().trim_start_matches('v');
     let looks_like_version = version.starts_with(|c: char| c.is_ascii_digit())
         && version
@@ -4934,6 +4935,82 @@ struct ProviderLaunch {
     batch_vars: Vec<(&'static str, String)>,
     /// 退出时删除的临时文件，都在系统临时目录里
     cleanup: Vec<PathBuf>,
+}
+
+/// Quick start launches the selected tool through the existing terminal adapter.
+/// Programs are fixed locally; no server-provided command is ever executed.
+pub(super) fn launch_platform_agent(agent: &str) -> Result<(), String> {
+    launch_provider_terminal(&platform_agent_launch(agent)?, None)
+}
+
+fn platform_agent_launch(agent: &str) -> Result<ProviderLaunch, String> {
+    let program = match agent {
+        "claude" => "claude",
+        "codex" => "codex",
+        "gemini" => "gemini",
+        "grokbuild" => "grok",
+        "opencode" => "opencode",
+        "openclaw" => "openclaw",
+        "hermes" => "hermes",
+        "pi" => "pi",
+        "mcode" => "mcode",
+        _ => return Err("This Agent has no platform launcher".into()),
+    };
+    let args = if agent == "openclaw" {
+        vec!["tui".into(), "--local".into()]
+    } else {
+        Vec::new()
+    };
+    let path_env = |key, path: PathBuf| vec![(key, Some(path.to_string_lossy().into_owned()))];
+    let env = match agent {
+        "claude" => path_env("CLAUDE_CONFIG_DIR", crate::config::get_claude_config_dir()),
+        "codex" => path_env("CODEX_HOME", crate::codex_config::get_codex_config_dir()),
+        "gemini" => {
+            let dir = crate::gemini_config::get_gemini_dir();
+            if dir.file_name().and_then(|v| v.to_str()) != Some(".gemini") {
+                return Err("Gemini CLI requires a .gemini directory under GEMINI_CLI_HOME".into());
+            }
+            path_env(
+                "GEMINI_CLI_HOME",
+                dir.parent()
+                    .ok_or("Invalid Gemini directory")?
+                    .to_path_buf(),
+            )
+        }
+        "opencode" => path_env(
+            "OPENCODE_CONFIG",
+            crate::opencode_config::get_opencode_config_path()
+                .map_err(|_| "Cannot locate OpenCode config")?,
+        ),
+        "openclaw" => path_env(
+            "OPENCLAW_CONFIG_PATH",
+            crate::openclaw_config::get_openclaw_config_path(),
+        ),
+        "hermes" => path_env("HERMES_HOME", crate::hermes_config::get_hermes_dir()),
+        "pi" => path_env(
+            "PI_CODING_AGENT_DIR",
+            crate::pi_config::get_pi_agent_dir().map_err(|_| "Cannot locate Pi config")?,
+        ),
+        "mcode" => path_env("MINIMAX_DATA_DIR", crate::mcode_config::data_dir()),
+        "grokbuild" if crate::settings::get_grok_override_dir().is_some() => {
+            return Err("Grok custom directories need an explicitly configured launcher".into())
+        }
+        _ => Vec::new(),
+    };
+    Ok(ProviderLaunch {
+        title: "Starting your configured AI tool",
+        detail: None,
+        program,
+        batch_command: if agent == "openclaw" {
+            "openclaw tui --local".into()
+        } else {
+            program.into()
+        },
+        args,
+        env,
+        batch_vars: Vec::new(),
+        cleanup: Vec::new(),
+    })
 }
 
 /// Claude Code：把卡上的 env 写进临时 settings 文件，`claude --settings <文件>` 启动。

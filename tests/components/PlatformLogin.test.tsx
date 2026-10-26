@@ -11,7 +11,15 @@ import {
   PlatformAuthGate,
   PlatformAccountMenu,
 } from "@/components/platform/PlatformLogin";
-import { PlatformAuthProvider } from "@/contexts/PlatformAuthContext";
+import {
+  platformModelsApi,
+  type PlatformCatalog,
+} from "@/lib/api/platformModels";
+import { platformCatalogKeys } from "@/lib/query/platformCatalogKeys";
+import {
+  PlatformAuthProvider,
+  usePlatformAuth,
+} from "@/contexts/PlatformAuthContext";
 import { platformAuthApi, type PlatformAccount } from "@/lib/api/platformAuth";
 import { toast } from "sonner";
 import zh from "@/i18n/locales/zh.json";
@@ -30,13 +38,16 @@ vi.mock("@/lib/api/platformAuth", async (original) => ({
     logout: vi.fn(),
   },
 }));
+vi.mock("@/lib/api/platformModels", () => ({
+  platformModelsApi: { syncCatalog: vi.fn(), sync: vi.fn() },
+}));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string) =>
       zh.platformAuth[key.split(".")[1] as keyof typeof zh.platformAuth] || key,
   }),
 }));
-vi.mock("sonner", () => ({ toast: { warning: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { warning: vi.fn(), error: vi.fn() } }));
 vi.mock("@/lib/api", () => ({ settingsApi: { openExternal: vi.fn() } }));
 vi.mock("@/components/shell/WindowControls", () => ({
   WindowControls: () => null,
@@ -52,6 +63,26 @@ const account: PlatformAccount = {
     balance: 10,
   },
 };
+const catalog: PlatformCatalog = {
+  baseUrl: account.baseUrl,
+  userId: account.user.id,
+  syncedAt: 1,
+  groups: [],
+  warnings: [],
+};
+function CatalogStatus() {
+  const auth = usePlatformAuth()!;
+  return (
+    <>
+      <p data-testid="catalog-status">
+        {auth.catalogSyncError || (auth.catalogSyncing ? "syncing" : "idle")}
+      </p>
+      <button onClick={() => void auth.syncCatalog().catch(() => undefined)}>
+        重试同步目录
+      </button>
+    </>
+  );
+}
 function renderGate() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -61,6 +92,7 @@ function renderGate() {
       <PlatformAuthProvider>
         <PlatformAuthGate>
           <p>工具主页</p>
+          <CatalogStatus />
           <PlatformAccountMenu collapsed={false} />
         </PlatformAuthGate>
       </PlatformAuthProvider>
@@ -84,6 +116,12 @@ async function submitCredentials() {
 }
 
 beforeEach(() => {
+  vi.mocked(platformModelsApi.syncCatalog)
+    .mockReset()
+    .mockResolvedValue(catalog);
+  vi.mocked(platformModelsApi.sync)
+    .mockReset()
+    .mockResolvedValue({ added: 0, removed: 0, skipped: 0, warnings: [] });
   vi.mocked(platformAuthApi.history).mockReset().mockResolvedValue([]);
   vi.mocked(platformAuthApi.savedPassword).mockReset().mockResolvedValue(null);
   vi.mocked(platformAuthApi.forgetPassword)
@@ -512,5 +550,153 @@ describe("platform login", () => {
       finishLogout();
     });
     await screen.findByLabelText("密码");
+  });
+});
+
+describe("catalog sync after verified login", () => {
+  it("keeps the account usable when automatic provider sync fails", async () => {
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    vi.mocked(platformModelsApi.sync).mockRejectedValue({
+      code: "CONFIG",
+      message: "工具配置失败",
+    });
+    renderGate();
+    await waitFor(() =>
+      expect(screen.getByTestId("catalog-status")).toHaveTextContent(
+        "工具配置失败",
+      ),
+    );
+    expect(screen.getByText("工具主页")).toBeInTheDocument();
+    expect(platformAuthApi.logout).not.toHaveBeenCalled();
+  });
+
+  it("shows warnings from partial automatic provider sync", async () => {
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    vi.mocked(platformModelsApi.sync).mockResolvedValue({
+      added: 1,
+      removed: 0,
+      skipped: 0,
+      warnings: ["部分工具同步失败"],
+    });
+    renderGate();
+    await waitFor(() =>
+      expect(screen.getByTestId("catalog-status")).toHaveTextContent(
+        "部分工具同步失败",
+      ),
+    );
+    expect(screen.getByText("工具主页")).toBeInTheDocument();
+  });
+
+  it("syncs once on restoration and does not resync during account checks", async () => {
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    const client = renderGate();
+    await screen.findByText("工具主页");
+    await waitFor(() =>
+      expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce(),
+    );
+    await waitFor(() =>
+      expect(
+        client.getQueryData(
+          platformCatalogKeys.account(account.baseUrl, account.user.id),
+        ),
+      ).toEqual(catalog),
+    );
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+      window.dispatchEvent(new Event("online"));
+    });
+    expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce();
+    expect(platformModelsApi.sync).toHaveBeenCalledOnce();
+    expect(platformModelsApi.sync).toHaveBeenCalledWith();
+  });
+  it("does not sync before the second authentication factor completes", async () => {
+    vi.mocked(platformAuthApi.login).mockResolvedValue({
+      status: "requires_2fa",
+    });
+    vi.mocked(platformAuthApi.login2fa).mockResolvedValue({
+      status: "authenticated",
+      account,
+    });
+    renderGate();
+    await submitCredentials();
+    const input = await screen.findByLabelText("二次验证码");
+    expect(platformModelsApi.syncCatalog).not.toHaveBeenCalled();
+    expect(platformModelsApi.sync).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: "123456" } });
+    fireEvent.submit(
+      screen.getByRole("button", { name: "验证并登录" }).closest("form")!,
+    );
+    await waitFor(() =>
+      expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce(),
+    );
+  });
+  it("allows retry after sync failure without losing the authenticated account", async () => {
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    vi.mocked(platformModelsApi.syncCatalog)
+      .mockRejectedValueOnce({ code: "NETWORK", message: "目录暂时不可用" })
+      .mockResolvedValue(catalog);
+    renderGate();
+    await waitFor(() =>
+      expect(screen.getByTestId("catalog-status")).toHaveTextContent(
+        "目录暂时不可用",
+      ),
+    );
+    expect(screen.getByText("工具主页")).toBeInTheDocument();
+    expect(platformModelsApi.sync).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("重试同步目录"));
+    await waitFor(() =>
+      expect(screen.getByTestId("catalog-status")).toHaveTextContent("idle"),
+    );
+    expect(platformModelsApi.syncCatalog).toHaveBeenCalledTimes(2);
+  });
+  it("ignores an old sync after logout and a new login to the same account", async () => {
+    let finish!: (value: PlatformCatalog) => void;
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    vi.mocked(platformAuthApi.login).mockResolvedValue({
+      status: "authenticated",
+      account,
+    });
+    vi.mocked(platformModelsApi.syncCatalog)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      )
+      .mockResolvedValue({ ...catalog, syncedAt: 2 });
+    const client = renderGate();
+    await waitFor(() =>
+      expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "退出平台登录" }));
+    await submitCredentials();
+    await waitFor(() =>
+      expect(platformModelsApi.syncCatalog).toHaveBeenCalledTimes(2),
+    );
+    await act(async () => {
+      finish(catalog);
+    });
+    expect(
+      client.getQueryData(
+        platformCatalogKeys.account(account.baseUrl, account.user.id),
+      ),
+    ).toEqual({ ...catalog, syncedAt: 2 });
+  });
+  it("coalesces manual retry with an automatic sync already in progress", async () => {
+    let finish!: (value: PlatformCatalog) => void;
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    vi.mocked(platformModelsApi.syncCatalog).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    renderGate();
+    await waitFor(() =>
+      expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce(),
+    );
+    fireEvent.click(screen.getByText("重试同步目录"));
+    expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce();
+    await act(async () => finish(catalog));
   });
 });

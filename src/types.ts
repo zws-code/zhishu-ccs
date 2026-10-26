@@ -174,6 +174,19 @@ export interface LocalProxyRequestOverrides {
 
 // 供应商元数据（字段名与后端一致，保持 snake_case）
 export interface ProviderMeta {
+  // Platform-owned row identity; shared by simple and advanced modes.
+  platformManaged?: {
+    origin: string;
+    userId: number;
+    entryId: string;
+    model: string;
+    keyId: number;
+    groupId?: number;
+    groupPlatform?: string;
+    groupName?: string;
+    keyName?: string;
+    subscriptionType?: string;
+  };
   // 自定义端点：以 URL 为键，值为端点信息
   custom_endpoints?: Record<string, CustomEndpoint>;
   // 是否在切换/同步到 live 时应用通用配置片段

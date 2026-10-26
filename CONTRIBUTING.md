@@ -42,15 +42,17 @@ pnpm install
 pnpm dev
 ```
 
-`pnpm dev` first starts Vite on `http://localhost:3000`, then opens the Tauri window. If port 3000 is already in use, it fails with an error instead of switching to another port.
+`pnpm dev` first starts Vite on `http://localhost:1420`, then opens the Tauri window. If port 1420 is already in use, it fails with an error instead of switching to another port.
 
 ### Useful Commands
 
 | Command | Description |
 |---------|-------------|
 | `pnpm dev` | Start dev server (hot reload) |
-| `pnpm build` | Production build and packaging |
-| `pnpm build:renderer` | Build the frontend only, output to `dist/` |
+| `pnpm build` | Production build and packaging; configure [Zhishu release settings](docs/zhishu-release.md) first |
+| `pnpm build:unsigned` | Fixed-server build without updater artifacts |
+| `pnpm build:editable` | Internal build with an editable platform server |
+| `pnpm build:renderer --mode development` | Build the frontend only, output to `dist/` |
 | `pnpm typecheck` | TypeScript type checking (strict; unused imports or parameters are errors) |
 | `pnpm format` | Format `src/` with Prettier |
 | `pnpm format:check` | Check code formatting in `src/` |
@@ -67,17 +69,19 @@ cargo test                    # Run all backend tests
 cargo test some_test_name     # Run tests matching a name
 ```
 
-> On a fresh clone where the frontend has never been built, first run `mkdir -p dist` (or `pnpm build:renderer`) at the repository root. Otherwise, cargo commands under `src-tauri` fail to compile because the frontend output directory is missing.
+> On a fresh clone where the frontend has never been built, first run `mkdir -p dist` (or `pnpm build:renderer --mode development`) at the repository root. Otherwise, cargo commands under `src-tauri` fail to compile because the frontend output directory is missing.
 
 ### Local Build
 
-As its final step, `pnpm build` signs the auto-update bundles, which requires the release private key `TAURI_SIGNING_PRIVATE_KEY`. If you don't have the key locally, you can turn off updater bundle generation:
+As its final step, `pnpm build` signs the auto-update bundles, which requires the release private key `TAURI_SIGNING_PRIVATE_KEY`. Configure [Zhishu release settings](docs/zhishu-release.md) first. If you don't have the key locally, use the controlled unsigned build that keeps the production server lock:
 
 ```bash
-pnpm tauri build -c '{"bundle":{"createUpdaterArtifacts":false}}'
+pnpm build:unsigned
 ```
 
-For a debug build, append `--debug` to the command above. This single-quote form works on macOS and Linux; on Windows, save `{"bundle":{"createUpdaterArtifacts":false}}` to a JSON file and pass it with `-c <file path>`.
+For a debug build, run `pnpm build:unsigned -- --debug`.
+
+Use `pnpm build:editable` for an internal package that exposes the platform address field. The complete command, parameter default, target, bundle, signing, and output-path reference is in [docs/zhishu-release.md](docs/zhishu-release.md#打包命令).
 
 ## Testing
 
@@ -85,7 +89,7 @@ For a debug build, append `--debug` to the command above. This single-quote form
 
 **Backend**: unit tests live next to the source (`#[cfg(test)]`), and integration tests live in `src-tauri/tests/`. CI runs `cargo test` on Linux, macOS, and Windows.
 
-> **Isolate your real config**: some backend tests read and write directories such as `~/.cc-switch` and `~/.codex`. When running them locally, point `CC_SWITCH_TEST_HOME` at a temporary directory:
+> **Isolate your real config**: some backend tests read and write directories such as `~/.zhishu-ccs` and `~/.codex`. When running them locally, point `CC_SWITCH_TEST_HOME` at a temporary directory:
 >
 > ```bash
 > CC_SWITCH_TEST_HOME="$(mktemp -d)" cargo test
@@ -102,7 +106,7 @@ Frontend (React + TypeScript)
   Components ── Hooks ── TanStack Query ── src/lib/api
                               │ Tauri IPC (invoke)
 Backend (Tauri 2 + Rust)
-  Commands ─► Services ─┬─► DAO ─► SQLite (~/.cc-switch/cc-switch.db)
+  Commands ─► Services ─┬─► DAO ─► SQLite (~/.zhishu-ccs/cc-switch.db)
                         ├─► Live config writers (atomic write)
                         │     ~/.claude, ~/.codex, ~/.gemini, ...
                         └─► Local routing (proxy/): forwarding, format
@@ -111,8 +115,8 @@ Backend (Tauri 2 + Rust)
 
 ### Core Design
 
-- **SSOT** (single source of truth): providers, MCP, prompts, Skills, projects, usage, and other data are all stored in `~/.cc-switch/cc-switch.db` (SQLite)
-- **Device-level settings**: settings that belong to this machine only, such as directory overrides and backup policy, are stored in `~/.cc-switch/settings.json` and are not cloud-synced
+- **SSOT** (single source of truth): providers, MCP, prompts, Skills, projects, usage, and other data are all stored in `~/.zhishu-ccs/cc-switch.db` (SQLite)
+- **Device-level settings**: settings that belong to this machine only, such as directory overrides and backup policy, are stored in `~/.zhishu-ccs/settings.json` and are not cloud-synced
 - **Two write modes**: for switch-mode tools (Claude Code, Claude Desktop, Codex, Gemini CLI, Grok Build), switching first backfills the current live config into the current provider (except for Claude Desktop), then writes the new provider; for coexist-mode tools (OpenCode, OpenClaw, Hermes, Pi, MiniMax Code), all providers coexist in a single live file and nothing is backfilled
 - **Atomic writes**: all live configs are written via "temp file + rename" to avoid corruption
 - **Concurrency safety**: the database connection is protected by a Mutex to avoid race conditions
@@ -177,7 +181,7 @@ Backend (Tauri 2 + Rust)
 Run the same checks as CI before submitting:
 
 ```bash
-pnpm typecheck && pnpm format:check && pnpm test:unit && pnpm build:renderer
+pnpm typecheck && pnpm format:check && pnpm test:unit && pnpm build:renderer --mode development
 cd src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo test
 ```
 
@@ -299,15 +303,17 @@ pnpm install
 pnpm dev
 ```
 
-`pnpm dev` 会先在 `http://localhost:3000` 启动 Vite，再打开 Tauri 窗口；3000 端口被占用时会直接报错，不会自动换端口。
+`pnpm dev` 会先在 `http://localhost:1420` 启动 Vite，再打开 Tauri 窗口；1420 端口被占用时会直接报错，不会自动换端口。
 
 ### 常用命令
 
 | 命令 | 说明 |
 |------|------|
 | `pnpm dev` | 启动开发服务器（热重载） |
-| `pnpm build` | 构建生产版本并打包 |
-| `pnpm build:renderer` | 只构建前端，输出到 `dist/` |
+| `pnpm build` | 构建生产版本并打包；先配置[智枢发布参数](docs/zhishu-release.md) |
+| `pnpm build:unsigned` | 锁定服务器地址并关闭 updater 产物 |
+| `pnpm build:editable` | 可修改平台服务器地址的内测包 |
+| `pnpm build:renderer --mode development` | 只构建前端，输出到 `dist/` |
 | `pnpm typecheck` | TypeScript 类型检查（strict，未使用的 import 或参数会报错） |
 | `pnpm format` | 用 Prettier 格式化 `src/` |
 | `pnpm format:check` | 检查 `src/` 的代码格式 |
@@ -324,17 +330,19 @@ cargo test                    # 运行所有后端测试
 cargo test some_test_name     # 按名称运行部分测试
 ```
 
-> 刚 clone 下来、还没构建过前端时，请先在仓库根目录执行 `mkdir -p dist`（或 `pnpm build:renderer`）。否则 `src-tauri` 下的 cargo 命令会因为找不到前端产物目录而编译失败。
+> 刚 clone 下来、还没构建过前端时，请先在仓库根目录执行 `mkdir -p dist`（或 `pnpm build:renderer --mode development`）。否则 `src-tauri` 下的 cargo 命令会因为找不到前端产物目录而编译失败。
 
 ### 本地打包
 
-`pnpm build` 最后会为自动更新包签名，这一步需要发布用的私钥 `TAURI_SIGNING_PRIVATE_KEY`。本地没有私钥时，可以关闭更新包生成：
+`pnpm build` 最后会为自动更新包签名，这一步需要发布用的私钥 `TAURI_SIGNING_PRIVATE_KEY`。执行前请先配置[智枢发布参数](docs/zhishu-release.md)。本地没有私钥时，使用仍保留正式服务器锁定的无签名构建：
 
 ```bash
-pnpm tauri build -c '{"bundle":{"createUpdaterArtifacts":false}}'
+pnpm build:unsigned
 ```
 
-需要调试版本时，在上面的命令后加 `--debug`。这种单引号写法适用于 macOS 和 Linux；在 Windows 上，可以把 `{"bundle":{"createUpdaterArtifacts":false}}` 存成一个 JSON 文件，再用 `-c <文件路径>` 传入。
+需要调试版本时，运行 `pnpm build:unsigned -- --debug`。
+
+需要显示平台服务器地址输入框时运行 `pnpm build:editable`。完整命令、参数默认值、target、bundle、签名和产物路径见 [docs/zhishu-release.md](docs/zhishu-release.md#打包命令)。
 
 ## 测试
 
@@ -342,7 +350,7 @@ pnpm tauri build -c '{"bundle":{"createUpdaterArtifacts":false}}'
 
 **后端**：单元测试写在源码旁边（`#[cfg(test)]`），集成测试放在 `src-tauri/tests/`。CI 会在 Linux、macOS 和 Windows 上运行 `cargo test`。
 
-> **隔离真实配置**：部分后端测试会读写 `~/.cc-switch`、`~/.codex` 等目录。本地运行时，建议把 `CC_SWITCH_TEST_HOME` 指向一个临时目录：
+> **隔离真实配置**：部分后端测试会读写 `~/.zhishu-ccs`、`~/.codex` 等目录。本地运行时，建议把 `CC_SWITCH_TEST_HOME` 指向一个临时目录：
 >
 > ```bash
 > CC_SWITCH_TEST_HOME="$(mktemp -d)" cargo test
@@ -359,7 +367,7 @@ Frontend (React + TypeScript)
   Components ── Hooks ── TanStack Query ── src/lib/api
                               │ Tauri IPC (invoke)
 Backend (Tauri 2 + Rust)
-  Commands ─► Services ─┬─► DAO ─► SQLite (~/.cc-switch/cc-switch.db)
+  Commands ─► Services ─┬─► DAO ─► SQLite (~/.zhishu-ccs/cc-switch.db)
                         ├─► Live config writers (atomic write)
                         │     ~/.claude, ~/.codex, ~/.gemini, ...
                         └─► Local routing (proxy/): forwarding, format
@@ -368,8 +376,8 @@ Backend (Tauri 2 + Rust)
 
 ### 核心设计
 
-- **SSOT**（单一事实源）：供应商、MCP、提示词、Skills、项目和用量等数据都存储在 `~/.cc-switch/cc-switch.db`（SQLite）
-- **设备级设置**：目录覆盖、备份策略等只属于本机的设置存放在 `~/.cc-switch/settings.json`，不参与云同步
+- **SSOT**（单一事实源）：供应商、MCP、提示词、Skills、项目和用量等数据都存储在 `~/.zhishu-ccs/cc-switch.db`（SQLite）
+- **设备级设置**：目录覆盖、备份策略等只属于本机的设置存放在 `~/.zhishu-ccs/settings.json`，不参与云同步
 - **两种写入模式**：切换式工具（Claude Code、Claude Desktop、Codex、Gemini CLI、Grok Build）切换时，先把当前 live 配置回填到当前供应商（Claude Desktop 除外），再写入新供应商；共存式工具（OpenCode、OpenClaw、Hermes、Pi、MiniMax Code）的所有供应商共存于同一个 live 文件，不做回填
 - **原子写入**：所有 live 配置都通过“临时文件 + 重命名”写入，避免配置损坏
 - **并发安全**：数据库连接由 Mutex 保护，避免竞态条件
@@ -434,7 +442,7 @@ Backend (Tauri 2 + Rust)
 提交前运行与 CI 相同的检查：
 
 ```bash
-pnpm typecheck && pnpm format:check && pnpm test:unit && pnpm build:renderer
+pnpm typecheck && pnpm format:check && pnpm test:unit && pnpm build:renderer --mode development
 cd src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo test
 ```
 

@@ -166,6 +166,11 @@ function MainDirectory({
     trailingLabel?: string;
     alert?: string;
   }[] = [
+    {
+      page: "platformCatalog",
+      label: t("platformCatalog.title", "平台基础数据"),
+      icon: Database,
+    },
     { page: "mcp", label: "MCP", icon: Server },
     { page: "skills", label: "Skills", icon: SkillsIcon },
     { page: "prompts", label: t("nav.prompts"), icon: BookOpen },

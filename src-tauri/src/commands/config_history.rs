@@ -49,6 +49,7 @@ fn restore_group(
     state: &crate::store::AppState,
     ids: &[String],
 ) -> Result<ConfigRestoreSummary, crate::error::AppError> {
+    let _apply = futures::executor::block_on(super::platform_models::APPLY_LOCK.lock());
     let plan = config_history::restore_plan(ids)?;
     let _switch = futures::executor::block_on(state.proxy_service.lock_switch_for_app(&plan.app));
     crate::mode::operation::settle(&state.db, &plan.app)?;

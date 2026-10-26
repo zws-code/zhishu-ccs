@@ -15,6 +15,7 @@ export type AppPage =
   | "hermesMemory";
 
 export type GlobalPage =
+  | "platformCatalog"
   | "usage"
   | "auth"
   | "mcp"
@@ -53,6 +54,7 @@ const APP_PAGES: AppPage[] = [
 ];
 
 const GLOBAL_PAGES: GlobalPage[] = [
+  "platformCatalog",
   "usage",
   "auth",
   "mcp",

@@ -439,6 +439,7 @@ pub async fn platform_login(
     password: String,
     remember_password: Option<bool>,
 ) -> Result<LoginResult, PlatformAuthError> {
+    let _operation = super::platform_models::APPLY_LOCK.lock().await;
     let store_result = initialize_session_store(&state.0, &handle).await;
     let remember = remember_password.unwrap_or(false);
     let mut result = login(&state.0, base_url, email, password.clone(), Some(remember)).await?;
@@ -544,6 +545,7 @@ pub async fn platform_login_2fa(
     state: State<'_, PlatformAuthState>,
     code: String,
 ) -> Result<LoginResult, PlatformAuthError> {
+    let _operation = super::platform_models::APPLY_LOCK.lock().await;
     let (mut result, remembered) = login_2fa_with_preferences(&state.0, code).await?;
     if let Some((password, remember)) = remembered {
         persist_login(handle, &mut result, password, remember).await;
@@ -913,9 +915,43 @@ async fn get_account_with_activity(
 
 #[tauri::command]
 pub async fn platform_logout(
+    handle: tauri::AppHandle,
     state: State<'_, PlatformAuthState>,
 ) -> Result<(), PlatformAuthError> {
-    logout(&state.0).await
+    let _operation = super::platform_models::APPLY_LOCK.lock().await;
+    let identity = {
+        let auth = state.0.lock().await;
+        if let Some(session) = &auth.session {
+            Some((session.base_url.clone(), session.user_id))
+        } else if let Some(store) = &auth.store {
+            // A locked vault can prevent restoration; explicit logout must still
+            // clean the saved account's managed CLI credentials.
+            store.identity().await.ok().flatten()
+        } else {
+            None
+        }
+    };
+    let result = logout(&state.0).await;
+    // Catalog credentials are device-local too, including when CLI cleanup fails.
+    let catalog_cleanup = super::platform_models::clear_cached_catalog_credentials(&handle);
+    if let Some((origin, user_id)) = identity {
+        let cleaned = tauri::async_runtime::spawn_blocking(move || {
+            super::platform_models::clear_account_credentials(
+                handle.state::<crate::store::AppState>().inner(),
+                &origin,
+                user_id,
+            )
+        })
+        .await;
+        if !matches!(cleaned, Ok(Ok(()))) {
+            return Err(error(
+                "LOGOUT_CLEANUP",
+                "已退出登录，但工具配置中的凭证未能完全清除，请在高级配置中检查平台托管项",
+            ));
+        }
+    }
+    catalog_cleanup?;
+    result
 }
 
 async fn logout(state: &Mutex<AuthState>) -> Result<(), PlatformAuthError> {

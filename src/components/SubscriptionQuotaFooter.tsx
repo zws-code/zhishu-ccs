@@ -42,6 +42,7 @@ interface SubscriptionQuotaViewProps {
 /** 已知 tier 名称的显示映射（官方订阅 + Token Plan 共用） */
 export const TIER_I18N_KEYS: Record<string, string> = {
   five_hour: "subscription.fiveHour",
+  daily: "subscription.daily",
   seven_day: "subscription.sevenDay",
   seven_day_fable: "subscription.sevenDayFable",
   seven_day_opus: "subscription.sevenDayOpus",

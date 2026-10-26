@@ -1,4 +1,93 @@
 {
+  "platformCatalog": {
+    "syncAction": "Platform sağlayıcı eşitlemesi",
+    "syncResult": "Sağlayıcı eşitleme sonucu",
+    "syncResultDescription": "Eşitleme sonucunu, yerel yapılandırma değişikliklerini ve yedek konumunu görüntüleyin.",
+    "syncStats": "Sağlayıcılar: {{added}} eklendi, {{updated}} güncellendi, {{removed}} kaldırıldı, {{unchanged}} değişmedi",
+    "nativeChanges": "Agent yerel yapılandırma dosyaları",
+    "noNativeChanges": "Agent yapılandırması değiştirilmedi. Yalnızca CCS içindeki sağlayıcı listesi eşitlendi.",
+    "syncBackup": "Eşitleme öncesi yedek",
+    "openBackup": "Yedek klasörünü aç",
+    "copyBackupPath": "Yedek yolunu kopyala",
+    "noSyncBackup": "Bu eşitleme için yedek dizin oluşturulmadı.",
+    "openBackupFailed": "Yedek klasörü açılamadı",
+    "backupPathCopied": "Yedek yolu kopyalandı",
+    "nativeChangedCount": "{{count}} yerel yapılandırma dosyası değişti",
+    "noNativeChangesShort": "Yerel yapılandırma dosyaları değişmedi",
+    "syncCompleted": "Sağlayıcılar: {{added}} eklendi, {{updated}} güncellendi, {{removed}} kaldırıldı; {{fileState}}. Ayrıntılar yapılandırma geçmişindedir.",
+    "credentialsCleared": "Platform verileri korundu, kimlik bilgileri temizlendi. Erişimi geri yüklemek için platform verilerini eşitleyin.",
+    "group": "Grup",
+    "actions": "İşlemler",
+    "groupStatus": "Grup durumu",
+    "userId": "Kullanıcı kimliği",
+    "keyId": "Anahtar kimliği",
+    "keyName": "Anahtar adı",
+    "showKey": "API Key göster",
+    "hideKey": "API Key gizle",
+    "copyKey": "API Key kopyala",
+    "keyCopied": "API Key kopyalandı",
+    "copyFailed": "API Key kopyalanamadı. Yeniden deneyin.",
+    "noKey": "Bu grup için API Key yok. Platform verilerini yeniden eşitleyin.",
+    "expandCatalog": "Model kataloğunu genişlet",
+    "collapseCatalog": "Model kataloğunu daralt",
+    "toggleModel": "{{name}} model parametreleri",
+    "expand": "Genişlet",
+    "collapse": "Daralt",
+    "viewDetails": "Ayrıntıları görüntüle",
+    "viewDetailsFor": "{{name}} ayrıntılarını görüntüle",
+    "detailsDescription": "Grup bilgileri ve model parametreleri",
+    "groupId": "Grup kimliği",
+    "platform": "Platform türü",
+    "billing": "Faturalandırma türü",
+    "source": "Platform adresi",
+    "status": "Eşitleme durumu",
+    "subscription": "Abonelik",
+    "standard": "Kullandıkça öde",
+    "modelCatalog": "Model kataloğu",
+    "noModels": "Görüntülenecek model verisi yok",
+    "contextWindow": "Bağlam penceresi",
+    "maxOutput": "En fazla çıktı token sayısı",
+    "endpoints": "API protokolleri",
+    "inputModalities": "Girdi türleri",
+    "tools": "Araç çağırma",
+    "streaming": "Akışlı çıktı",
+    "reasoningLevels": "Akıl yürütme düzeyleri",
+    "defaultReasoning": "Varsayılan akıl yürütme düzeyi",
+    "notReported": "Belirtilmemiş",
+    "supported": "Destekleniyor",
+    "unsupported": "Desteklenmiyor",
+    "title": "Platform verileri",
+    "description": "Grupları ve model kataloglarını tüm uygulamalar için ortak veri olarak Zhishu platformundan alın. Ardından her uygulamada Platform sağlayıcılarını eşitle seçeneğiyle yerel sağlayıcı yapılandırmasını oluşturun.",
+    "sync": "Platform verilerini eşitle",
+    "syncing": "Platform verileri eşitleniyor…",
+    "success": "Platform verileri güncellendi. Uygulamak için her uygulamada platform sağlayıcılarını eşitleyin.",
+    "partial": "Bazı gruplar eşitlenemedi. Kullanılabilir veriler kaydedildi; yeniden deneyebilirsiniz.",
+    "account": "Geçerli hesap",
+    "lastSync": "Son eşitleme",
+    "never": "Henüz eşitlenmedi",
+    "counts": "{{groups}} grup · {{models}} model",
+    "loading": "Yerel platform verileri okunuyor…",
+    "empty": "Bu hesap için henüz platform verisi yok. Yukarıdaki düğmeyle eşitleyin.",
+    "noGroups": "Bu hesapta eşitlenebilecek grup yok.",
+    "models": "model",
+    "failed": "Eşitleme başarısız; yeniden deneyebilirsiniz",
+    "ready": "Eşitlendi",
+    "localHint": "Bu cihazda kayıtlı platform verileriyle sağlayıcı yapılandırmaları oluşturun",
+    "changes": "Eklenen {{added}}, kaldırılan {{removed}}, atlanan {{skipped}}",
+    "providersSuccess": "Platform sağlayıcıları eşitlendi: eklenen {{added}}, kaldırılan {{removed}}, atlanan {{skipped}}",
+    "providersSyncing": "Platform sağlayıcıları eşitleniyor…",
+    "providersSync": "Platform sağlayıcılarını eşitle",
+    "providersSyncAll": "Tüm uygulamaların sağlayıcılarını eşitle",
+    "bulkAdd": "Tümünü ekle",
+    "bulkRemove": "Tümünü çıkar",
+    "bulkAddHint": "Henüz eklenmemiş tüm platform sağlayıcılarını eklenmiş listeye ekler",
+    "bulkRemoveHint": "Eklenmiş platform sağlayıcılarını yapılandırmadan çıkarır; kullanılabilir listede kalır",
+    "bulkAddStackHint": "Tüm platform sağlayıcılarını yığın listesine ekler",
+    "bulkRemoveStackHint": "Platform sağlayıcılarını yığın listesinden çıkarır",
+    "bulkAddDone": "{{count}} platform sağlayıcısı eklendi",
+    "bulkRemoveDone": "{{count}} platform sağlayıcısı çıkarıldı",
+    "bulkPartial": "{{success}} başarılı, {{failed}} başarısız"
+  },
   "app": {
     "title": "CC Switch",
     "description": "Claude Code, Codex ve Gemini CLI için Hepsi Bir Arada Asistan"
@@ -900,6 +989,8 @@
     "hermesConfigDirDescription": "Hermes yapılandırma dizinini (config.yaml) geçersiz kılın.",
     "piConfigDir": "Pi Yapılandırma Dizini",
     "piConfigDirDescription": "Pi yapılandırma dizinini (models.json, talimat dosyaları, istemler, beceriler ve oturumlar) geçersiz kılın.",
+    "workbuddyConfigDir": "WorkBuddy Yapılandırma Dizini",
+    "workbuddyConfigDirDescription": "WorkBuddy yapılandırma dizinini (models.json) geçersiz kılın.",
     "browsePlaceholderClaude": "ör. /home/<your-username>/.claude",
     "browsePlaceholderCodex": "ör. /home/<your-username>/.codex",
     "browsePlaceholderGemini": "ör., /home/<your-username>/.gemini",
@@ -908,6 +999,7 @@
     "browsePlaceholderOpenclaw": "ör. /home/<your-username>/.openclaw",
     "browsePlaceholderHermes": "ör. /home/<your-username>/.hermes",
     "browsePlaceholderPi": "ör. /home/<your-username>/.pi/agent",
+    "browsePlaceholderWorkbuddy": "ör. /home/<your-username>/.workbuddy",
     "browseDirectory": "Dizine Göz Atın",
     "resetDefault": "Varsayılan dizine sıfırla (kaydettikten sonra etkili olur)",
     "checkForUpdates": "Güncellemeleri Kontrol Et",
@@ -1052,9 +1144,6 @@
     "data": {
       "location": "Konum"
     },
-    "workbuddyConfigDir": "WorkBuddy Yapılandırma Dizini",
-    "workbuddyConfigDirDescription": "WorkBuddy yapılandırma dizinini (models.json) geçersiz kılın.",
-    "browsePlaceholderWorkbuddy": "ör. /home/<your-username>/.workbuddy",
     "configHistory": {
       "title": "Yapılandırma değişiklik geçmişi",
       "description": "zhishu-ccs her uygulamanın yapılandırma dosyasını ne zaman yazdığını, tetikleyiciyi ve önce/sonra içeriğini gösterir. Son 300 kayıt yalnızca bu cihazda tutulur.",
@@ -1137,8 +1226,8 @@
     "openclaw": "OpenClaw",
     "hermes": "Hermes",
     "pi": "Pi",
-    "mcode": "MiniMax Code",
-    "workbuddy": "WorkBuddy"
+    "workbuddy": "WorkBuddy",
+    "mcode": "MiniMax Code"
   },
   "mcode": {
     "empty": {
@@ -4094,6 +4183,7 @@
     "title": "Abonelik Kotası",
     "short": {
       "fiveHour": "5 saat",
+      "daily": "Gün",
       "sevenDay": "hafta",
       "sevenDayFable": "Fable",
       "sevenDayOpus": "Opus",
@@ -4107,6 +4197,7 @@
       "copilotPremium": "Premium"
     },
     "fiveHour": "5 saat",
+    "daily": "Günlük",
     "sevenDay": "Haftalık",
     "sevenDayFable": "Fable",
     "sevenDayOpus": "Haftalık Opus",
@@ -4167,6 +4258,7 @@
     "columnVersion": "Sürüm",
     "columnVisible": "Göster",
     "visibleHelp": "Kapalıyken uygulama artık kenar çubuğunda, tepsi menüsünde, MCP / Skills uygulama sütunlarında veya İstemler ve Oturumlar'daki uygulama seçicilerde görünmez. Yalnızca gizlenir: sağlayıcıları, MCP sunucuları ve diğer ayarları yerinde kalır, kendi yapılandırma dosyalarına da dokunulmaz.",
+    "manuallyManaged": "Kurulum ve güncellemeleri elle yönetin",
     "desktopHelp": "Claude Desktop bir masaüstü uygulamasıdır ve buraya yüklenemez veya yükseltilemez; CC Switch, yapılandırma dosyası aracılığıyla ona bağlanır.",
     "desktopUnsupported": "Bu sistemde desteklenmiyor",
     "desktopConnected": "Bağlı",
@@ -4186,8 +4278,7 @@
       "hermes": "Resmi komut dosyasıyla yüklenir",
       "pi": "Npm ile yüklenir",
       "mcode": "Resmi komut dosyasıyla yüklenir, npm'ye geri döner"
-    },
-    "manuallyManaged": "Kurulum ve güncellemeleri elle yönetin"
+    }
   },
   "appPage": {
     "moreActions": "{{name}} için diğer işlemler",
@@ -4200,7 +4291,9 @@
     "openclawConfig": "Yapılandırma",
     "memory": "Bellek",
     "webUi": "Web kullanıcı arayüzü",
-    "viewUsage": "Bu uygulamanın kullanımını görüntüle"
+    "viewUsage": "Bu uygulamanın kullanımını görüntüle",
+    "browseDirectory": "Dizine gözat",
+    "openDirectoryFailed": "Dizin açılamadı"
   },
   "mode": {
     "tabsLabel": "Bağlantı modu",
@@ -4317,7 +4410,9 @@
       "mapping": "Model eşleme",
       "direct": "Doğrudan",
       "hermesManaged": "Hermes tarafından yönetilmektedir",
-      "defaultModel": "Varsayılan model {{model}}"
+      "defaultModel": "Varsayılan model {{model}}",
+      "platform": "Platform",
+      "platformHint": "Platform temel verilerinden eşitlendi; API anahtarı platform tarafından yönetilir."
     },
     "reason": {
       "noRoute": "Resmi abonelikler yönlendirmeden geçmez; doğrudan modda tekrar kullanılabilir.",
@@ -4863,6 +4958,19 @@
       "refresh": "Kotayı yenile",
       "refreshAria": "{{login}} için kotayı yenileyin"
     }
+  },
+  "platformUsage": {
+    "accountBalance": "Hesap bakiyesi",
+    "sharedBalance": "Tüm kullanım tabanlı gruplar tarafından paylaşılır",
+    "sharedQuota": "Tüm araçlar tarafından paylaşılır",
+    "expiresInDays": "{{count}} gün kaldı",
+    "unlimited": "Sınırsız",
+    "subscriptionUnavailable": "Abonelik kotası kullanılamıyor: {{reason}}",
+    "manageSubscription": "Aboneliği yönet",
+    "renewSubscription": "Aboneliği yenile",
+    "subscriptionInactive": "Abonelik kullanılamıyor",
+    "subscriptionLoading": "Abonelik bilgileri yükleniyor",
+    "openSubscriptionFailed": "Abonelik sayfası açılamadı. Lütfen tekrar deneyin."
   },
   "kimi": {
     "oauth": {

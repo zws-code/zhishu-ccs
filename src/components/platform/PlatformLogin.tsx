@@ -23,12 +23,13 @@ import { DRAG_REGION_ATTR, DRAG_REGION_STYLE, isMac } from "@/lib/platform";
 import { WindowControls } from "@/components/shell/WindowControls";
 import logo from "@/assets/icons/logo.png";
 
-// Vite's root is src/, so the optional deployment configuration lives in src/.env.local.
+// Vite 根目录是 src/，可选的部署环境配置相应放在 src/.env.local。
 const DEFAULT_API =
   import.meta.env.VITE_PLATFORM_API_URL || "http://127.0.0.1:3000";
 const WEBSITE =
   import.meta.env.VITE_PLATFORM_WEB_URL || "http://127.0.0.1:3081";
 
+/** 平台登录门禁：恢复期间等待验证，恢复失败提供重试入口，通过认证后才挂载工具界面。 */
 export function PlatformAuthGate({ children }: { children: ReactNode }) {
   const auth = usePlatformAuth();
   const { t } = useTranslation();
@@ -46,6 +47,7 @@ export function PlatformAuthGate({ children }: { children: ReactNode }) {
   return auth.account ? children : <PlatformLogin />;
 }
 
+/** 启动恢复失败页；重试保留现有会话资料，返回登录则先显式退出，避免绕过身份验证。 */
 function PlatformSessionRecovery() {
   const auth = usePlatformAuth()!;
   const { t } = useTranslation();
@@ -104,6 +106,7 @@ function PlatformSessionRecovery() {
   );
 }
 
+/** 登录表单与二次验证共用入口；账号历史可预填密码，仍需用户提交并完成平台验证。 */
 export function PlatformLogin() {
   const auth = usePlatformAuth();
   const { t } = useTranslation();
@@ -466,7 +469,7 @@ export function PlatformAccountMenu({ collapsed }: { collapsed: boolean }) {
   const [refreshingBalance, setRefreshingBalance] = useState(false);
   if (!auth?.account) return null;
   const { user } = auth.account;
-  // Platform balances are denominated in USD, independent of local usage display settings.
+  // 平台钱包金额固定以美元计价，不跟随本地用量展示币种切换。
   const digits =
     Math.abs(user.balance) > 0 && Math.abs(user.balance) < 0.01 ? 6 : 2;
   const balance = new Intl.NumberFormat(

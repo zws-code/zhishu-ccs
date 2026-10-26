@@ -211,7 +211,7 @@ describe("App integration with MSW", () => {
     toastSuccessMock.mockReset();
     toastErrorMock.mockReset();
     skillsPanelMocks.initialViews = [];
-    localStorage.removeItem("cc-switch-last-view");
+    localStorage.setItem("cc-switch-last-view", "providers");
     localStorage.removeItem("cc-switch-last-app");
   });
 
@@ -848,7 +848,9 @@ describe("App integration with MSW", () => {
     await waitFor(() =>
       expect(toastErrorMock).toHaveBeenCalledWith(
         "notifications.removeFromConfigFailed",
-        expect.objectContaining({ description: "kimi.error.defaultModelInUse" }),
+        expect.objectContaining({
+          description: "kimi.error.defaultModelInUse",
+        }),
       ),
     );
     await waitFor(() =>
@@ -948,6 +950,23 @@ describe("App integration with MSW", () => {
     );
 
     liveIdsSpy.mockRestore();
+  });
+
+  it("opens the shared platform data page from the sidebar and persists its navigation", async () => {
+    const { default: App } = await import("@/App");
+    renderApp(App);
+    fireEvent.click(sidebarApp("平台基础数据"));
+    expect(
+      screen.getByRole("heading", { name: "平台基础数据", hidden: true }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "同步平台基础数据", hidden: true }),
+    ).toBeDisabled();
+    await waitFor(() =>
+      expect(localStorage.getItem("cc-switch-last-view")).toBe(
+        "platformCatalog",
+      ),
+    );
   });
 
   it("renders the Skills page with its own header", async () => {

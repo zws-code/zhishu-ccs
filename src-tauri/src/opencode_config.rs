@@ -619,6 +619,41 @@ pub fn get_mcp_servers() -> Result<Map<String, Value>, AppError> {
         .unwrap_or_default())
 }
 
+/// Seed native model selection for provider-sync and logout regression tests.
+#[cfg(test)]
+pub(crate) fn set_platform_default(id: &str, model: &str) -> Result<(), AppError> {
+    try_edit_config(get_opencode_config_path, |config| {
+        if ["providers", "provider"].iter().all(|key| {
+            config
+                .get(*key)
+                .and_then(|providers| providers.get(id))
+                .is_none()
+        }) {
+            return Err(AppError::Config(
+                "The platform provider has not been configured".into(),
+            ));
+        }
+        config["model"] = json!(format!("{id}/{model}"));
+        config["small_model"] = json!(format!("{id}/{model}"));
+        if let Some(disabled) = config
+            .get_mut("disabled_providers")
+            .and_then(Value::as_array_mut)
+        {
+            disabled.retain(|value| value.as_str() != Some(id));
+        }
+        if let Some(enabled) = config
+            .get_mut("enabled_providers")
+            .and_then(Value::as_array_mut)
+        {
+            if !enabled.iter().any(|value| value.as_str() == Some(id)) {
+                enabled.push(json!(id));
+            }
+        }
+        Ok(())
+    })
+    .map(|_| ())
+}
+
 pub fn set_mcp_server(id: &str, config: Value) -> Result<(), AppError> {
     edit_config(get_opencode_config_path, |full_config| {
         if !full_config.get("mcp").is_some_and(Value::is_object) {

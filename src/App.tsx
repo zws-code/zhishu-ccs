@@ -27,6 +27,7 @@ import {
   useProvidersQuery,
   useSettingsQuery,
 } from "@/lib/query";
+import { refreshAdditiveLiveState } from "@/lib/query/additiveLiveState";
 import {
   piApi,
   providersApi,
@@ -78,6 +79,9 @@ import { WindowControls } from "@/components/shell/WindowControls";
 import { APP_DISPLAY_NAME, AppGlyph } from "@/components/shell/AppGlyph";
 import { ProfileSwitcher } from "@/components/profiles/ProfileSwitcher";
 import { ProviderList } from "@/components/providers/ProviderList";
+import { PlatformConnectButton } from "@/components/platform/PlatformConnectButton";
+import { PlatformBulkSyncButtons } from "@/components/platform/PlatformBulkSyncButtons";
+import { PlatformCatalogPage } from "@/components/platform/PlatformCatalogPage";
 import { AddProviderDialog } from "@/components/providers/AddProviderDialog";
 import {
   hasOpencodeDefinition,
@@ -156,7 +160,6 @@ function App() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { hasUpdate } = useUpdate();
-
   const [activeApp, setActiveApp] = useState<AppId>(getInitialApp);
   const sharedFeatureApp = sharedFeatureAppOf(activeApp);
   const [currentView, setCurrentView] = useState<View>(readStoredView);
@@ -822,33 +825,7 @@ function App() {
   };
 
   // 累加式应用的「已添加」和「默认」都现读客户端文件，移除前后重读一遍
-  const refreshAdditiveLiveState = async (app: AppId) => {
-    if (app === "pi") {
-      await invalidatePiProviderCaches(queryClient);
-    } else if (app === "opencode") {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: ["opencodeLiveProviderIds"],
-        }),
-        queryClient.invalidateQueries({ queryKey: ["opencodeDefaultModel"] }),
-      ]);
-    } else if (app === "openclaw") {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: openclawKeys.liveProviderIds,
-        }),
-        queryClient.invalidateQueries({ queryKey: openclawKeys.defaultModel }),
-        queryClient.invalidateQueries({ queryKey: openclawKeys.health }),
-      ]);
-    } else if (app === "hermes") {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: hermesKeys.liveProviderIds }),
-        queryClient.invalidateQueries({ queryKey: hermesKeys.modelConfig }),
-      ]);
-    } else if (app === "mcode" || app === "kimi") {
-      await queryClient.invalidateQueries({ queryKey: ["providers", app] });
-    }
-  };
+  // （实现在 src/lib/query/additiveLiveState.ts，页头的平台批量按钮共用）
 
   const handleConfirmAction = async () => {
     if (!confirmAction) return;
@@ -868,14 +845,16 @@ function App() {
               ? translateKimiProviderMutationError(detail, t)
               : "") || detail;
         // 默认模型可能在客户端里改过、页面还是旧的：失败了也重读，让「默认」和移除按钮跟上
-        void refreshAdditiveLiveState(activeApp).catch(() => undefined);
+        void refreshAdditiveLiveState(queryClient, activeApp).catch(
+          () => undefined,
+        );
         toast.error(t("notifications.removeFromConfigFailed"), {
           description: description || t("common.unknown"),
           closeButton: true,
         });
         return;
       }
-      await refreshAdditiveLiveState(activeApp);
+      await refreshAdditiveLiveState(queryClient, activeApp);
       toast.success(
         activeApp === "pi"
           ? t("pi.provider.removed", {
@@ -1077,11 +1056,29 @@ function App() {
     const isPiGlobalDefault =
       activeApp === "pi" &&
       piCurrentState?.defaultProviderId === confirmAction.provider.id;
+    // DSH 对当前供应商：删除时后端先自动切到备用路由，移除会清掉默认模型设置，
+    // 两种后果不同，弹窗里分别说明
+    const isDshCurrentProvider =
+      activeApp === "deepseek-harness" &&
+      confirmAction.provider.id === currentProviderId;
 
-    return isPiGlobalDefault
-      ? `${message}\n\n${t("confirm.piDefaultProviderWarning")}`
-      : message;
-  }, [activeApp, confirmAction, piCurrentState?.defaultProviderId, t]);
+    if (isPiGlobalDefault) {
+      return `${message}\n\n${t("confirm.piDefaultProviderWarning")}`;
+    }
+    if (isDshCurrentProvider && confirmAction.action === "delete") {
+      return `${message}\n\n${t("confirm.dshCurrentProviderDeleteWarning")}`;
+    }
+    if (isDshCurrentProvider && confirmAction.action === "remove") {
+      return `${message}\n\n${t("confirm.dshCurrentProviderRemoveWarning")}`;
+    }
+    return message;
+  }, [
+    activeApp,
+    confirmAction,
+    currentProviderId,
+    piCurrentState?.defaultProviderId,
+    t,
+  ]);
 
   const handleImportSuccess = async () => {
     try {
@@ -1163,6 +1160,20 @@ function App() {
             {t("appPage.viewUsage")}
           </DropdownMenuItem>
         )}
+        <DropdownMenuItem
+          onSelect={() => {
+            settingsApi.openConfigFolder(activeApp).catch((error: unknown) => {
+              toast.error(
+                t("appPage.openDirectoryFailed", {
+                  defaultValue: "打开目录失败",
+                }),
+                { description: extractErrorMessage(error) || undefined },
+              );
+            });
+          }}
+        >
+          {t("appPage.browseDirectory")}
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => openSettings("appConfig", activeApp)}>
           {t("appPage.configDirectory")}
         </DropdownMenuItem>
@@ -1248,6 +1259,16 @@ function App() {
                 </Button>
               </HoverTip>
             )}
+          {currentView === "providers" && (
+            <>
+              <PlatformConnectButton app={activeApp} />
+              <PlatformBulkSyncButtons
+                app={activeApp}
+                modeView={modeAppId ? (currentModeView ?? null) : null}
+                providers={Object.values(providers)}
+              />
+            </>
+          )}
           {currentView === "providers" && (
             <Button
               variant="solid"
@@ -1477,6 +1498,8 @@ function App() {
 
   const renderGlobalPage = () => {
     switch (currentView) {
+      case "platformCatalog":
+        return <PlatformCatalogPage />;
       case "usage":
         return (
           <UsagePage

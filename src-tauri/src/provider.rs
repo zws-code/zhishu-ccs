@@ -245,7 +245,13 @@ impl Provider {
             ),
             // OpenCode (OMO) nests credentials under `options` (the SDK options object).
             AppType::OpenCode | AppType::Mcode => {
-                let options = settings.get("options");
+                let options = if app_type == &AppType::OpenCode
+                    && self.opencode_config_format() == Some(OpenCodeConfigFormat::V2)
+                {
+                    settings.get("settings")
+                } else {
+                    settings.get("options")
+                };
                 (
                     str_at(options.and_then(|o| o.get("baseURL"))),
                     str_at(options.and_then(|o| o.get("apiKey"))),
