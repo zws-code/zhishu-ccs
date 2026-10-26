@@ -80,6 +80,35 @@ impl ClaudeProjection {
     }
 }
 
+/// 直连切换时补齐模型档位：行里写了主模型（`ANTHROPIC_MODEL`）但某个档位没写时，
+/// 按代理投影同一条回落链补上，`/model` 的别名才不会落回 Claude Code 内置的官方
+/// 模型表、把官方模型名发给第三方网关。只补 `env` 里的三个档位：行里已有的档位
+/// 以行为准，缺的在写盘时补上（行本身不改写）。没有主模型的行（官方登录、Bedrock）
+/// 什么都不补。回落链与 [`proxy_model_fields`] 相同：haiku 档先
+/// `ANTHROPIC_SMALL_FAST_MODEL` 再主模型，sonnet、opus 直接用主模型。
+pub fn with_derived_model_slots(mut projection: ClaudeProjection) -> ClaudeProjection {
+    let Some(default_model) = env_string(&projection.env, "ANTHROPIC_MODEL").map(str::to_string)
+    else {
+        return projection;
+    };
+    let small_fast = env_string(&projection.env, "ANTHROPIC_SMALL_FAST_MODEL").map(str::to_string);
+    let slots = [
+        (
+            "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+            small_fast.unwrap_or_else(|| default_model.clone()),
+        ),
+        ("ANTHROPIC_DEFAULT_SONNET_MODEL", default_model.clone()),
+        ("ANTHROPIC_DEFAULT_OPUS_MODEL", default_model),
+    ];
+    for (key, derived) in slots {
+        projection
+            .env
+            .entry(key.to_string())
+            .or_insert_with(|| Value::String(derived));
+    }
+    projection
+}
+
 /// 以 live 为底切到 `target`：
 /// - 关键字段：一律清空，再写 `target` 的；
 /// - 独有字段：先删 `prev` 带进来、而且值没被改过的，再写 `target` 的；
@@ -763,6 +792,63 @@ mod tests {
             store_into_row(&env_row, &ClaudeProjection::of(&env_row)),
             env_row
         );
+    }
+
+    #[test]
+    fn direct_slots_fill_from_the_main_model_when_missing() {
+        let row = json!({ "env": {
+            "ANTHROPIC_BASE_URL": "https://gw.example",
+            "ANTHROPIC_AUTH_TOKEN": "sk-gw",
+            "ANTHROPIC_MODEL": "glm-5.2[1M]"
+        }});
+        let projection = with_derived_model_slots(ClaudeProjection::of(&row));
+        let env = |key: &str| projection.env.get(key).and_then(Value::as_str);
+        assert_eq!(env("ANTHROPIC_DEFAULT_HAIKU_MODEL"), Some("glm-5.2[1M]"));
+        assert_eq!(env("ANTHROPIC_DEFAULT_SONNET_MODEL"), Some("glm-5.2[1M]"));
+        assert_eq!(env("ANTHROPIC_DEFAULT_OPUS_MODEL"), Some("glm-5.2[1M]"));
+    }
+
+    #[test]
+    fn derived_slots_keep_explicit_values_and_the_small_fast_fallback() {
+        let row = json!({ "env": {
+            "ANTHROPIC_MODEL": "glm-5.2",
+            "ANTHROPIC_SMALL_FAST_MODEL": "glm-4.7-air",
+            "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.2-air"
+        }});
+        let projection = with_derived_model_slots(ClaudeProjection::of(&row));
+        let env = |key: &str| projection.env.get(key).and_then(Value::as_str);
+        assert_eq!(env("ANTHROPIC_DEFAULT_HAIKU_MODEL"), Some("glm-4.7-air"));
+        assert_eq!(env("ANTHROPIC_DEFAULT_SONNET_MODEL"), Some("glm-5.2-air"));
+        assert_eq!(env("ANTHROPIC_DEFAULT_OPUS_MODEL"), Some("glm-5.2"));
+    }
+
+    #[test]
+    fn rows_without_a_main_model_get_no_derived_slots() {
+        for row in [
+            json!({ "env": { "ANTHROPIC_AUTH_TOKEN": "sk-official" } }),
+            json!({ "env": {
+                "CLAUDE_CODE_USE_BEDROCK": "1",
+                "AWS_REGION": "us-west-2"
+            }}),
+        ] {
+            let projection = with_derived_model_slots(ClaudeProjection::of(&row));
+            for key in [
+                "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+                "ANTHROPIC_DEFAULT_SONNET_MODEL",
+                "ANTHROPIC_DEFAULT_OPUS_MODEL",
+            ] {
+                assert!(projection.env.get(key).is_none(), "{key}");
+            }
+        }
+    }
+
+    #[test]
+    fn deriving_only_touches_the_writeout_projection_not_the_row() {
+        let row = json!({ "env": {
+            "ANTHROPIC_BASE_URL": "https://gw.example",
+            "ANTHROPIC_MODEL": "glm-5.2"
+        }});
+        assert_eq!(store_into_row(&row, &ClaudeProjection::of(&row)), row);
     }
 
     #[test]

@@ -1296,6 +1296,47 @@ mod tests {
         );
     }
 
+    /// 切换时自动补齐模型档位：行里只写了主模型时，`/model` 的三个别名档位按回落链
+    /// 补进 `settings.json`；行里已有的档位以行为准，供应商行本身不改写。
+    #[tokio::test]
+    #[serial]
+    async fn switching_claude_provider_fills_missing_model_slots_in_live() {
+        let _home = TempHome::new();
+        crate::settings::reload_settings().expect("reload settings");
+
+        let db = Arc::new(Database::memory().expect("init db"));
+        let state = AppState::new(db.clone());
+        let bare = Provider::with_id(
+            "gw".into(),
+            "Gateway".into(),
+            json!({ "env": {
+                "ANTHROPIC_BASE_URL": "https://gw.example",
+                "ANTHROPIC_AUTH_TOKEN": "sk-gw",
+                "ANTHROPIC_MODEL": "glm-5.2"
+            }}),
+            None,
+        );
+        db.save_provider("claude", &bare).expect("save provider");
+        ProviderService::switch(&state, AppType::Claude, "gw").expect("switch");
+
+        let live: Value = read_json_file(&get_claude_settings_path()).expect("read live");
+        let env = |key: &str| live["env"][key].as_str();
+        assert_eq!(env("ANTHROPIC_DEFAULT_HAIKU_MODEL"), Some("glm-5.2"));
+        assert_eq!(env("ANTHROPIC_DEFAULT_SONNET_MODEL"), Some("glm-5.2"));
+        assert_eq!(env("ANTHROPIC_DEFAULT_OPUS_MODEL"), Some("glm-5.2"));
+
+        // 行里已有的档位以行为准；行本身保持只有主模型，下次编辑看到的还是原样。
+        let row = db
+            .get_all_providers("claude")
+            .expect("providers")
+            .get("gw")
+            .expect("row")
+            .clone();
+        assert!(row.settings_config["env"]
+            .get("ANTHROPIC_DEFAULT_SONNET_MODEL")
+            .is_none());
+    }
+
     /// 文件已经写成目标供应商、指针还没改时崩溃：下次启动按 pending 补完指针，
     /// 文件和指针重新一致。
     #[tokio::test]

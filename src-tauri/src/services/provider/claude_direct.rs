@@ -10,7 +10,7 @@ use crate::database::Database;
 use crate::error::AppError;
 use crate::live::engine::LiveFile;
 use crate::live::patch::json::JsonPatch;
-use crate::live::project::claude::{direct_patch, ClaudeProjection};
+use crate::live::project::claude::{direct_patch, with_derived_model_slots, ClaudeProjection};
 use crate::mode::operation::{AppWrite, FileChange, OperationReport};
 use crate::mode::state::{op, PendingTarget};
 use crate::provider::Provider;
@@ -54,7 +54,8 @@ fn write(
     let prev = prev.map(|provider| ClaudeProjection::of(&provider.settings_config));
     let patch = direct_patch(
         prev.as_ref(),
-        &ClaudeProjection::of(&target.settings_config),
+        // 切换写盘的那一份补齐模型档位；`prev` 只用独有字段，不用补。
+        &with_derived_model_slots(ClaudeProjection::of(&target.settings_config)),
     );
     run(
         db,
