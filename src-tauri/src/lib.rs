@@ -1293,6 +1293,7 @@ pub fn run() {
             );
             // 将同一个实例注入到全局状态，避免重复创建导致的不一致
             app.manage(app_state);
+            app.manage(commands::PlatformAuthState::default());
             app.manage(services::kimi_oauth::KimiOAuthManager::default());
 
             // 初始化 SkillService
@@ -1539,6 +1540,16 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::platform_cancel_login,
+            commands::platform_login_history,
+            commands::platform_saved_password,
+            commands::platform_forget_password,
+            commands::platform_remove_login,
+            commands::platform_login,
+            commands::platform_login_2fa,
+            commands::platform_get_account,
+            commands::platform_get_subscription_usage,
+            commands::platform_logout,
             commands::get_providers,
             commands::get_current_provider,
             commands::add_provider,

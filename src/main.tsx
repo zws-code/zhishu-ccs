@@ -1,6 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { PlatformAuthProvider } from "./contexts/PlatformAuthContext";
+import { PlatformAuthGate } from "./components/platform/PlatformLogin";
 import { DatabaseUpgrade } from "./components/DatabaseUpgrade";
 import { UpdateProvider } from "./contexts/UpdateContext";
 import "./index.css";
@@ -139,7 +141,11 @@ async function bootstrap() {
               <MotionConfig reducedMotion="user">
                 {/* 全局悬停提示：移上去立即出现（HoverTip） */}
                 <TooltipProvider delayDuration={0} skipDelayDuration={0}>
-                  <App />
+                  <PlatformAuthProvider>
+                    <PlatformAuthGate>
+                      <App />
+                    </PlatformAuthGate>
+                  </PlatformAuthProvider>
                 </TooltipProvider>
               </MotionConfig>
               <Toaster />

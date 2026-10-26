@@ -5012,5 +5012,32 @@
     "defaultModel": "默认模型",
     "defaultModelHint": "DSH 默认使用的模型。",
     "defaultModelBackgroundHint": "该供应商不是 DSH 当前使用的路由，默认模型修改不会生效。"
+  },
+  "platformAuth": {
+    "title": "登录智枢router",
+    "subtitle": "使用平台账户登录，管理你的 AI 编程工具。",
+    "address": "平台后端地址",
+    "email": "邮箱",
+    "password": "密码",
+    "login": "登录",
+    "loading": "正在检查登录状态…",
+    "totp": "二次验证码",
+    "totpHint": "请输入身份验证器中的六位数字验证码。",
+    "verify": "验证并登录",
+    "back": "返回邮箱登录",
+    "register": "注册账户",
+    "forgot": "忘记密码",
+    "logout": "退出平台登录",
+    "account": "平台账户",
+    "balance": "余额",
+    "refreshBalance": "点击刷新余额",
+    "sessionHint": "登录后自动保持登录；连续超过 7 天未使用需要重新登录。“记住密码”仅用于下次填写密码。",
+    "restoreFailed": "暂时无法恢复登录",
+    "restoreHint": "请检查网络或解锁系统凭据库后重试，已保存的登录凭证会保留。",
+    "retryRestore": "重试恢复登录",
+    "loginHistory": "登录账号记录",
+    "otherAccount": "使用其他账号",
+    "removeLogin": "删除记录",
+    "rememberPassword": "记住密码"
   }
 }

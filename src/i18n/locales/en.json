@@ -5012,5 +5012,32 @@
     "defaultModel": "Default Model",
     "defaultModelHint": "The model DSH uses by default.",
     "defaultModelBackgroundHint": "This provider is not the route DSH currently uses; default-model changes would not apply."
+  },
+  "platformAuth": {
+    "title": "Sign in to 智枢router",
+    "subtitle": "Sign in with your platform account to manage AI coding tools.",
+    "address": "Platform API address",
+    "email": "Email",
+    "password": "Password",
+    "login": "Sign in",
+    "loading": "Checking your session…",
+    "totp": "Verification code",
+    "totpHint": "Enter the six-digit code from your authenticator.",
+    "verify": "Verify and sign in",
+    "back": "Back to sign in",
+    "register": "Create an account",
+    "forgot": "Forgot password",
+    "logout": "Sign out of platform",
+    "account": "Platform account",
+    "balance": "Balance",
+    "refreshBalance": "Click to refresh balance",
+    "sessionHint": "Stay signed in across restarts. Sign in again after more than 7 days without use. Remember password only fills your password next time.",
+    "restoreFailed": "Unable to restore your session",
+    "restoreHint": "Check your connection or unlock your system credential store, then retry. Your saved session is kept.",
+    "retryRestore": "Retry restoring session",
+    "loginHistory": "Recent accounts",
+    "otherAccount": "Use another account",
+    "removeLogin": "Remove",
+    "rememberPassword": "Remember password"
   }
 }

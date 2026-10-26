@@ -4826,5 +4826,11 @@
       "tool_use": "Araç kullanımı",
       "dynamically_loaded_tools": "Araçları gerektiğinde yükle"
     }
+  },
+  "platformAuth": {
+    "restoreFailed": "Oturumunuz geri yüklenemedi",
+    "restoreHint": "Bağlantınızı kontrol edin veya sistem kimlik bilgisi deposunun kilidini açıp yeniden deneyin. Kaydedilen oturumunuz korunur.",
+    "retryRestore": "Oturumu geri yüklemeyi dene",
+    "sessionHint": "Yeniden başlatmalarda oturum açık kalır. 7 günden uzun süre kullanılmazsa yeniden giriş gerekir. Parolayı hatırla yalnızca bir sonraki girişte parolayı doldurur."
   }
 }

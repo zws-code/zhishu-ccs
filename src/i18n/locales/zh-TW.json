@@ -5013,5 +5013,11 @@
     "defaultModel": "預設模型",
     "defaultModelHint": "DSH 預設使用的模型。",
     "defaultModelBackgroundHint": "該供應商不是 DSH 目前使用的路由，預設模型修改不會生效。"
+  },
+  "platformAuth": {
+    "restoreFailed": "暫時無法恢復登入",
+    "restoreHint": "請檢查網路或解鎖系統憑證庫後重試，已儲存的登入憑證會保留。",
+    "retryRestore": "重試恢復登入",
+    "sessionHint": "登入後自動保持登入；連續超過 7 天未使用需要重新登入。「記住密碼」僅用於下次填寫密碼。"
   }
 }

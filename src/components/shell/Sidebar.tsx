@@ -41,6 +41,7 @@ import {
 import { useSidebarStatus, type AppNavStatus } from "@/hooks/useSidebarStatus";
 import { HoverTip } from "@/components/ui/hover-tip";
 import { cn } from "@/lib/utils";
+import { PlatformAccountMenu } from "@/components/platform/PlatformLogin";
 import { SidebarTopBar } from "./SidebarTopBar";
 import { APP_DISPLAY_NAME, AppGlyph } from "./AppGlyph";
 
@@ -95,6 +96,7 @@ export function Sidebar(props: SidebarProps) {
       ) : (
         <MainDirectory {...props} collapsed={collapsed} />
       )}
+      <PlatformAccountMenu collapsed={collapsed} />
     </nav>
   );
 }
