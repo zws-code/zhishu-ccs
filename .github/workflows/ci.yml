@@ -42,6 +42,9 @@ jobs:
             frontend:
               - "src/**"
               - "tests/**"
+              - "scripts/*release*.mjs"
+              - "scripts/generate-download-manifest.mjs"
+              - "deploy/client-download/**"
               - "index.html"
               - "package.json"
               - "pnpm-lock.yaml"
@@ -107,8 +110,11 @@ jobs:
       - name: Unit tests
         run: pnpm test:unit
 
+      - name: Test Zhishu release scripts
+        run: pnpm test:release
+
       - name: Build frontend
-        run: pnpm build:renderer
+        run: pnpm build:renderer --mode development
 
   backend:
     name: Backend Checks

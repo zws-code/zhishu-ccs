@@ -128,7 +128,10 @@ lto = "thin"
 opt-level = "s"
 # 使用 unwind 以便 panic hook 能捕获 backtrace（abort 会直接终止无法捕获）
 panic = "unwind"
-strip = "symbols"
+# Cargo applies this to proc-macro crates too. Stripping them breaks older
+# Tauri transitive dependencies with Rust 1.95, so keep the release profile
+# unstripped and strip only a finished application binary if needed.
+strip = false
 
 [dev-dependencies]
 serial_test = "3"

@@ -15,6 +15,13 @@ concurrency:
   group: release-${{ github.event_name }}-${{ github.ref_name }}
   cancel-in-progress: true
 
+env:
+  VITE_PLATFORM_API_URL: ${{ vars.ZHISHU_PLATFORM_API_URL }}
+  VITE_PLATFORM_WEB_URL: ${{ vars.ZHISHU_PLATFORM_WEB_URL }}
+  ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP: ${{ vars.ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP }}
+  ZHISHU_UPDATE_URL: ${{ vars.ZHISHU_UPDATE_URL }}
+  ZHISHU_UPDATE_PUBLIC_KEY: ${{ vars.ZHISHU_UPDATE_PUBLIC_KEY }}
+
 jobs:
   # 应用内更新摘要（src/whats-new/<版本>.json，见同目录 README）随安装包发出。漏写的话
   # 升级到这一版的用户什么也看不到；结构写坏的话弹窗渲染出错，整个应用落进错误页。
@@ -185,6 +192,9 @@ jobs:
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare Zhishu production configuration
+        run: node scripts/prepare-release.mjs
+
       - name: Prepare Tauri signing key
         uses: ./.github/actions/prepare-tauri-signing-key
         with:
@@ -200,14 +210,14 @@ jobs:
           $ErrorActionPreference = 'Stop'
           # 只发布 MSI（和便携版 exe），不打用不上的 NSIS 安装包
           if ($env:WINDOWS_RELEASE_ARCH -eq 'arm64') {
-            pnpm tauri build --target aarch64-pc-windows-msvc --bundles msi
+            pnpm tauri build --config src-tauri/tauri.release.local.conf.json --target aarch64-pc-windows-msvc --bundles msi
           } else {
-            pnpm tauri build --bundles msi
+            pnpm tauri build --config src-tauri/tauri.release.local.conf.json --bundles msi
           }
 
       - name: Build Tauri App (Linux)
         if: runner.os == 'Linux'
-        run: pnpm tauri build --bundles appimage,deb,rpm
+        run: pnpm tauri build --config src-tauri/tauri.release.local.conf.json --bundles appimage,deb,rpm
 
       - name: Prepare Windows Assets
         if: runner.os == 'Windows'
@@ -244,7 +254,7 @@ jobs:
             }
             Write-Host "MSI REBOOT property: $reboot"
 
-            $dest = "CC-Switch-$VERSION-Windows$assetSuffix.msi"
+            $dest = "Zhishu-Ccs-$VERSION-Windows$assetSuffix.msi"
             Copy-Item $msi.FullName (Join-Path release-assets $dest)
             Write-Host "Installer copied: $dest"
             $sigPath = "$($msi.FullName).sig"
@@ -260,16 +270,16 @@ jobs:
 
           # 绿色版（portable）：仅可执行文件打 zip（不参与 Updater）
           $exeCandidates = if ($isArm64) {
-            @('src-tauri/target/aarch64-pc-windows-msvc/release/cc-switch.exe')
+            @('src-tauri/target/aarch64-pc-windows-msvc/release/zhishu-ccs.exe')
           } else {
             @(
-              'src-tauri/target/release/cc-switch.exe',
-              'src-tauri/target/x86_64-pc-windows-msvc/release/cc-switch.exe'
+              'src-tauri/target/release/zhishu-ccs.exe',
+              'src-tauri/target/x86_64-pc-windows-msvc/release/zhishu-ccs.exe'
             )
           }
           $exePath = $exeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
           if ($null -ne $exePath) {
-            $portableDir = 'release-assets/CC-Switch-Portable'
+            $portableDir = 'release-assets/Zhishu-Ccs-Portable'
             New-Item -ItemType Directory -Force -Path $portableDir | Out-Null
             Copy-Item $exePath $portableDir
             $portableIniPath = Join-Path $portableDir 'portable.ini'
@@ -286,10 +296,10 @@ jobs:
               )
             }
             $portableContent | Set-Content -Path $portableIniPath -Encoding UTF8
-            $portableZip = "release-assets/CC-Switch-$VERSION-Windows$assetSuffix-Portable.zip"
+            $portableZip = "release-assets/Zhishu-Ccs-$VERSION-Windows$assetSuffix-Portable.zip"
             Compress-Archive -Path "$portableDir/*" -DestinationPath $portableZip -Force
             Remove-Item -Recurse -Force $portableDir
-            Write-Host "Windows portable zip created: CC-Switch-$VERSION-Windows$assetSuffix-Portable.zip"
+            Write-Host "Windows portable zip created: Zhishu-Ccs-$VERSION-Windows$assetSuffix-Portable.zip"
           } elseif ($isArm64) {
             throw 'Portable ARM64 exe not found'
           } else {
@@ -315,7 +325,7 @@ jobs:
             echo "❌ Updater signature not found: $APPIMAGE.sig" >&2
             exit 1
           fi
-          NEW_APPIMAGE="CC-Switch-${VERSION}-Linux-${ARCH}.AppImage"
+          NEW_APPIMAGE="Zhishu-Ccs-${VERSION}-Linux-${ARCH}.AppImage"
           cp "$APPIMAGE" "release-assets/$NEW_APPIMAGE"
           cp "$APPIMAGE.sig" "release-assets/$NEW_APPIMAGE.sig"
           echo "AppImage copied: $NEW_APPIMAGE"
@@ -329,7 +339,7 @@ jobs:
             echo "❌ Updater signature not found: $DEB.sig" >&2
             exit 1
           fi
-          NEW_DEB="CC-Switch-${VERSION}-Linux-${ARCH}.deb"
+          NEW_DEB="Zhishu-Ccs-${VERSION}-Linux-${ARCH}.deb"
           cp "$DEB" "release-assets/$NEW_DEB"
           cp "$DEB.sig" "release-assets/$NEW_DEB.sig"
           echo "Deb package copied: $NEW_DEB"
@@ -343,7 +353,7 @@ jobs:
             echo "❌ Updater signature not found: $RPM.sig" >&2
             exit 1
           fi
-          NEW_RPM="CC-Switch-${VERSION}-Linux-${ARCH}.rpm"
+          NEW_RPM="Zhishu-Ccs-${VERSION}-Linux-${ARCH}.rpm"
           cp "$RPM" "release-assets/$NEW_RPM"
           cp "$RPM.sig" "release-assets/$NEW_RPM.sig"
           echo "RPM package copied: $NEW_RPM"
@@ -433,17 +443,20 @@ jobs:
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare Zhishu production configuration
+        run: node scripts/prepare-release.mjs
+
       # 编译只做一次：编译失败是确定性的，重试没有意义。签名和公证依赖 Apple 的服务，
       # 在 macos-release 里单独重试，不会再重编。
       - name: Build Tauri App (${{ matrix.target }})
         timeout-minutes: 60
-        run: pnpm tauri build --target ${{ matrix.target }} --no-bundle
+        run: pnpm tauri build --config src-tauri/tauri.release.local.conf.json --target ${{ matrix.target }} --no-bundle
 
       - name: Upload binary
         uses: actions/upload-artifact@v7
         with:
           name: macos-binary-${{ matrix.target }}
-          path: src-tauri/target/${{ matrix.target }}/release/cc-switch
+          path: src-tauri/target/${{ matrix.target }}/release/zhishu-ccs
           if-no-files-found: error
           retention-days: 1
 
@@ -500,6 +513,9 @@ jobs:
 
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
+
+      - name: Prepare Zhishu production configuration
+        run: node scripts/prepare-release.mjs
 
       - name: Prepare Tauri signing key
         uses: ./.github/actions/prepare-tauri-signing-key
@@ -562,11 +578,11 @@ jobs:
           set -euo pipefail
           out=src-tauri/target/universal-apple-darwin/release
           mkdir -p "$out"
-          lipo -create -output "$out/cc-switch" \
-            macos-binaries/macos-binary-aarch64-apple-darwin/cc-switch \
-            macos-binaries/macos-binary-x86_64-apple-darwin/cc-switch
-          chmod +x "$out/cc-switch"
-          lipo -info "$out/cc-switch"
+          lipo -create -output "$out/zhishu-ccs" \
+            macos-binaries/macos-binary-aarch64-apple-darwin/zhishu-ccs \
+            macos-binaries/macos-binary-x86_64-apple-darwin/zhishu-ccs
+          chmod +x "$out/zhishu-ccs"
+          lipo -info "$out/zhishu-ccs"
 
       # 只打 .app（连同 updater 的 .app.tar.gz 和 .sig）：发布用的 DMG 在下面由 create-dmg 制作，
       # Tauri 自己的 DMG 从来不上传。失败只重试这一步，不会重编。
@@ -584,7 +600,7 @@ jobs:
           for attempt in $(seq 1 "$max_attempts"); do
             echo "=== macOS bundle/notarization attempt ${attempt}/${max_attempts} ==="
             bundle_log="$RUNNER_TEMP/tauri-bundle-macos-${attempt}.log"
-            if pnpm tauri bundle --target universal-apple-darwin --bundles app 2>&1 | tee "$bundle_log"; then
+            if pnpm tauri bundle --config src-tauri/tauri.release.local.conf.json --target universal-apple-darwin --bundles app 2>&1 | tee "$bundle_log"; then
               echo "✅ macOS bundle/notarization succeeded"
               exit 0
             fi
@@ -642,7 +658,7 @@ jobs:
           echo "✅ .app stapled"
 
           # 1) Collect .tar.gz (updater artifact)
-          NEW_TAR_GZ="CC-Switch-${VERSION}-macOS.tar.gz"
+          NEW_TAR_GZ="Zhishu-Ccs-${VERSION}-macOS.tar.gz"
           cp "$TAR_GZ" "release-assets/$NEW_TAR_GZ"
           if [ ! -f "$TAR_GZ.sig" ]; then
             echo "❌ Updater signature not found: $TAR_GZ.sig" >&2
@@ -652,7 +668,7 @@ jobs:
           echo "macOS updater artifact copied: $NEW_TAR_GZ"
 
           # 2) Collect .app as zip
-          NEW_ZIP="CC-Switch-${VERSION}-macOS.zip"
+          NEW_ZIP="Zhishu-Ccs-${VERSION}-macOS.zip"
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "release-assets/$NEW_ZIP"
           echo "macOS zip ready: $NEW_ZIP"
 
@@ -663,20 +679,21 @@ jobs:
           fi
 
           HOMEBREW_NO_AUTO_UPDATE=1 brew install create-dmg
-          NEW_DMG="CC-Switch-${VERSION}-macOS.dmg"
+          NEW_DMG="Zhishu-Ccs-${VERSION}-macOS.dmg"
           DMG_STAGE_DIR="$RUNNER_TEMP/dmg-stage"
           rm -rf "$DMG_STAGE_DIR"
           mkdir -p "$DMG_STAGE_DIR"
-          ditto "$APP_PATH" "$DMG_STAGE_DIR/CC Switch.app"
+          APP_BUNDLE_NAME="$(basename "$APP_PATH")"
+          ditto "$APP_PATH" "$DMG_STAGE_DIR/$APP_BUNDLE_NAME"
 
           create-dmg \
-            --volname "CC Switch" \
+            --volname "${APP_BUNDLE_NAME%.app}" \
             --background "src-tauri/icons/dmg-background.png" \
             --window-size 660 400 \
             --window-pos 200 120 \
             --icon-size 80 \
-            --icon "CC Switch.app" 180 220 \
-            --hide-extension "CC Switch.app" \
+            --icon "$APP_BUNDLE_NAME" 180 220 \
+            --hide-extension "$APP_BUNDLE_NAME" \
             --app-drop-link 480 220 \
             --codesign "$APPLE_SIGNING_IDENTITY" \
             --no-internet-enable \
@@ -811,6 +828,16 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout release manifest tools
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: scripts
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
       - name: Download built release artifacts
         uses: actions/download-artifact@v8
         with:
@@ -950,6 +977,12 @@ jobs:
           } > "$tmp_json"
           echo "Generated latest.json:" && cat "$tmp_json"
           mv "$tmp_json" release-assets/latest.json
+      - name: Generate platform download manifest
+        env:
+          RELEASE_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/generate-download-manifest.mjs release-assets "$RELEASE_TAG" "https://github.com/$RELEASE_REPO/releases/download" release-assets/client-release.json
+
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v3
         with:
@@ -965,11 +998,11 @@ jobs:
 
             ### 下载
 
-            - **macOS**: `CC-Switch-${{ github.ref_name }}-macOS.dmg`（推荐）或 `CC-Switch-${{ github.ref_name }}-macOS.zip`（解压即用）
-            - **Windows (x86_64)**: `CC-Switch-${{ github.ref_name }}-Windows.msi`（安装版）或 `CC-Switch-${{ github.ref_name }}-Windows-Portable.zip`（绿色版）
-            - **Windows (ARM64)**: `CC-Switch-${{ github.ref_name }}-Windows-arm64.msi`（安装版）或 `CC-Switch-${{ github.ref_name }}-Windows-arm64-Portable.zip`（绿色版）
-            - **Linux (x86_64)**: `CC-Switch-${{ github.ref_name }}-Linux-x86_64.AppImage` / `.deb` / `.rpm`
-            - **Linux (ARM64)**: `CC-Switch-${{ github.ref_name }}-Linux-arm64.AppImage` / `.deb` / `.rpm`
+            - **macOS**: `Zhishu-Ccs-${{ github.ref_name }}-macOS.dmg`（推荐）或 `Zhishu-Ccs-${{ github.ref_name }}-macOS.zip`（解压即用）
+            - **Windows (x86_64)**: `Zhishu-Ccs-${{ github.ref_name }}-Windows.msi`（安装版）或 `Zhishu-Ccs-${{ github.ref_name }}-Windows-Portable.zip`（绿色版）
+            - **Windows (ARM64)**: `Zhishu-Ccs-${{ github.ref_name }}-Windows-arm64.msi`（安装版）或 `Zhishu-Ccs-${{ github.ref_name }}-Windows-arm64-Portable.zip`（绿色版）
+            - **Linux (x86_64)**: `Zhishu-Ccs-${{ github.ref_name }}-Linux-x86_64.AppImage` / `.deb` / `.rpm`
+            - **Linux (ARM64)**: `Zhishu-Ccs-${{ github.ref_name }}-Linux-arm64.AppImage` / `.deb` / `.rpm`
 
             > `.tar.gz` 为 Tauri updater 自动更新专用，无需手动下载。
 

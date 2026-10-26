@@ -32,6 +32,7 @@ let appVersionCache: string | null = null;
 
 // 邀 Star 条关掉后记在本机（纯界面偏好，不进库、不随云同步）
 const STAR_PROMPT_DISMISSED_KEY = "ccswitch:about:starPromptDismissed";
+const zhishuDownloadPage = `${(import.meta.env.VITE_PLATFORM_WEB_URL || "http://127.0.0.1:3081").replace(/\/+$/, "")}/download`;
 
 function readStarPromptDismissed(): boolean {
   try {
@@ -135,9 +136,7 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
     if (hasUpdate) {
       if (isPortable) {
         try {
-          await settingsApi.openPortableUpdateDownload(
-            updateInfo?.availableVersion ?? "",
-          );
+          await settingsApi.openExternal(zhishuDownloadPage);
         } catch (error) {
           console.error("[AboutSection] Portable update failed", error);
         }
@@ -158,7 +157,7 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
           closeButton: true,
         });
         try {
-          await settingsApi.checkUpdates();
+          await settingsApi.openExternal(zhishuDownloadPage);
         } catch (fallbackError) {
           console.error(
             "[AboutSection] Failed to open fallback updater",
