@@ -424,40 +424,16 @@ function App() {
     });
   };
 
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    let active = true;
-
-    const setupListener = async () => {
-      try {
-        const off = await providersApi.onSwitched(
-          async (event: ProviderSwitchEvent) => {
-            // 按前缀失效：故障转移只改路由指针，「路由中」标记读的是
-            // ["providers", app, "mode"]，只 refetch 列表会让它停在旧那家
-            await queryClient.invalidateQueries({
-              queryKey: ["providers", event.appType],
-            });
-            if (event.appType === "pi") {
-              await invalidatePiProviderCaches(queryClient);
-            }
-          },
-        );
-        if (!active) {
-          off();
-          return;
-        }
-        unsubscribe = off;
-      } catch (error) {
-        console.error("[App] Failed to subscribe provider switch event", error);
-      }
-    };
-
-    void setupListener();
-    return () => {
-      active = false;
-      unsubscribe?.();
-    };
-  }, [queryClient]);
+  useTauriEvent<ProviderSwitchEvent>("provider-switched", async (event) => {
+    // 按前缀失效：故障转移只改路由指针，「路由中」标记读的是
+    // ["providers", app, "mode"]，只 refetch 列表会让它停在旧那家
+    await queryClient.invalidateQueries({
+      queryKey: ["providers", event.appType],
+    });
+    if (event.appType === "pi") {
+      await invalidatePiProviderCaches(queryClient);
+    }
+  });
 
   useTauriEvent("universal-provider-synced", async () => {
     await queryClient.invalidateQueries({ queryKey: ["providers"] });
