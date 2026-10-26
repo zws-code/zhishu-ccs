@@ -1,4 +1,6 @@
 fn main() {
+    // Re-embed application icons whenever their source assets change.
+    println!("cargo:rerun-if-changed=icons");
     tauri_build::build();
 
     // Windows: Embed Common Controls v6 manifest for test binaries

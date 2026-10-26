@@ -15,7 +15,7 @@ This guide covers both integration methods:
 
 The chain has four main steps:
 
-1. When Claude Code is taken over, `ANTHROPIC_BASE_URL` in `~/.claude/settings.json` is written as the local route address (default `http://127.0.0.1:15721`), the auth entry keeps only a placeholder, and real credentials never enter the live config.
+1. When Claude Code is taken over, `ANTHROPIC_BASE_URL` in `~/.claude/settings.json` is written as the local route address (default `http://127.0.0.1:25721`), the auth entry keeps only a placeholder, and real credentials never enter the live config.
 2. The provider's `API Format` is set to OpenAI Responses, telling the route that the real upstream speaks the Responses protocol.
 3. The route converts the `/v1/messages` request into a Responses request body for the upstream; Method 2 additionally carries the OAuth token and the official client identity to reach ChatGPT's Codex service.
 4. After the upstream responds, the route converts the Responses JSON/SSE back into the Messages shape Claude Code understands.
@@ -68,7 +68,7 @@ The login credentials are stored in `~/.cc-switch/codex_oauth_auth.json` (not `~
 
 Go to the `Routing` page in Settings, expand `Local Routing`, and complete two toggles:
 
-1. Turn on the `Routing Master Switch` to start the local service (the first time you enable it, an explanatory confirmation dialog appears). The default address is `127.0.0.1:15721`.
+1. Turn on the `Routing Master Switch` to start the local service (the first time you enable it, an explanatory confirmation dialog appears). The default address is `127.0.0.1:25721`.
 2. Turn on `Claude Code` under `Routing Enabled`. If you only want Claude Code to use routing, leave the other apps off.
 
 After takeover, CC Switch points Claude Code's live config at the local route, with only a placeholder in the auth entry; both Method 1's gateway key and Method 2's OAuth token are injected by the local route on forward.

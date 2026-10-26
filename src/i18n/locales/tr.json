@@ -881,7 +881,7 @@
     "configDirectoryDescription": "WSL gibi ortamlarda Claude Code veya Codex kullanırken, sağlayıcı verilerini ana ortamla tutarlı tutmak için yapılandırma dizinini WSL'deki dizine manuel olarak belirtebilirsiniz.",
     "appConfigDir": "CC Switch Yapılandırma Dizini",
     "appConfigDirDescription": "CC Switch yapılandırması için depolama konumunu özelleştirin (yapılandırma eşitlemeunu etkinleştirmek için bulut eşitleme klasörünü işaretleyin)",
-    "browsePlaceholderApp": "örneğin, C:\\Users\\Administrator\\.cc-switch",
+    "browsePlaceholderApp": "örneğin, C:\\Users\\Administrator\\.zhishu-ccs",
     "claudeConfigDir": "Claude Code Yapılandırma Dizini",
     "claudeConfigDirDescription": "Claude yapılandırma dizinini (settings.json) geçersiz kılın. Özel dizinler .claude.json'u (MCP) dizinin içinde saklar; varsayılan ~/.claude dizini Claude Code'nin bölünmüş ~/.claude.json yolunu korur.",
     "codexConfigDir": "Codex Yapılandırma Dizini",
@@ -3591,7 +3591,7 @@
         },
         "listenPort": {
           "label": "Bağlantı Noktasını Dinle",
-          "placeholder": "15721",
+          "placeholder": "25721",
           "description": "Yönlendirme sunucusunun dinlediği port numarası (1024 ~ 65535)"
         },
         "maxRetries": {

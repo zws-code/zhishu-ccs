@@ -1,5 +1,5 @@
 [package]
-name = "cc-switch"
+name = "zhishu-ccs"
 version = "4.0.19"
 description = "All-in-One Assistant for Claude Code, Codex & Gemini CLI"
 authors = ["Jason Young"]
@@ -116,8 +116,8 @@ objc2 = "0.5"
 objc2-app-kit = { version = "0.2", features = ["NSColor"] }
 # 托盘面板的原生玻璃：NSGlassEffectView（macOS 26）/ NSVisualEffectView；0.2 那套没有前者
 objc2-06 = { package = "objc2", version = "0.6" }
-objc2-foundation-03 = { package = "objc2-foundation", version = "0.3", default-features = false, features = ["std", "NSArray", "NSGeometry", "NSString"] }
-objc2-app-kit-03 = { package = "objc2-app-kit", version = "0.3", default-features = false, features = ["std", "NSAppearance", "NSGlassEffectView", "NSGraphics", "NSResponder", "NSScreen", "NSView", "NSVisualEffectView", "NSWindow"] }
+objc2-foundation-03 = { package = "objc2-foundation", version = "0.3", default-features = false, features = ["std", "NSArray", "NSData", "NSGeometry", "NSString"] }
+objc2-app-kit-03 = { package = "objc2-app-kit", version = "0.3", default-features = false, features = ["std", "NSAppearance", "NSApplication", "NSGlassEffectView", "NSGraphics", "NSImage", "NSResponder", "NSScreen", "NSView", "NSVisualEffectView", "NSWindow"] }
 
 # Optimize release binary size to help reduce AppImage footprint
 [profile.release]

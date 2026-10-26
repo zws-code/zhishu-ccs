@@ -20,7 +20,7 @@ import { useUpdate } from "@/contexts/UpdateContext";
 import { Badge } from "@/components/ui/badge";
 import { WhatsNewDialog } from "@/components/WhatsNewDialog";
 import { WHATS_NEW_ENTRIES, entriesUpTo } from "@/lib/whatsNew";
-import ccswitchLogo from "@/assets/icons/logo.svg";
+import ccswitchLogo from "@/assets/icons/logo.png";
 import { extractErrorMessage } from "@/utils/errorUtils";
 
 interface AboutSectionProps {
@@ -201,7 +201,7 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
           src={ccswitchLogo}
           alt=""
           draggable={false}
-          className="h-10 w-10 shrink-0 p-1"
+          className="h-16 w-16 shrink-0 object-contain dark:invert"
         />
         <div className="min-w-0 flex-1">
           <div className="text-title text-fg-1">CC Switch</div>

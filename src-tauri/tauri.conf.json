@@ -1,13 +1,15 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "CC Switch",
+  "productName": "Zhishu CC Switch",
+  "mainBinaryName": "zhishu-ccs",
   "version": "4.0.19",
-  "identifier": "com.ccswitch.desktop",
+  "identifier": "com.zhishu.ccswitch.desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:3000",
     "beforeDevCommand": "pnpm run dev:renderer",
-    "beforeBuildCommand": "pnpm run build:renderer"
+    "beforeBuildCommand": "pnpm run build:renderer",
+    "additionalWatchFolders": ["icons"]
   },
   "app": {
     "macOSPrivateApi": true,
@@ -58,7 +60,7 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["ccswitch"]
+        "schemes": ["zhishu-ccswitch"]
       }
     },
     "updater": {

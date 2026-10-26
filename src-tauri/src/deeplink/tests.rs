@@ -177,6 +177,24 @@ fn test_parse_grokbuild_provider() {
 }
 
 #[test]
+fn test_parse_zhishu_and_legacy_schemes_equivalently() {
+    for payload in [
+        "provider&app=claude&name=Test&endpoint=https%3A%2F%2Fapi.example.com&apiKey=sk-test",
+        "mcp&apps=claude&config=eyJtY3BTZXJ2ZXJzIjp7ImRlbW8iOnsiY29tbWFuZCI6Im5weCJ9fX0%3D",
+        "prompt&app=codex&name=Test&content=IyBUZXN0",
+        "skill&repo=example/skills&directory=skills&branch=main",
+    ] {
+        let suffix = format!("v1/import?resource={payload}");
+        let zhishu = parse_deeplink_url(&format!("zhishu-ccswitch://{suffix}")).unwrap();
+        let legacy = parse_deeplink_url(&format!("ccswitch://{suffix}")).unwrap();
+        assert_eq!(
+            serde_json::to_value(zhishu).unwrap(),
+            serde_json::to_value(legacy).unwrap()
+        );
+    }
+}
+
+#[test]
 fn test_parse_invalid_scheme() {
     let url = "https://v1/import?resource=provider&app=claude&name=Test";
 

@@ -502,7 +502,7 @@ Note: official subscriptions use the tool's own login and don't go through local
 <details>
 <summary><strong>After I start routing, why does my config file point to 127.0.0.1?</strong></summary>
 
-In Routing mode, the tool's requests first go to CC Switch's local routing (`http://127.0.0.1:15721` by default), and CC Switch then forwards them to the provider you selected. That's why the tool's config file only contains the local address and the placeholder key `PROXY_MANAGED`; for Claude Code, the model name is also written as a fixed alias such as `claude-sonnet-5` (the `/model` menu still shows the real model name). The real provider address, key, and model are all stored in CC Switch. Aggregation mode works the same way.
+In Routing mode, the tool's requests first go to CC Switch's local routing (`http://127.0.0.1:25721` by default), and CC Switch then forwards them to the provider you selected. That's why the tool's config file only contains the local address and the placeholder key `PROXY_MANAGED`; for Claude Code, the model name is also written as a fixed alias such as `claude-sonnet-5` (the `/model` menu still shows the real model name). The real provider address, key, and model are all stored in CC Switch. Aggregation mode works the same way.
 
 In the request logs under "Usage" in the sidebar, you can see "requested model → actual model" for each request.
 
