@@ -55,6 +55,41 @@ describe("platform synchronization IPC layers", () => {
     });
   });
 
+  it("deletes across all Agents with a null scope and preserves per-app results", async () => {
+    const result = {
+      removed: 2,
+      skipped: 1,
+      warnings: ["claude: in use"],
+      nativeFilesChanged: 0,
+      apps: [
+        {
+          agent: "claude",
+          removed: 0,
+          skipped: 1,
+          warnings: ["in use"],
+          nativeFilesChanged: 0,
+        },
+        {
+          agent: "kimi",
+          removed: 2,
+          skipped: 0,
+          warnings: [],
+          nativeFilesChanged: 0,
+        },
+      ],
+    };
+    vi.mocked(invoke).mockResolvedValue(result);
+    expect(
+      await platformModelsApi.deleteProviders(null, "https://platform.test", 1),
+    ).toEqual(result);
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke).toHaveBeenCalledWith("platform_delete_providers", {
+      agent: null,
+      baseUrl: "https://platform.test",
+      userId: 1,
+    });
+  });
+
   it("keeps the Agent sync contract including the all-Agents scope", async () => {
     await platformModelsApi.sync("codex");
     expect(invoke).toHaveBeenLastCalledWith("platform_sync_providers", {

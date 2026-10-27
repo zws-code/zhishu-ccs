@@ -1,5 +1,9 @@
 import { useEffect, useRef } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useIsMutating,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { Provider } from "@/types";
 import type { AppId } from "@/lib/api";
@@ -10,10 +14,10 @@ import { platformAuthError } from "@/lib/api/platformAuth";
 import { refreshPlatformProviders } from "@/lib/query/platformProviders";
 import { toast } from "@/lib/toast";
 
-/** 挂在应用页而非菜单内容中，菜单关闭后仍能展示进度、刷新列表。 */
+/** 挂在页面而非菜单内容中；app 为 null 时删除当前账户在全部已支持应用中的供应商。 */
 export function usePlatformProviderDeletion(
-  app: AppId,
-  providers: Record<string, Provider>,
+  app: AppId | null,
+  providers: Record<string, Provider> = {},
 ) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -37,22 +41,30 @@ export function usePlatformProviderDeletion(
           provider.meta?.platformManaged?.userId === account.user.id,
       ).length
     : 0;
+  const providerSyncing = useIsMutating({
+    mutationKey: ["platformSyncProviders"],
+  });
+  const providerDeleting = useIsMutating({
+    mutationKey: ["platformDeleteProviders"],
+  });
   const deletion = useMutation({
+    mutationKey: ["platformDeleteProviders"],
     mutationFn: ({
       app,
       baseUrl,
       userId,
     }: {
-      app: AppId;
+      app: AppId | null;
       baseUrl: string;
       userId: number;
       identity: string;
     }) => platformModelsApi.deleteProviders(app, baseUrl, userId),
     onSuccess: async (result, target) => {
       if (currentIdentity.current !== target.identity) return;
-      await refreshPlatformProviders(queryClient, target.app);
+      await refreshPlatformProviders(queryClient, target.app ?? undefined);
       if (currentIdentity.current !== target.identity) return;
       const message = t("platformCatalog.deleteCompleted", {
+        defaultValue: "已删除 {{removed}} 个平台供应商，保留 {{skipped}} 个",
         removed: result.removed,
         skipped: result.skipped,
       });
@@ -67,18 +79,32 @@ export function usePlatformProviderDeletion(
     },
     onError: async (error, target) => {
       if (currentIdentity.current !== target.identity) return;
-      await refreshPlatformProviders(queryClient, target.app);
+      await refreshPlatformProviders(queryClient, target.app ?? undefined);
       if (currentIdentity.current === target.identity)
         toast.error(platformAuthError(error));
     },
   });
-  const visible = Boolean(account) && PLATFORM_SYNC_APPS.has(app);
+  const visible =
+    Boolean(account) && (app === null || PLATFORM_SYNC_APPS.has(app));
   const disabled =
-    !visible || !count || deletion.isPending || Boolean(auth?.catalogSyncing);
+    !visible ||
+    (app !== null && !count) ||
+    deletion.isPending ||
+    providerDeleting > 0 ||
+    providerSyncing > 0 ||
+    Boolean(auth?.catalogSyncing);
+  const matchesTarget =
+    deletion.variables?.identity === identity &&
+    deletion.variables?.app === app;
   return {
     visible,
     disabled,
     pending: deletion.isPending,
+    result: matchesTarget ? deletion.data : undefined,
+    error:
+      matchesTarget && deletion.isError
+        ? platformAuthError(deletion.error)
+        : null,
     remove: () => {
       if (disabled || !account || !identity) return;
       deletion.mutate({

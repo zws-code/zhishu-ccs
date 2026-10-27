@@ -1,5 +1,10 @@
 {
   "platformCatalog": {
+    "deleteAllHint": "删除当前账号在所有 Agent 应用中的平台供应商（含未显示应用），保留平台基础数据和服务端 Key。",
+    "deleteAllResult": "所有 Agent 应用删除结果",
+    "deleteResultApp": "Agent 应用",
+    "deleteResultStatus": "删除结果",
+    "deleteAppFailed": "删除失败：{{message}}",
     "deleteProviders": "一键删除平台供应商",
     "deletingProviders": "正在删除平台供应商…",
     "deleteAction": "平台供应商删除",

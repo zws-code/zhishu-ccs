@@ -1,5 +1,10 @@
 {
   "platformCatalog": {
+    "deleteAllHint": "非表示のアプリを含むすべての Agent アプリから、現在のアカウントのプラットフォームプロバイダーを削除します。プラットフォーム基本データとサーバー側の Key は保持されます。",
+    "deleteAllResult": "すべての Agent アプリの削除結果",
+    "deleteResultApp": "Agent アプリ",
+    "deleteResultStatus": "削除結果",
+    "deleteAppFailed": "削除に失敗しました：{{message}}",
     "deleteProviders": "プラットフォームプロバイダーを一括削除",
     "deletingProviders": "プラットフォームプロバイダーを削除中…",
     "deleteAction": "プラットフォームプロバイダーの削除",

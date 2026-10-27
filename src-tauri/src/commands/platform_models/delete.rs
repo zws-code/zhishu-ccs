@@ -1,4 +1,4 @@
-//! 显式删除当前账户、当前应用的托管供应商；不读取目录或访问平台 HTTP。
+//! 显式删除当前账户的托管供应商，支持当前应用或全部已支持应用；不读取目录或访问平台 HTTP。
 use super::{delete_managed_provider, local_error, sync_report, PlatformAuthError};
 use crate::{app_config::AppType, store::AppState};
 use serde::Serialize;
@@ -11,6 +11,73 @@ pub struct PlatformDeleteSummary {
     pub skipped: usize,
     pub warnings: Vec<String>,
     pub native_files_changed: usize,
+    /// 仅全应用操作返回逐应用结果；单应用调用保留既有返回字段。
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub apps: Vec<PlatformDeleteAppResult>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformDeleteAppResult {
+    pub agent: String,
+    pub removed: usize,
+    pub skipped: usize,
+    pub warnings: Vec<String>,
+    pub native_files_changed: usize,
+    /// 应用级准备失败时尚未执行删除，数量不可用，不能将零解释为删除成功。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<PlatformAuthError>,
+}
+
+/// 整个批次保持同一个已验证身份；每个应用独立保留安全删除、备份和审计路径。
+pub(super) fn delete_all_for_identity(
+    auth: &super::PlatformAuthState,
+    state: &AppState,
+    base_url: &str,
+    user_id: i64,
+) -> Result<PlatformDeleteSummary, PlatformAuthError> {
+    auth.with_local_identity_blocking(|origin, current_user_id| {
+        if origin != base_url || current_user_id != user_id {
+            return Err(super::fail("UNAUTHORIZED", "登录状态已改变，请重新操作"));
+        }
+        let mut summary = PlatformDeleteSummary::default();
+        for agent in super::adapter::AGENTS {
+            let app = super::adapter::app(agent)?;
+            match delete_account_providers(state, &app, origin, current_user_id) {
+                Ok(result) => {
+                    summary.removed += result.removed;
+                    summary.skipped += result.skipped;
+                    summary.native_files_changed += result.native_files_changed;
+                    summary.warnings.extend(
+                        result
+                            .warnings
+                            .iter()
+                            .map(|warning| format!("{agent}：{warning}")),
+                    );
+                    summary.apps.push(PlatformDeleteAppResult {
+                        agent: (*agent).into(),
+                        removed: result.removed,
+                        skipped: result.skipped,
+                        warnings: result.warnings,
+                        native_files_changed: result.native_files_changed,
+                        error: None,
+                    });
+                }
+                Err(error) => {
+                    summary.warnings.push(format!("{agent}：{}", error.message));
+                    summary.apps.push(PlatformDeleteAppResult {
+                        agent: (*agent).into(),
+                        removed: 0,
+                        skipped: 0,
+                        warnings: Vec::new(),
+                        native_files_changed: 0,
+                        error: Some(error),
+                    });
+                }
+            }
+        }
+        Ok(summary)
+    })
 }
 
 pub(super) fn delete_for_identity(

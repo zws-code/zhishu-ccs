@@ -1,5 +1,10 @@
 {
   "platformCatalog": {
+    "deleteAllHint": "Gizli uygulamalar dahil tüm Agent uygulamalarında mevcut hesabın platform sağlayıcılarını siler. Platform temel verileri ve sunucu anahtarları korunur.",
+    "deleteAllResult": "Tüm Agent uygulamaları için silme sonuçları",
+    "deleteResultApp": "Agent uygulaması",
+    "deleteResultStatus": "Silme sonucu",
+    "deleteAppFailed": "Silme başarısız: {{message}}",
     "deleteProviders": "Tüm platform sağlayıcılarını sil",
     "deletingProviders": "Platform sağlayıcıları siliniyor…",
     "deleteAction": "Platform sağlayıcılarını silme",

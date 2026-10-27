@@ -17,6 +17,17 @@ export interface PlatformDeleteSummary {
   skipped: number;
   warnings: string[];
   nativeFilesChanged: number;
+  /** 全应用删除时返回；应用级失败的数量不可用，应展示 error。 */
+  apps?: PlatformDeleteAppResult[];
+}
+
+export interface PlatformDeleteAppResult {
+  agent: AppId;
+  removed: number;
+  skipped: number;
+  warnings: string[];
+  nativeFilesChanged: number;
+  error?: { code: string; message: string };
 }
 
 /** 当前账户的目录摘要，不含模型 Key；syncedAt 使用 Unix 毫秒。 */
@@ -58,7 +69,8 @@ export interface PlatformCatalogModel {
 }
 
 export const platformModelsApi = {
-  deleteProviders: (agent: AppId, baseUrl: string, userId: number) =>
+  // null 删除当前账户在全部已支持应用中的托管供应商。
+  deleteProviders: (agent: AppId | null, baseUrl: string, userId: number) =>
     invoke<PlatformDeleteSummary>("platform_delete_providers", {
       agent,
       baseUrl,

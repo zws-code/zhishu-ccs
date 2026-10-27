@@ -13,19 +13,25 @@ import { PlatformCatalogPage } from "@/components/platform/PlatformCatalogPage";
 import {
   platformModelsApi,
   type PlatformCatalog,
+  type PlatformDeleteSummary,
 } from "@/lib/api/platformModels";
 import { platformCatalogKeys } from "@/lib/query/platformCatalog";
 import { toast } from "@/lib/toast";
 import { copyText } from "@/lib/clipboard";
 
 const auth = vi.hoisted(() => ({
+  signedIn: true,
+  catalogSyncing: false,
   account: {
     baseUrl: "https://platform.test",
     user: { id: 1, email: "one@test.com" },
   },
 }));
 vi.mock("@/contexts/PlatformAuthContext", () => ({
-  usePlatformAuth: () => auth,
+  usePlatformAuth: () => ({
+    ...auth,
+    account: auth.signedIn ? auth.account : null,
+  }),
 }));
 vi.mock("@/lib/api/platformModels", () => ({
   platformModelsApi: {
@@ -33,6 +39,7 @@ vi.mock("@/lib/api/platformModels", () => ({
     catalogKey: vi.fn(),
     syncCatalog: vi.fn(),
     sync: vi.fn(),
+    deleteProviders: vi.fn(),
   },
 }));
 vi.mock("@/lib/clipboard", () => ({ copyText: vi.fn() }));
@@ -61,6 +68,29 @@ const snapshot: PlatformCatalog = {
   warnings: [],
 };
 
+const deletionSummary: PlatformDeleteSummary = {
+  removed: 3,
+  skipped: 0,
+  warnings: [],
+  nativeFilesChanged: 1,
+  apps: [
+    {
+      agent: "codex",
+      removed: 1,
+      skipped: 0,
+      warnings: [],
+      nativeFilesChanged: 0,
+    },
+    {
+      agent: "workbuddy",
+      removed: 2,
+      skipped: 0,
+      warnings: [],
+      nativeFilesChanged: 1,
+    },
+  ],
+};
+
 function renderPage() {
   const client = new QueryClient({
     defaultOptions: {
@@ -79,6 +109,8 @@ function renderPage() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  auth.signedIn = true;
+  auth.catalogSyncing = false;
   auth.account = {
     baseUrl: "https://platform.test",
     user: { id: 1, email: "one@test.com" },
@@ -88,12 +120,246 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue("test-only-group-secret");
   vi.mocked(copyText).mockReset().mockResolvedValue(undefined);
+  vi.mocked(platformModelsApi.sync)
+    .mockReset()
+    .mockResolvedValue({ added: 1, removed: 0, skipped: 0, warnings: [] });
+  vi.mocked(platformModelsApi.deleteProviders)
+    .mockReset()
+    .mockResolvedValue(deletionSummary);
   vi.mocked(platformModelsApi.syncCatalog)
     .mockReset()
     .mockResolvedValue(snapshot);
 });
 
 describe("shared platform base data", () => {
+  it.each([null, { ...snapshot, credentialsCleared: true }])(
+    "deletes across all apps without requiring usable catalog credentials (%j)",
+    async (catalog) => {
+      vi.mocked(platformModelsApi.catalog).mockResolvedValue(catalog);
+      const { client, invalidate } = renderPage();
+      const button = screen.getByRole("button", { name: "一键删除平台供应商" });
+      expect(button).toBeEnabled();
+      expect(button).toHaveAttribute(
+        "title",
+        expect.stringContaining("所有 Agent 应用"),
+      );
+      expect(platformModelsApi.deleteProviders).not.toHaveBeenCalled();
+      fireEvent.click(button);
+      await screen.findByRole("table", { name: "所有 Agent 应用删除结果" });
+      expect(platformModelsApi.deleteProviders).toHaveBeenCalledWith(
+        null,
+        "https://platform.test",
+        1,
+      );
+      expect(platformModelsApi.deleteProviders).toHaveBeenCalledTimes(1);
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ["providers"] });
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: ["configChangeHistory"],
+      });
+      expect(invalidate).not.toHaveBeenCalledWith({
+        queryKey: ["platformUsage"],
+      });
+      expect(invalidate).not.toHaveBeenCalledWith({
+        queryKey: ["platformCatalog"],
+      });
+      expect(platformModelsApi.syncCatalog).not.toHaveBeenCalled();
+      expect(platformModelsApi.sync).not.toHaveBeenCalled();
+      expect(platformModelsApi.catalog).toHaveBeenCalledTimes(1);
+      expect(
+        client.getQueryData(platformCatalogKeys.account(snapshot.baseUrl, 1)),
+      ).toEqual(catalog);
+      expect(toast.success).toHaveBeenCalledWith(
+        "已删除 3 个平台供应商，保留 0 个",
+      );
+    },
+  );
+
+  it("shows individual app results, retained providers and failed apps", async () => {
+    vi.mocked(platformModelsApi.deleteProviders).mockResolvedValue({
+      ...deletionSummary,
+      removed: 2,
+      skipped: 1,
+      warnings: ["claude：当前供应商没有备用项", "codex：配置不可读"],
+      apps: [
+        {
+          agent: "claude",
+          removed: 0,
+          skipped: 1,
+          warnings: ["当前供应商没有备用项"],
+          nativeFilesChanged: 0,
+        },
+        {
+          agent: "codex",
+          removed: 0,
+          skipped: 0,
+          warnings: [],
+          nativeFilesChanged: 0,
+          error: { code: "CONFIG", message: "配置不可读" },
+        },
+        deletionSummary.apps![1],
+      ],
+    });
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "一键删除平台供应商" }));
+    const table = await screen.findByRole("table", {
+      name: "所有 Agent 应用删除结果",
+    });
+    expect(within(table).getByText("当前供应商没有备用项")).toBeInTheDocument();
+    expect(within(table).getByText("删除失败：配置不可读")).toBeInTheDocument();
+    expect(
+      within(table).getByRole("row", { name: /WorkBuddy/ }),
+    ).toHaveTextContent("已删除 2 个平台供应商，保留 0 个");
+    expect(toast.warning).toHaveBeenCalledWith(
+      "已删除 2 个平台供应商，保留 1 个",
+      expect.any(Object),
+    );
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("disables repeated deletion and both sync actions while deleting", async () => {
+    vi.mocked(platformModelsApi.catalog).mockResolvedValue(snapshot);
+    let finish!: (value: PlatformDeleteSummary) => void;
+    vi.mocked(platformModelsApi.deleteProviders).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    renderPage();
+    await screen.findByText("Shared group");
+    fireEvent.click(screen.getByRole("button", { name: "一键删除平台供应商" }));
+    const pending = await screen.findByRole("button", {
+      name: "正在删除平台供应商…",
+    });
+    expect(pending).toBeDisabled();
+    expect(pending).toHaveAttribute("aria-busy", "true");
+    expect(
+      screen.getByRole("button", { name: "同步平台基础数据" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "全部同步平台供应商" }),
+    ).toBeDisabled();
+    fireEvent.click(pending);
+    expect(platformModelsApi.deleteProviders).toHaveBeenCalledTimes(1);
+    await act(async () => finish(deletionSummary));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "一键删除平台供应商" }),
+      ).toBeEnabled(),
+    );
+    expect(
+      screen.getByRole("button", { name: "同步平台基础数据" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "全部同步平台供应商" }),
+    ).toBeEnabled();
+  });
+
+  it("disables deletion while local providers are syncing", async () => {
+    vi.mocked(platformModelsApi.catalog).mockResolvedValue(snapshot);
+    let finish!: (
+      value: Awaited<ReturnType<typeof platformModelsApi.sync>>,
+    ) => void;
+    vi.mocked(platformModelsApi.sync).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    renderPage();
+    await screen.findByText("Shared group");
+    fireEvent.click(screen.getByRole("button", { name: "全部同步平台供应商" }));
+    await screen.findByRole("button", { name: "正在同步平台供应商…" });
+    expect(
+      screen.getByRole("button", { name: "一键删除平台供应商" }),
+    ).toBeDisabled();
+    await act(async () =>
+      finish({ added: 1, removed: 0, skipped: 0, warnings: [] }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "一键删除平台供应商" }),
+      ).toBeEnabled(),
+    );
+  });
+
+  it("disables deletion during automatic catalog sync and while signed out", async () => {
+    auth.catalogSyncing = true;
+    const { client, rerender } = renderPage();
+    expect(
+      screen.getByRole("button", { name: "一键删除平台供应商" }),
+    ).toBeDisabled();
+    auth.catalogSyncing = false;
+    auth.signedIn = false;
+    rerender(
+      <QueryClientProvider client={client}>
+        <PlatformCatalogPage />
+      </QueryClientProvider>,
+    );
+    expect(
+      screen.getByRole("button", { name: "一键删除平台供应商" }),
+    ).toBeDisabled();
+    expect(platformModelsApi.deleteProviders).not.toHaveBeenCalled();
+  });
+
+  it("shows a safe deletion error, refreshes local state and allows retry", async () => {
+    vi.mocked(platformModelsApi.deleteProviders).mockRejectedValueOnce(
+      new Error("secret-token"),
+    );
+    const { invalidate } = renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "一键删除平台供应商" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("无法完成平台请求，请稍后重试");
+    expect(screen.queryByText("secret-token")).not.toBeInTheDocument();
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["providers"] });
+    fireEvent.click(screen.getByRole("button", { name: "一键删除平台供应商" }));
+    await screen.findByRole("table", { name: "所有 Agent 应用删除结果" });
+    expect(platformModelsApi.deleteProviders).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("ignores a deletion response after logout without rebuilding caches", async () => {
+    let finish!: (value: PlatformDeleteSummary) => void;
+    vi.mocked(platformModelsApi.deleteProviders).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const { client, invalidate, unmount } = renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "一键删除平台供应商" }));
+    await screen.findByRole("button", { name: "正在删除平台供应商…" });
+    await act(async () => {
+      unmount();
+      client.clear();
+      finish(deletionSummary);
+    });
+    expect(invalidate).not.toHaveBeenCalled();
+    expect(client.getQueryCache().getAll()).toHaveLength(0);
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("does not show a late deletion result after switching accounts", async () => {
+    let finish!: (value: PlatformDeleteSummary) => void;
+    vi.mocked(platformModelsApi.deleteProviders).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const { client, invalidate, rerender } = renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "一键删除平台供应商" }));
+    await screen.findByRole("button", { name: "正在删除平台供应商…" });
+    auth.account = { ...auth.account, user: { id: 2, email: "two@test.com" } };
+    rerender(
+      <QueryClientProvider client={client}>
+        <PlatformCatalogPage />
+      </QueryClientProvider>,
+    );
+    await act(async () => finish(deletionSummary));
+    expect(invalidate).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("table", { name: "所有 Agent 应用删除结果" }),
+    ).not.toBeInTheDocument();
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
   it("syncs all apps from local data without fetching platform data or usage", async () => {
     vi.mocked(platformModelsApi.catalog).mockResolvedValue(snapshot);
     vi.mocked(platformModelsApi.sync).mockResolvedValue({
@@ -193,6 +459,9 @@ describe("shared platform base data", () => {
       name: "正在同步平台数据…",
     });
     expect(button).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "一键删除平台供应商" }),
+    ).toBeDisabled();
     fireEvent.click(button);
     expect(platformModelsApi.syncCatalog).toHaveBeenCalledTimes(1);
     finish(snapshot);

@@ -148,7 +148,7 @@
 - 为什么：平台拉取会管理服务端 Key，本地同步会写供应商和工具配置；两阶段副作用不同，不能把按钮重新合并为隐式联网与自动应用。
 - 平台层：`platform_sync_catalog()` 获取可用分组、完整订阅、分页 Key 和模型目录，按需创建分组 Key，保存 `platform-catalog.json`，返回目录摘要；不修改 Agent 供应商。整体拉取失败保留上一快照，分组失败保留失败标记。
 - 本地层：`platform_get_catalog()` 返回当前账户本机摘要或 `null`；`platform_sync_providers({ agent })` 只从本机目录生成供应商，不发平台请求、不创建/撤销 Key，也不触发平台额度刷新，且不做同步前检测或覆盖确认。`agent: null` 表示全部已支持应用。缺快照返回 `CATALOG_REQUIRED`；旧版本退出或显式清理过 Key 的快照返回 `CATALOG_CREDENTIALS_REQUIRED`，需先手动同步平台数据。
-- 应用页右上角「更多」中的「一键删除平台供应商」调用 `platform_delete_providers({ agent, baseUrl, userId })`，只删除当前应用、当前账户的平台托管行；复用操作锁和 `ProviderService`，无安全备用项的当前供应商保留并提示。该操作不联网、不改平台目录、不撤销服务端 Key，部分失败也记录 `platform_delete` 报告；后续同步可重新添加供应商。
+- 应用页右上角「更多」中的「一键删除平台供应商」调用 `platform_delete_providers({ agent, baseUrl, userId })`，删除当前应用、当前账户的平台托管行；「平台基础数据」页面的同名按钮传 `agent: null`，遍历全部已支持应用（含未显示应用），返回总计及逐应用 `apps` 结果，单个应用失败不阻塞其他应用。复用操作锁和 `ProviderService`，无安全备用项的当前供应商保留并提示。该操作不依赖平台目录、不联网、不改平台目录、不撤销服务端 Key，部分失败也记录 `platform_delete` 报告；后续同步可重新添加供应商。
 - 同步返回 `{ added, removed, skipped, warnings }`，另有可选 `updated`、`nativeFilesChanged`。部分成功仍需展示 warnings。供应商行有变化不代表原生配置文件已变化。
 - 目录摘要为 `{ baseUrl, userId, syncedAt, credentialsCleared, groups, warnings }`，`syncedAt` 为 Unix 毫秒，模型展示字段使用白名单。`platform_get_catalog_key({ baseUrl, userId, groupId })` 只读本机单个 Key，并校验当前身份、快照归属及分组；查看详情不触发同步。
 - 平台层读取 `/api/v1/groups/available`、`/api/v1/subscriptions`、分页 `/api/v1/keys`，按需 `POST /api/v1/keys`，用模型 Key 访问 `/v1/models` 及其能力目录；网页登录 JWT 不能作为模型 Key。订阅分组不受名称前缀限制，普通分组要求 `智枢router-ccs-` 前缀，专用 Key 名为 `zhishu-ccs-<platform>-<group-id>`。
