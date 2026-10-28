@@ -63,7 +63,7 @@ bash deploy/rocky10/deploy.sh "client-downloads-$(date +%Y%m%d-%H%M%S)"
 平台异常时停止客户端发布，使用该次部署输出中的备份 ID：
 
 ```sh
-ssh -i /Users/wenszou/IdeaProjects/zhishu/zhishu-proxy/veee-rocky-ed25519 root@124.223.73.2 \
+ssh -i /Users/wenszou/IdeaProjects/zhishu/zhishu-proxy/veee-rocky-ed25519 root@43.136.64.205 \
   'bash /opt/zhishu-proxy/rocky10/rollback.sh <该次部署输出的备份ID>'
 ```
 
@@ -73,18 +73,18 @@ ssh -i /Users/wenszou/IdeaProjects/zhishu/zhishu-proxy/veee-rocky-ed25519 root@1
 
 | 项目 | 地址/位置 |
 | --- | --- |
-| 平台与下载页 | `http://124.223.73.2:8080/download` |
-| 安装包根地址 | `http://124.223.73.2:8080/client-downloads` |
-| 客户端自动更新清单 | `http://124.223.73.2:8080/client-downloads/latest.json` |
-| 网页读取的下载清单 | `http://124.223.73.2:8080/client-release.json` |
-| SSH 服务器 | `root@124.223.73.2:22` |
+| 平台与下载页 | `http://43.136.64.205/download` |
+| 安装包根地址 | `http://43.136.64.205/client-downloads` |
+| 客户端自动更新清单 | `http://43.136.64.205/client-downloads/latest.json` |
+| 网页读取的下载清单 | `http://43.136.64.205/client-release.json` |
+| SSH 服务器 | `root@43.136.64.205` |
 | 服务器发布目录 | `/opt/zhishu-proxy/data/public/client-downloads` |
 | 平台清单覆盖文件 | `/opt/zhishu-proxy/data/public/client-release.json` |
 | 本机发布配置 | `release.publish.local.json` |
 | 本机应用配置 | `release.config.local.json` |
 | 本机更新签名私钥 | `~/.tauri/zhishu-ccs.key` |
 
-下载复用现有 8080 端口，不需要额外域名、HTTPS 证书、GitHub 仓库或新端口。服务器只需要现有平台、SSH 和 Python 3；日常客户端发布不重启网关，也不构建网关镜像。
+下载使用服务器默认 HTTP 端口，不需要额外域名、HTTPS 证书、GitHub 仓库或单独开放下载端口。服务器只需要现有平台、SSH 和 Python 3；日常客户端发布不重启网关，也不构建网关镜像。
 
 HTTP 不加密网络流量，登录密码仍有明文传输风险。更新包始终由独立私钥签名，客户端先验签再安装；这不能替代 HTTPS 对登录和网络传输的保护。以后有域名时按本文末尾迁移。
 
@@ -194,7 +194,7 @@ macOS updater 签名与 Apple Developer ID 签名是两件事。没有 Apple Dev
 | 同一版本已打包 / 不可覆盖 | 新代码使用新版本号；未完成的本地残留先移走 |
 | 线上 URL 是网页 HTML | 网关未包含 `/client-downloads/` 支持，先部署一次新版网关 |
 | 缺少以前已发布的平台 | 在对应系统打包并 import 后再发布 |
-| 公网验证失败 | 检查平台 8080、文件挂载/权限和路由；旧清单保持不变，修好后重试 |
+| 公网验证失败 | 检查平台 HTTP 服务、文件挂载/权限和路由；旧清单保持不变，修好后重试 |
 | 页面显示暂未发布，但更新清单已有版本 | 检查 `/client-release.json` 的 `files` 是否为空；用原产物重新执行 `pnpm release:publish <版本>`，无需重新打包 |
 | 自动更新提示未配置 | 当前是 unsigned/editable 老包，手动安装一次新的签名正式包 |
 

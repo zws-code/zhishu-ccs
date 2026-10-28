@@ -202,7 +202,7 @@ function initialize() {
   const previous = existsSync(releasePath) ? json(releasePath) : {};
   if (previous.updatePublicKey && previous.updatePublicKey !== publicKey)
     throw new Error("已有公钥与当前私钥的 .pub 不同；拒绝自动更换更新身份");
-  const platform = previous.platformApiUrl || "http://124.223.73.2:8080";
+  const platform = previous.platformApiUrl || "http://43.136.64.205";
   const updated = {
     ...previous,
     platformApiUrl: platform,

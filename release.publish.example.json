@@ -1,7 +1,7 @@
 {
-  "downloadBaseUrl": "http://124.223.73.2:8080/client-downloads",
+  "downloadBaseUrl": "http://43.136.64.205/client-downloads",
   "allowInsecureHttp": true,
-  "server": "root@124.223.73.2",
+  "server": "root@43.136.64.205",
   "sshPort": 22,
   "sshKey": "../zhishu-proxy/veee-rocky-ed25519",
   "remoteRoot": "/opt/zhishu-proxy/data/public/client-downloads",
