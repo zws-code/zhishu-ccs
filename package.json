@@ -27,7 +27,7 @@
     "test:unit:watch": "vitest watch",
     "release:prepare": "node scripts/prepare-release.mjs",
     "test:release-config": "node --test scripts/release-config.test.mjs",
-    "test:release": "node --test scripts/release-config.test.mjs scripts/release-artifacts.test.mjs scripts/cos-release.test.mjs",
+    "test:release": "node --test scripts/release-config.test.mjs scripts/release-artifacts.test.mjs scripts/cos-release.test.mjs scripts/resume-release.test.mjs",
     "release:check": "node scripts/cos-release.mjs check",
     "test:release-cos": "python3 -B -m unittest discover -s scripts -p 'test_publish_cos.py'"
   },

@@ -17,6 +17,39 @@ class ReleaseError(Exception):
     pass
 
 
+def credential(env, name, optional=False):
+    value = env.get(name, "").strip()
+    if not value and not optional:
+        raise ReleaseError("Missing environment variable: " + name)
+    if any(character.isspace() for character in value):
+        raise ReleaseError(name + " contains whitespace inside the credential; re-enter this GitHub Secret")
+    return value or None
+
+
+def safe_error(error):
+    if isinstance(error, ReleaseError):
+        return str(error)
+    kind = type(error).__name__
+    if kind == "CosClientError":
+        message = str(error).lower()
+        categories = [
+            (("secret_id", "secretkey", "secretid", "secret_key"), "credential format; check GitHub COS Secrets"),
+            (("ssl", "certificate", "tls"), "TLS connection; check runner-to-COS connectivity"),
+            (("proxy",), "proxy connection; check runner network"),
+            (("timeout", "timed out"), "network timeout; retry with the same payload"),
+            (("connection", "name resolution", "getaddrinfo"), "network connection; retry with the same payload"),
+        ]
+        for words, category in categories:
+            if any(word in message for word in words):
+                return "COS client error: " + category
+    if kind == "CosServiceError":
+        code = str(error.get_error_code())
+        status = str(error.get_status_code())
+        if re.fullmatch(r"[A-Za-z][A-Za-z0-9]{0,63}", code) and re.fullmatch(r"[1-5][0-9]{2}", status):
+            return "COS service error: HTTP " + status + " / " + code
+    return "COS publication failed (" + kind + "); check credentials, bucket permissions and network"
+
+
 def version(value):
     if not isinstance(value, str) or not re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)", value):
         raise ReleaseError("Invalid stable version")
@@ -82,8 +115,8 @@ class CosStore:
         from qcloud_cos import CosConfig, CosS3Client
         self.bucket = env["COS_BUCKET"]
         self.client = CosS3Client(CosConfig(
-            Region=env["COS_REGION"], SecretId=env["COS_SECRET_ID"],
-            SecretKey=env["COS_SECRET_KEY"], Token=env.get("COS_SESSION_TOKEN") or None,
+            Region=env["COS_REGION"], SecretId=credential(env, "COS_SECRET_ID"),
+            SecretKey=credential(env, "COS_SECRET_KEY"), Token=credential(env, "COS_SESSION_TOKEN", optional=True),
             Scheme="https", Timeout=120,
         ))
 
@@ -205,7 +238,9 @@ def main():
         raise ReleaseError("Invalid COS_PUBLIC_BASE_URL")
     # COS forbid-overwrite does not protect version-enabled buckets. Explicitly
     # require versioning disabled; preserve historical versions via immutable paths.
+    print("Initializing COS client", flush=True)
     store = CosStore(os.environ)
+    print("Checking bucket versioning", flush=True)
     status = store.client.get_bucket_versioning(Bucket=store.bucket).get("Status")
     if status not in (None, ""):
         raise ReleaseError("Use a dedicated bucket with COS versioning disabled")
@@ -218,5 +253,5 @@ if __name__ == "__main__":
         main()
     except Exception as error:
         # Never echo raw SDK exceptions/headers/credentials into Actions logs.
-        print(str(error) if isinstance(error, ReleaseError) else "COS publication failed (" + type(error).__name__ + "); check credentials, bucket permissions and network", file=sys.stderr)
+        print(safe_error(error), file=sys.stderr)
         sys.exit(1)

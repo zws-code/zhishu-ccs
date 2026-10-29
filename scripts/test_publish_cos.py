@@ -157,6 +157,37 @@ class HashCompatibilityTests(unittest.TestCase):
                 self.assertEqual(module.digest(path), hashlib.sha256(data).hexdigest())
 
 
+class CredentialAndDiagnosticTests(unittest.TestCase):
+    def test_copy_whitespace_is_trimmed_without_echoing_secrets(self):
+        self.assertEqual(module.credential({"COS_SECRET_ID": "  example-id\n"}, "COS_SECRET_ID"), "example-id")
+        self.assertEqual(module.credential({"COS_SECRET_KEY": "\nexample-key\r\n"}, "COS_SECRET_KEY"), "example-key")
+        self.assertIsNone(module.credential({}, "COS_SESSION_TOKEN", optional=True))
+        for value in ("", " ", "example key"):
+            with self.assertRaises(module.ReleaseError) as caught:
+                module.credential({"COS_SECRET_KEY": value}, "COS_SECRET_KEY")
+            self.assertNotIn("example key", str(caught.exception))
+
+    def test_safe_diagnostics_do_not_echo_signed_urls_or_credentials(self):
+        ClientError = type("CosClientError", (Exception,), {})
+        secret = "SECRET-DO-NOT-LOG"
+        for message, expected in [
+            ("secret_id cannot contain spaces " + secret, "credential format"),
+            ("SSL error https://cos/?q-signature=" + secret, "TLS connection"),
+            ("Read timed out " + secret, "network timeout"),
+            ("ConnectionError " + secret, "network connection"),
+            ("ProxyError " + secret, "proxy connection"),
+            ("unknown " + secret, "CosClientError"),
+        ]:
+            result = module.safe_error(ClientError(message))
+            self.assertIn(expected, result)
+            self.assertNotIn(secret, result)
+        ServiceError = type("CosServiceError", (Exception,), {
+            "get_error_code": lambda _: "AccessDenied",
+            "get_status_code": lambda _: 403,
+        })
+        self.assertEqual(module.safe_error(ServiceError(secret)), "COS service error: HTTP 403 / AccessDenied")
+
+
 class CosAdapterTests(unittest.TestCase):
     def test_head_404_sdk_code_is_absent_but_permission_errors_are_not(self):
         class ServiceError(Exception):
