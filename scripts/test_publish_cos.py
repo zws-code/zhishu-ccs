@@ -146,6 +146,17 @@ class PublisherTests(unittest.TestCase):
         self.assertIn("no network requests or uploads", result.stdout)
 
 
+class HashCompatibilityTests(unittest.TestCase):
+    def test_hashes_across_chunks_without_python_311_file_digest(self):
+        data = b"release-payload" * 100000
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "installer"
+            path.write_bytes(data)
+            old_hashlib = types.SimpleNamespace(sha256=hashlib.sha256)
+            with patch.object(module, "hashlib", old_hashlib):
+                self.assertEqual(module.digest(path), hashlib.sha256(data).hexdigest())
+
+
 class CosAdapterTests(unittest.TestCase):
     def test_head_404_sdk_code_is_absent_but_permission_errors_are_not(self):
         class ServiceError(Exception):
