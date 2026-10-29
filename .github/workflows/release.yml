@@ -2,6 +2,9 @@ name: Release to Tencent COS
 
 on:
   push:
+    # Dedicated validation ref: branch pushes compile only; uploads still require a tag.
+    branches:
+      - 'codex/cos-validation'
     tags:
       - 'v*'
   # 手动触发即干跑：完整编译、签名、公证，产物只留在 workflow 里，不建 GitHub Release
@@ -888,8 +891,8 @@ jobs:
     name: Validate artifacts and publish to COS
     runs-on: ubuntu-22.04
     needs: [whats-new-check, release, macos-release]
-    # 手动运行只校验并保存产物；仅 push tag 可执行 COS 上传步骤。
-    environment: ${{ github.event_name == 'push' && 'cos-production' || 'release-validation' }}
+    # 手动运行和专用分支推送只校验并保存产物；仅 push tag 可上传 COS。
+    environment: ${{ github.event_name == 'push' && github.ref_type == 'tag' && 'cos-production' || 'release-validation' }}
     concurrency:
       group: cos-stable-publication
       cancel-in-progress: false

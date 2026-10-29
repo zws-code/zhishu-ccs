@@ -13,7 +13,7 @@
 - 已创建广州普通桶 `zhishu-ccs-release-1252121424`，地域 `ap-guangzhou`；用户已将桶设为公有读私有写，仅保存公开发布产物。
 - 当前没有自己的域名，先以 COS 默认 HTTPS 域名直连验证发布/更新，尚未启用 CDN。下载根地址为 `https://zhishu-ccs-release-1252121424.cos.ap-guangzhou.myqcloud.com/ccs/stable`。
 - 用户已在 GitHub 添加桶/平台变量、COS 上传凭据及更新签名密钥，macOS 选择 `adhoc`。这些配置仍须通过实际 Actions 演练验证；不能称已完成 Apple 公证。
-- 已推送发布流程提交，并启动[首次手动演练](https://github.com/zws-code/zhishu-ccs/actions/runs/40816726762)：配置预检与 Node 回归通过，Python 回归暴露 Ubuntu 22.04 系统 Python 3.10 不支持 `hashlib.file_digest`，已改为兼容的分块哈希并补回归，待重跑。
+- 已推送发布流程提交，并启动[首次手动演练](https://github.com/zws-code/zhishu-ccs/actions/runs/40816726762)：配置预检与 Node 回归通过，Python 回归暴露 Ubuntu 22.04 系统 Python 3.10 不支持 `hashlib.file_digest`，已改为兼容的分块哈希并补回归。[第二次演练](https://github.com/zws-code/zhishu-ccs/actions/runs/40817286547)的配置、Node/Python 回归及 TypeScript 预检通过，随后运行被取消，尚未完成各平台编译。
 - 本次没有部署/重启平台，没有上传 COS 安装包，尚未验证真实系统安装与更新。
 
 ## 1. 准备腾讯云 COS 和 CDN
@@ -137,6 +137,14 @@ git push zhishu-git <你的发布分支>
 ```
 
 版本必须在 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 保持一致；Rust 构建会更新 Cargo.lock，提交版本变更时也应同步核对。新增 `src/whats-new/<版本>.json`，无应用内公告时使用真实版本与 `items: []`。
+
+也可以通过专用分支启动相同演练，无需操作浏览器：
+
+```sh
+git push zhishu-git HEAD:refs/heads/codex/cos-validation
+```
+
+该分支推送使用 `release-validation` 环境；COS 上传和 SDK 安装步骤仍要求 `push` 事件且 `ref_type=tag`，分支推送不会发布。只在需要演练时推送该专用分支。
 
 在 GitHub `Actions → Release to Tencent COS → Run workflow` 选择该分支。手动运行会完成配置检查、多平台构建、签名校验和本地发布预演，产物保存为 Actions artifact；**不会上传 COS、不会替换正式清单、不会创建 GitHub Release**。
 

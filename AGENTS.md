@@ -68,7 +68,7 @@
 ### 打包、发布与更新
 
 - **唯一操作文档：[智枢客户端下载、打包、发布与更新](docs/zhishu-release.md)。** 涉及发布、签名、安装包、下载清单或更新时先读该文档。
-- 正式发布只走 `zws-code/zhishu-ccs` 的 GitHub Actions → 腾讯云 COS/CDN。手动运行工作流只构建并校验；推 `vX.Y.Z` tag 才上传并切换稳定清单。首次正式发布不兼容旧测试客户端更新入口。当前无自有域名，先用广州桶 `zhishu-ccs-release-1252121424` 的 COS 默认 HTTPS 地址直连，CDN 尚未接入。
+- 正式发布只走 `zws-code/zhishu-ccs` 的 GitHub Actions → 腾讯云 COS/CDN。手动运行或推送专用分支 `codex/cos-validation` 只构建并校验；推 `vX.Y.Z` tag 才上传并切换稳定清单。首次正式发布不兼容旧测试客户端更新入口。当前无自有域名，先用广州桶 `zhishu-ccs-release-1252121424` 的 COS 默认 HTTPS 地址直连，CDN 尚未接入。
 - 二开旧 SSH 发布工具、服务器脚本和配置示例已删除；原 `release:init/server/build/publish/import/help` 命令已移除。上游 GitHub Release/R2 实现保留，但不在智枢仓库执行。
 - `pnpm release:check` 校验 COS 配置（不连接云端）；`pnpm test:release` 运行 Node 发布回归；`pnpm test:release-cos` 运行 Python 模拟上传回归。底层 `build`/`build:unsigned`/`build:editable` 仅用于开发或内部验证。
 - GitHub Repository Variables 配置平台与 CDN 地址、公钥及 COS 桶/地域/前缀；更新私钥放 Repository Secrets，COS 凭据可放 `cos-production` Environment Secrets。不提交或输出密钥。
