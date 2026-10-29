@@ -12,8 +12,9 @@
 - 已实现仓库中的多平台构建、COS 发布、两份清单和回归验证。
 - 已创建广州普通桶 `zhishu-ccs-release-1252121424`，地域 `ap-guangzhou`；用户已将桶设为公有读私有写，仅保存公开发布产物。
 - 当前没有自己的域名，先以 COS 默认 HTTPS 域名直连验证发布/更新，尚未启用 CDN。下载根地址为 `https://zhishu-ccs-release-1252121424.cos.ap-guangzhou.myqcloud.com/ccs/stable`。
-- 用户已在 GitHub 添加桶/平台变量、COS 上传凭据及更新签名密钥，macOS 选择 `adhoc`。这些配置仍须通过实际 Actions 演练验证；不能称已完成 Apple 公证。
+- 用户已在 GitHub 添加桶/平台变量、COS 上传凭据及更新签名密钥，macOS 选择 `adhoc`。构建变量与更新签名已通过实际 Actions 演练，COS 凭据和权限尚未通过真实上传验证；不能称已完成 Apple 公证。
 - 已推送发布流程提交，并启动[首次手动演练](https://github.com/zws-code/zhishu-ccs/actions/runs/40816726762)：配置预检与 Node 回归通过，Python 回归暴露 Ubuntu 22.04 系统 Python 3.10 不支持 `hashlib.file_digest`，已改为兼容的分块哈希并补回归。[第二次演练](https://github.com/zws-code/zhishu-ccs/actions/runs/40817286547)的配置、Node/Python 回归及 TypeScript 预检通过，随后运行被取消，尚未完成各平台编译。
+- [第三次演练（2026-10-29）](https://github.com/zws-code/zhishu-ccs/actions/runs/40818363265)在 `codex/cos-validation` 分支、提交 `7e8b7079fb7d5cdd376b763913860e774602e447` 上全部成功：9 个作业通过，完成 macOS universal、Windows x64/ARM64、Linux x64/ARM64 的编译与打包、更新签名校验、两份清单生成和 COS 发布预演；最终产物 `cos-payload-v0.0.1` 已保存，COS SDK 安装与真实上传步骤按设计跳过。
 - 本次没有部署/重启平台，没有上传 COS 安装包，尚未验证真实系统安装与更新。
 
 ## 1. 准备腾讯云 COS 和 CDN
