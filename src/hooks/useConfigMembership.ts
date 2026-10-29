@@ -7,6 +7,7 @@ import { useOpenClawLiveProviderIds } from "@/hooks/useOpenClaw";
 import { useHermesLiveProviderIds } from "@/hooks/useHermes";
 import { useDshCurrentState } from "@/lib/query/dsh";
 import { usePiCurrentState } from "@/lib/query/pi";
+import { isPiFamilyApp } from "@/config/appConfig";
 
 /**
  * 共存式应用里「这家在不在已添加列表」的统一判断：OpenCode / OpenClaw / Hermes 读各自的
@@ -31,7 +32,10 @@ export function useConfigMembership(appId: AppId, enabled = true) {
     data: piCurrentState,
     isSuccess: isPiCurrentStateSuccess,
     isPending: isPiCurrentStatePending,
-  } = usePiCurrentState(enabled && appId === "pi");
+  } = usePiCurrentState(
+    enabled && isPiFamilyApp(appId),
+    appId === "omp" ? "omp" : "pi",
+  );
   // 列表和批量按钮会反复判断成员；原生状态变化时建立索引，避免每张卡片都线性扫描 ID 数组。
   const liveIds = useMemo(() => {
     const ids: Partial<Record<AppId, readonly string[] | undefined>> = {
@@ -39,7 +43,7 @@ export function useConfigMembership(appId: AppId, enabled = true) {
       openclaw: openclawLiveIds,
       hermes: hermesLiveIds,
       "deepseek-harness": dshCurrentState?.providerIds,
-      pi: isPiCurrentStateSuccess
+      [appId === "omp" ? "omp" : "pi"]: isPiCurrentStateSuccess
         ? piCurrentState?.enabledProviderIds
         : undefined,
     };
@@ -66,6 +70,7 @@ export function useConfigMembership(appId: AppId, enabled = true) {
         case "hermes":
         case "deepseek-harness":
         case "pi":
+        case "omp":
           return liveIds.has(provider.id);
         default:
           return true;
@@ -82,7 +87,7 @@ export function useConfigMembership(appId: AppId, enabled = true) {
       (appId === "openclaw" && isOpenclawLiveIdsPending) ||
       (appId === "hermes" && isHermesLiveIdsPending) ||
       (appId === "deepseek-harness" && isDshCurrentStatePending) ||
-      (appId === "pi" && isPiCurrentStatePending));
+      (isPiFamilyApp(appId) && isPiCurrentStatePending));
 
   return { isInConfig, isPending };
 }

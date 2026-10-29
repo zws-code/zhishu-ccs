@@ -1737,6 +1737,7 @@ mod tests {
     }
 
     #[test]
+    #[serial_test::serial]
     fn restore_paths_must_still_belong_to_the_same_app() {
         let mut item = record("0001", "2026-10-25T00:00:00Z", "a", "b");
         item.path = crate::codex_config::get_codex_config_dir()

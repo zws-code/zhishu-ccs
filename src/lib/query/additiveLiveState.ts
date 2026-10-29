@@ -4,6 +4,7 @@ import { openclawKeys } from "@/hooks/useOpenClaw";
 import { hermesKeys } from "@/hooks/useHermes";
 import { invalidateDshProviderCaches } from "@/lib/query/dsh";
 import { invalidatePiProviderCaches } from "@/lib/query/pi";
+import { isPiFamilyApp } from "@/config/appConfig";
 
 /**
  * 累加式应用的「已添加」和「默认」都现读客户端文件，增删供应商前后重读一遍。
@@ -13,8 +14,8 @@ export async function refreshAdditiveLiveState(
   queryClient: QueryClient,
   app: AppId,
 ) {
-  if (app === "pi") {
-    await invalidatePiProviderCaches(queryClient);
+  if (isPiFamilyApp(app)) {
+    await invalidatePiProviderCaches(queryClient, app);
   } else if (app === "opencode") {
     await Promise.all([
       queryClient.invalidateQueries({

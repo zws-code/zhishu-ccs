@@ -186,6 +186,7 @@ impl StreamCheckService {
                 .map(str::to_string)
                 .ok_or_else(|| AppError::Message("WorkBuddy endpoint URL is missing".into())),
             AppType::DeepSeekHarness => Self::extract_dsh_base_url(provider),
+            AppType::Omp => crate::omp_config::provider_base_url(&provider.settings_config),
             AppType::ClaudeDesktop => ClaudeAdapter::new()
                 .extract_base_url(provider)
                 .map_err(|e| AppError::Message(format!("Failed to extract base_url: {e}"))),

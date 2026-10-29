@@ -1,7 +1,7 @@
 //! ② Claude Code 关键字段的切换结果。
 //!
 //! 关键字段回答「请求发到哪、凭什么鉴权、哪个模型名、哪种协议」，由供应商完全拥有：
-//! 切换后 live 里的关键字段必须恰好等于目标供应商行里的，上一家的一个都不能留。
+//! 显式配置的关键字段按目标供应商替换；缺失模型档位按智枢既有规则写盘补齐，上一家的一个都不能留。
 //! 旧代码靠整份覆盖做到这一点，重构版改成「清空关键字段再写入」，结果必须一样。
 //!
 //! 关键字段的定义直接引用 `live::floor`，和切换用的是同一份。
@@ -76,7 +76,9 @@ fn relay(id: &str, common_config: Option<bool>) -> Provider {
                 "ANTHROPIC_BASE_URL": format!("https://{id}.example"),
                 "ANTHROPIC_AUTH_TOKEN": format!("sk-{id}"),
                 "ANTHROPIC_MODEL": format!("{id}-model"),
+                "ANTHROPIC_DEFAULT_HAIKU_MODEL": format!("{id}-haiku"),
                 "ANTHROPIC_DEFAULT_SONNET_MODEL": format!("{id}-sonnet"),
+                "ANTHROPIC_DEFAULT_OPUS_MODEL": format!("{id}-opus"),
                 "CLAUDE_CODE_SUBAGENT_MODEL": format!("{id}-subagent")
             }
         }),
@@ -297,4 +299,43 @@ fn common_config_opt_in_does_not_carry_key_fields_to_the_next_provider() {
     write_home_file(LIVE, &live.to_string());
 
     switch_and_check(&state, "claude-official");
+}
+
+/// 智枢分支的写盘补齐不能携带上一家模型，也不能改写持久化的原始配置。
+#[test]
+fn missing_model_slots_are_derived_only_in_live_settings() {
+    let _guard = test_mutex().lock().unwrap_or_else(|e| e.into_inner());
+    reset_test_fs();
+    let target = provider(
+        "derived",
+        json!({ "env": {
+        "ANTHROPIC_BASE_URL": "https://derived.example",
+        "ANTHROPIC_AUTH_TOKEN": "fixture-key",
+        "ANTHROPIC_MODEL": "main-model",
+        "ANTHROPIC_SMALL_FAST_MODEL": "fast-model",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": "explicit-sonnet"
+    } }),
+        None,
+    );
+    let state = setup(&[relay("old", None), target.clone()], "old");
+    ProviderService::switch(&state, AppType::Claude, "derived").expect("switch");
+    let live = read_home_json(LIVE);
+    assert_eq!(
+        live["env"],
+        json!({
+            "ANTHROPIC_BASE_URL": "https://derived.example",
+            "ANTHROPIC_AUTH_TOKEN": "fixture-key",
+            "ANTHROPIC_MODEL": "main-model",
+            "ANTHROPIC_SMALL_FAST_MODEL": "fast-model",
+            "ANTHROPIC_DEFAULT_HAIKU_MODEL": "fast-model",
+            "ANTHROPIC_DEFAULT_SONNET_MODEL": "explicit-sonnet",
+            "ANTHROPIC_DEFAULT_OPUS_MODEL": "main-model"
+        })
+    );
+    let saved = state
+        .db
+        .get_provider_by_id("derived", "claude")
+        .unwrap()
+        .unwrap();
+    assert_eq!(saved.settings_config, target.settings_config);
 }

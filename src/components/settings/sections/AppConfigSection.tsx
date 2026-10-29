@@ -30,6 +30,7 @@ const DIRECTORY_FIELD: Record<DirectoryAppId, keyof Settings> = {
   pi: "piConfigDir",
   "deepseek-harness": "dshConfigDir",
   workbuddy: "workbuddyConfigDir",
+  omp: "ompConfigDir",
 };
 
 const DIRECTORY_PLACEHOLDER: Record<DirectoryAppId, string> = {
@@ -43,6 +44,7 @@ const DIRECTORY_PLACEHOLDER: Record<DirectoryAppId, string> = {
   pi: "settings.browsePlaceholderPi",
   "deepseek-harness": "settings.browsePlaceholderDsh",
   workbuddy: "settings.browsePlaceholderWorkbuddy",
+  omp: "settings.browsePlaceholderOmp",
 };
 
 const DIRECTORY_APPS: DirectoryAppId[] = [
@@ -56,6 +58,7 @@ const DIRECTORY_APPS: DirectoryAppId[] = [
   "pi",
   "deepseek-harness",
   "workbuddy",
+  "omp",
 ];
 
 const normalizeDir = (value: unknown) =>

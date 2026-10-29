@@ -19,7 +19,8 @@ type AppDirectoryKey =
   | "hermes"
   | "pi"
   | "dsh"
-  | "workbuddy";
+  | "workbuddy"
+  | "omp";
 type DirectoryKey = "appConfig" | AppDirectoryKey;
 
 export interface ResolvedDirectories {
@@ -34,6 +35,7 @@ export interface ResolvedDirectories {
   pi: string;
   dsh: string;
   workbuddy: string;
+  omp: string;
 }
 
 // Single source of truth for per-app directory metadata.
@@ -51,6 +53,7 @@ const APP_DIRECTORY_META: Record<
   pi: { key: "pi", defaultFolder: ".pi/agent" },
   "deepseek-harness": { key: "dsh", defaultFolder: ".dsh" },
   workbuddy: { key: "workbuddy", defaultFolder: ".workbuddy" },
+  omp: { key: "omp", defaultFolder: ".omp/agent" },
 };
 
 const DIRECTORY_KEY_TO_SETTINGS_FIELD: Record<
@@ -67,6 +70,7 @@ const DIRECTORY_KEY_TO_SETTINGS_FIELD: Record<
   pi: "piConfigDir",
   dsh: "dshConfigDir",
   workbuddy: "workbuddyConfigDir",
+  omp: "ompConfigDir",
 };
 
 const sanitizeDir = (value?: string | null): string | undefined => {
@@ -158,6 +162,7 @@ export function useDirectorySettings({
     pi: "",
     dsh: "",
     workbuddy: "",
+    omp: "",
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -173,6 +178,7 @@ export function useDirectorySettings({
     pi: "",
     dsh: "",
     workbuddy: "",
+    omp: "",
   });
   // 已保存的数据目录（保存按钮和「需要重启」都和它比）。ref 给回调用，state 让比较它的
   // 组件在保存后重渲染：保存成功要把它更新成刚存的值，否则保存按钮一直在、改回去存不了
@@ -204,6 +210,7 @@ export function useDirectorySettings({
           piDir,
           dshDir,
           workbuddyDir,
+          ompDir,
           defaultAppConfig,
           defaultClaudeDir,
           defaultCodexDir,
@@ -215,6 +222,7 @@ export function useDirectorySettings({
           defaultPiDir,
           defaultDshDir,
           defaultWorkbuddyDir,
+          defaultOmpDir,
         ] = await Promise.all([
           settingsApi.getAppConfigDirOverride(),
           settingsApi.getConfigDir("claude"),
@@ -227,6 +235,7 @@ export function useDirectorySettings({
           settingsApi.getConfigDir("pi"),
           settingsApi.getConfigDir("deepseek-harness"),
           settingsApi.getConfigDir("workbuddy"),
+          settingsApi.getConfigDir("omp"),
           computeDefaultAppConfigDir(),
           computeDefaultConfigDir("claude"),
           computeDefaultConfigDir("codex"),
@@ -238,6 +247,7 @@ export function useDirectorySettings({
           computeDefaultConfigDir("pi"),
           computeDefaultConfigDir("deepseek-harness"),
           computeDefaultConfigDir("workbuddy"),
+          computeDefaultConfigDir("omp"),
         ]);
 
         if (!active) return;
@@ -256,6 +266,7 @@ export function useDirectorySettings({
           pi: defaultPiDir ?? "",
           dsh: defaultDshDir ?? "",
           workbuddy: defaultWorkbuddyDir ?? "",
+          omp: defaultOmpDir ?? "",
         };
 
         setAppConfigDir(normalizedOverride);
@@ -273,6 +284,7 @@ export function useDirectorySettings({
           pi: piDir || defaultsRef.current.pi,
           dsh: dshDir || defaultsRef.current.dsh,
           workbuddy: workbuddyDir || defaultsRef.current.workbuddy,
+          omp: ompDir || defaultsRef.current.omp,
         });
       } catch (error) {
         console.error(
@@ -495,6 +507,7 @@ export function useDirectorySettings({
         pi: overrides?.pi ?? defaultsRef.current.pi,
         dsh: overrides?.dsh ?? defaultsRef.current.dsh,
         workbuddy: overrides?.workbuddy ?? defaultsRef.current.workbuddy,
+        omp: overrides?.omp ?? defaultsRef.current.omp,
       });
     },
     [],

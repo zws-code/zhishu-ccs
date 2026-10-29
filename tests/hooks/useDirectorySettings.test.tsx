@@ -75,6 +75,7 @@ describe("useDirectorySettings", () => {
       if (app === "pi") return "/remote/pi";
       if (app === "deepseek-harness") return "/remote/dsh";
       if (app === "workbuddy") return "/remote/workbuddy";
+      if (app === "omp") return "/remote/omp";
       return "/remote/hermes";
     });
     selectConfigDirectoryMock.mockReset();
@@ -102,6 +103,7 @@ describe("useDirectorySettings", () => {
       pi: "/remote/pi",
       dsh: "/remote/dsh",
       workbuddy: "/remote/workbuddy",
+      omp: "/remote/omp",
     });
   });
 
@@ -116,6 +118,7 @@ describe("useDirectorySettings", () => {
     ["pi", "piConfigDir"],
     ["deepseek-harness", "dshConfigDir"],
     ["workbuddy", "workbuddyConfigDir"],
+    ["omp", "ompConfigDir"],
   ] as const)(
     "syncs the %s display when form drafts are discarded",
     async (app, field) => {

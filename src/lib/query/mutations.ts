@@ -19,6 +19,7 @@ import { usageKeys } from "@/lib/query/usage";
 import { sessionKeys } from "@/lib/query/sessions";
 import { invalidatePiProviderCaches } from "@/lib/query/pi";
 import { invalidateDshProviderCaches } from "@/lib/query/dsh";
+import { isPiFamilyApp } from "@/config/appConfig";
 import { GROKBUILD_OFFICIAL_PROVIDER_ID } from "@/utils/providerCapabilities";
 
 export const useAddProviderMutation = (appId: AppId) => {
@@ -73,7 +74,8 @@ export const useAddProviderMutation = (appId: AppId) => {
         appId === "pi" ||
         appId === "workbuddy" ||
         appId === "mcode" ||
-        appId === "kimi"
+        appId === "kimi" ||
+        appId === "omp"
       ) {
         if (
           providerInput.category === "omo" ||
@@ -151,7 +153,7 @@ export const useAddProviderMutation = (appId: AppId) => {
       if (parseLiveEditConflict(error)) return;
       const rawDetail = extractErrorMessage(error);
       const detail =
-        (appId === "pi"
+        (isPiFamilyApp(appId)
           ? translatePiProviderMutationError(rawDetail, t)
           : appId === "kimi"
             ? translateKimiProviderMutationError(rawDetail, t)
@@ -166,8 +168,8 @@ export const useAddProviderMutation = (appId: AppId) => {
       );
     },
     onSettled: async () => {
-      if (appId === "pi") {
-        await invalidatePiProviderCaches(queryClient);
+      if (isPiFamilyApp(appId)) {
+        await invalidatePiProviderCaches(queryClient, appId);
       }
       if (appId === "deepseek-harness") {
         await invalidateDshProviderCaches(queryClient);
@@ -229,7 +231,7 @@ export const useUpdateProviderMutation = (appId: AppId) => {
       if (parseLiveEditConflict(error)) return;
       const rawDetail = extractErrorMessage(error);
       const detail =
-        (appId === "pi"
+        (isPiFamilyApp(appId)
           ? translatePiProviderMutationError(rawDetail, t)
           : appId === "kimi"
             ? translateKimiProviderMutationError(rawDetail, t)
@@ -244,8 +246,8 @@ export const useUpdateProviderMutation = (appId: AppId) => {
       );
     },
     onSettled: async () => {
-      if (appId === "pi") {
-        await invalidatePiProviderCaches(queryClient);
+      if (isPiFamilyApp(appId)) {
+        await invalidatePiProviderCaches(queryClient, appId);
       } else if (appId === "kimi") {
         // 默认模型可能在 Kimi Code 里改过：失败时也重读，页面上的「默认」才跟得上
         await queryClient.invalidateQueries({
@@ -320,7 +322,7 @@ export const useDeleteProviderMutation = (appId: AppId) => {
     onError: (error: Error) => {
       const rawDetail = extractErrorMessage(error);
       const detail =
-        (appId === "pi"
+        (isPiFamilyApp(appId)
           ? translatePiProviderMutationError(rawDetail, t)
           : appId === "kimi"
             ? translateKimiProviderMutationError(rawDetail, t)
@@ -335,8 +337,8 @@ export const useDeleteProviderMutation = (appId: AppId) => {
       );
     },
     onSettled: async () => {
-      if (appId === "pi") {
-        await invalidatePiProviderCaches(queryClient);
+      if (isPiFamilyApp(appId)) {
+        await invalidatePiProviderCaches(queryClient, appId);
       } else if (appId === "kimi") {
         // 默认模型可能在 Kimi Code 里改过：失败时也重读，页面上的「默认」才跟得上
         await queryClient.invalidateQueries({
@@ -365,6 +367,12 @@ export const useSwitchProviderMutation = (appId: AppId) => {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["providers", appId] });
+      if (appId === "claude") {
+        // 切到绑了账号的官方卡时，后端可能把原来的默认登录收成了新账号：授权中心要重读
+        await queryClient.invalidateQueries({
+          queryKey: ["managed-auth-status", "claude_official"],
+        });
+      }
       if (appId === "claude-desktop") {
         await queryClient.invalidateQueries({ queryKey: proxyKeys.status });
         await queryClient.invalidateQueries({
@@ -431,8 +439,8 @@ export const useSwitchProviderMutation = (appId: AppId) => {
       );
     },
     onSettled: async () => {
-      if (appId === "pi") {
-        await invalidatePiProviderCaches(queryClient);
+      if (isPiFamilyApp(appId)) {
+        await invalidatePiProviderCaches(queryClient, appId);
       }
       if (appId === "deepseek-harness") {
         await invalidateDshProviderCaches(queryClient);

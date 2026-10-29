@@ -71,7 +71,8 @@ impl Database {
             enabled_agy BOOLEAN NOT NULL DEFAULT 0,
             enabled_kimi BOOLEAN NOT NULL DEFAULT 0,
             enabled_hermes BOOLEAN NOT NULL DEFAULT 0,
-            enabled_pi BOOLEAN NOT NULL DEFAULT 0
+            enabled_pi BOOLEAN NOT NULL DEFAULT 0,
+            enabled_omp BOOLEAN NOT NULL DEFAULT 0
         )",
             [],
         )
@@ -623,6 +624,16 @@ impl Database {
                 }
                 version = Self::get_user_version(conn)?;
             }
+            // Zhishu and upstream both shipped v23 with different additions.
+            // Reconcile existing v23 databases too, within the migration savepoint.
+            if Self::needs_omp_schema_reconciliation(conn)? {
+                Self::add_column_if_missing(
+                    conn,
+                    "mcp_servers",
+                    "enabled_omp",
+                    "BOOLEAN NOT NULL DEFAULT 0",
+                )?;
+            }
             Ok(())
         })();
 
@@ -638,6 +649,11 @@ impl Database {
                 Err(e)
             }
         }
+    }
+
+    pub(crate) fn needs_omp_schema_reconciliation(conn: &Connection) -> Result<bool, AppError> {
+        Ok(Self::table_exists(conn, "mcp_servers")?
+            && !Self::has_column(conn, "mcp_servers", "enabled_omp")?)
     }
 
     /// v0 -> v1 迁移：补齐所有缺失列
@@ -2527,6 +2543,34 @@ impl Database {
             ("kimi-k3", "Kimi K3", "3.00", "15.00", "0.30", "3.00"),
             // Kimi For Coding 套餐里 K3 的裸名（无 kimi- 前缀），同标准 list 价
             ("k3", "Kimi K3", "3.00", "15.00", "0.30", "3.00"),
+            // 2026-10-24 官方价页：K3.1 Pro 缓存写入取默认 5 分钟档（1 小时档为 2 倍）。
+            // HighSpeed 只有输入/输出/缓存写翻倍，缓存读仍是 $0.20，别按 K2.7 的 2 倍规律改
+            (
+                "kimi-k3.1-pro",
+                "Kimi K3.1 Pro",
+                "2.00",
+                "10.00",
+                "0.20",
+                "2.00",
+            ),
+            (
+                "kimi-k3.1-pro-highspeed",
+                "Kimi K3.1 Pro HighSpeed",
+                "4.00",
+                "20.00",
+                "0.20",
+                "4.00",
+            ),
+            // Kimi Code 套餐里的裸名（无 kimi- 前缀），同标准 list 价
+            ("k3.1-pro", "Kimi K3.1 Pro", "2.00", "10.00", "0.20", "2.00"),
+            (
+                "k3.1-pro-highspeed",
+                "Kimi K3.1 Pro HighSpeed",
+                "4.00",
+                "20.00",
+                "0.20",
+                "4.00",
+            ),
             // 腾讯混元 (Tencent Hunyuan)（官方 CNY 1/4/0.25 按 1 USD ≈ 7.14 折算；Hy3 阶梯计价取最低档）
             ("hunyuan-hy3", "Hunyuan Hy3", "0.14", "0.56", "0.035", "0"),
             ("hy3", "Hunyuan Hy3", "0.14", "0.56", "0.035", "0"),
@@ -4013,6 +4057,84 @@ mod tests {
                 assert_eq!(ports, vec![25721, 12345]);
             }
         }
+        Ok(())
+    }
+
+    #[test]
+    fn merged_v23_reconciles_omp_without_changing_existing_data() -> Result<(), AppError> {
+        for upstream_v23 in [false, true] {
+            let conn = Connection::open_in_memory()?;
+            conn.execute_batch(
+                "CREATE TABLE mcp_servers(id TEXT PRIMARY KEY, enabled_kimi BOOLEAN);
+                 INSERT INTO mcp_servers VALUES ('m', 1);
+                 CREATE TABLE proxy_config(app_type TEXT PRIMARY KEY, listen_port INTEGER);
+                 INSERT INTO proxy_config VALUES ('claude', 15721), ('codex', 12345);",
+            )?;
+            if upstream_v23 {
+                conn.execute_batch(
+                    "ALTER TABLE mcp_servers ADD COLUMN enabled_omp BOOLEAN NOT NULL DEFAULT 0;
+                     UPDATE mcp_servers SET enabled_omp = 1;",
+                )?;
+            }
+            Database::set_user_version(&conn, 23)?;
+            assert_eq!(
+                Database::needs_omp_schema_reconciliation(&conn)?,
+                !upstream_v23
+            );
+            for _ in 0..2 {
+                Database::apply_schema_migrations_on_conn(&conn)?;
+                assert!(!Database::needs_omp_schema_reconciliation(&conn)?);
+                assert_eq!(Database::get_user_version(&conn)?, 23);
+                let flags: (i64, i64) = conn.query_row(
+                    "SELECT enabled_kimi, enabled_omp FROM mcp_servers WHERE id = 'm'",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )?;
+                assert_eq!(flags, (1, i64::from(upstream_v23)));
+                let ports: Vec<i64> = conn
+                    .prepare("SELECT listen_port FROM proxy_config ORDER BY app_type")?
+                    .query_map([], |row| row.get(0))?
+                    .collect::<Result<_, _>>()?;
+                assert_eq!(ports, vec![15721, 12345]);
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn merged_migration_failure_rolls_back_version_and_port_changes() -> Result<(), AppError> {
+        let conn = Connection::open_in_memory()?;
+        conn.execute_batch(
+            "CREATE TABLE mcp_servers(id TEXT PRIMARY KEY, enabled_codex BOOLEAN);
+             INSERT INTO mcp_servers VALUES ('m', 1);
+             CREATE TABLE proxy_config(app_type TEXT PRIMARY KEY, listen_port INTEGER, updated_at TEXT);
+             INSERT INTO proxy_config VALUES ('claude', 15721, NULL);",
+        )?;
+        Database::set_user_version(&conn, 21)?;
+        conn.authorizer(Some(|context: rusqlite::hooks::AuthContext<'_>| {
+            if matches!(
+                context.action,
+                rusqlite::hooks::AuthAction::AlterTable { .. }
+            ) {
+                rusqlite::hooks::Authorization::Deny
+            } else {
+                rusqlite::hooks::Authorization::Allow
+            }
+        }));
+        assert!(Database::apply_schema_migrations_on_conn(&conn).is_err());
+        assert_eq!(Database::get_user_version(&conn)?, 21);
+        assert_eq!(
+            conn.query_row("SELECT listen_port FROM proxy_config", [], |row| row
+                .get::<_, i64>(0))?,
+            15721
+        );
+        assert!(!Database::has_column(&conn, "mcp_servers", "enabled_kimi")?);
+        assert!(!Database::has_column(&conn, "mcp_servers", "enabled_omp")?);
+        assert_eq!(
+            conn.query_row("SELECT enabled_codex FROM mcp_servers", [], |row| row
+                .get::<_, i64>(0))?,
+            1
+        );
         Ok(())
     }
 

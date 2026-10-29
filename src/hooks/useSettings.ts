@@ -64,6 +64,7 @@ const DIRECTORY_KEYS = [
   "piConfigDir",
   "dshConfigDir",
   "workbuddyConfigDir",
+  "ompConfigDir",
 ] as const;
 
 const sanitizeDir = (value?: string | null): string | undefined => {
@@ -138,6 +139,7 @@ export function useSettings(): UseSettingsResult {
       pi: sanitizeDir(data?.piConfigDir),
       dsh: sanitizeDir(data?.dshConfigDir),
       workbuddy: sanitizeDir(data?.workbuddyConfigDir),
+      omp: sanitizeDir(data?.ompConfigDir),
     });
     setRequiresRestart(false);
   }, [
@@ -229,6 +231,7 @@ export function useSettings(): UseSettingsResult {
         const sanitizedWorkBuddyDir = sanitizeDir(
           mergedSettings.workbuddyConfigDir,
         );
+        const sanitizedOmpDir = sanitizeDir(mergedSettings.ompConfigDir);
         const {
           webdavSync: _ignoredWebdavSync,
           s3Sync: _ignoredS3Sync,
@@ -246,6 +249,7 @@ export function useSettings(): UseSettingsResult {
           piConfigDir: sanitizedPiDir,
           dshConfigDir: sanitizedDshDir,
           workbuddyConfigDir: sanitizedWorkBuddyDir,
+          ompConfigDir: sanitizedOmpDir,
           language: mergedSettings.language,
         };
 
@@ -370,6 +374,7 @@ export function useSettings(): UseSettingsResult {
         const sanitizedWorkBuddyDir = sanitizeDir(
           mergedSettings.workbuddyConfigDir,
         );
+        const sanitizedOmpDir = sanitizeDir(mergedSettings.ompConfigDir);
         const previousAppDir = initialAppConfigDir;
         const previousClaudeDir = sanitizeDir(data?.claudeConfigDir);
         const previousCodexDir = sanitizeDir(data?.codexConfigDir);
@@ -380,6 +385,7 @@ export function useSettings(): UseSettingsResult {
         const previousPiDir = sanitizeDir(data?.piConfigDir);
         const previousDshDir = sanitizeDir(data?.dshConfigDir);
         const previousWorkBuddyDir = sanitizeDir(data?.workbuddyConfigDir);
+        const previousOmpDir = sanitizeDir(data?.ompConfigDir);
         const {
           webdavSync: _ignoredWebdavSync,
           s3Sync: _ignoredS3Sync,
@@ -397,6 +403,7 @@ export function useSettings(): UseSettingsResult {
           piConfigDir: sanitizedPiDir,
           dshConfigDir: sanitizedDshDir,
           workbuddyConfigDir: sanitizedWorkBuddyDir,
+          ompConfigDir: sanitizedOmpDir,
           language: mergedSettings.language,
         };
 
@@ -490,6 +497,7 @@ export function useSettings(): UseSettingsResult {
         const dshDirChanged = sanitizedDshDir !== previousDshDir;
         const workbuddyDirChanged =
           sanitizedWorkBuddyDir !== previousWorkBuddyDir;
+        const ompDirChanged = sanitizedOmpDir !== previousOmpDir;
         if (
           !pluginSynced &&
           (claudeDirChanged ||
@@ -517,6 +525,9 @@ export function useSettings(): UseSettingsResult {
           await queryClient.invalidateQueries({
             queryKey: ["providers", "workbuddy"],
           });
+        }
+        if (ompDirChanged) {
+          await invalidatePiDirectoryCaches(queryClient, "omp");
         }
 
         const appDirChanged = sanitizedAppDir !== (previousAppDir ?? undefined);
