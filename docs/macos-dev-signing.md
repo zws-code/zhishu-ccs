@@ -24,7 +24,7 @@ security find-identity -v -p codesigning
 pnpm dev
 ```
 
-`pnpm dev:macos`、`pnpm dev:isolated` 以及手动真实配置验收入口 `pnpm test` 使用同一套 macOS 签名逻辑。`pnpm test` 会使用真实用户配置，不是自动化测试。开发隔离范围见 [隔离开发与真实配置验收](dev-isolation.md)。直接运行 `pnpm tauri dev` 会绕过该签名流程。
+`pnpm dev` 在 macOS 上自动使用开发签名逻辑。开发隔离范围见 [隔离开发](dev-isolation.md)。直接运行 `pnpm tauri dev` 会绕过该签名流程。
 
 启动器按以下顺序选择有效身份：Apple Development、Mac Developer、Developer ID Application、Apple Distribution、3rd Party Mac Developer Application。同一优先级有多个身份时会停止并列出指纹，需明确指定；也可主动指定完整名称或 SHA-1 指纹：
 
@@ -53,7 +53,6 @@ MACOS_DEV_SIGNING_IDENTITY='<证书的完整 SHA-1 指纹>' pnpm dev
 ```sh
 pnpm test:dev-signing
 pnpm test:dev-isolation
-pnpm test:dev-local
 ```
 
 在已配置证书的 macOS 上，可显式执行真实系统验证：

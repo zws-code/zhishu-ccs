@@ -45,13 +45,8 @@
 | 安装依赖 | `pnpm install --frozen-lockfile` |
 | 桌面开发 | `pnpm dev` |
 | 检查开发启动参数，不启动程序 | `pnpm dev --dry-run` |
-| 准备应用数据与 Codex 的开发隔离目录 | `pnpm dev:prepare` |
-| 使用开发隔离目录启动 Codex | `pnpm codex:dev` |
-| 只预览真实配置启动方式，不启动程序 | `pnpm test:dry-run` |
-| 开发启动脚本回归 | `pnpm test:dev-isolation`、`pnpm test:dev-local` |
+| 开发启动脚本回归 | `pnpm test:dev-isolation` |
 | 本机正式构建与打包 | `pnpm build` |
-| 内测打包（锁定服务器地址，关闭自动更新） | `pnpm build:unsigned` |
-| 内测打包（可修改服务器地址，关闭自动更新） | `pnpm build:editable` |
 | 仅构建前端 | `pnpm build:renderer` |
 | 前端类型检查 | `pnpm typecheck` |
 | 前端格式检查 | `pnpm format:check` |
@@ -60,31 +55,24 @@
 | Rust Clippy 检查 | `cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings` |
 | Rust 测试，macOS/Linux 隔离示例 | `CC_SWITCH_TEST_HOME="$(mktemp -d)" cargo test --manifest-path src-tauri/Cargo.toml` |
 
-- **`pnpm test` 不是单元测试**：它运行 `scripts/dev-local.mjs`，移除子进程的隔离变量并以真实用户配置启动开发应用，可能修改实际 CLI 设置与凭证。自动验证使用 `pnpm test:unit`；只有明确需要真实环境验收时才使用此入口。
-- `pnpm dev`、`dev:macos`、`dev:isolated` 使用 `scripts/dev-isolated.mjs`，默认目录为 `~/.zhishu-ccs-dev-home`，可用绝对路径 `ZHISHU_CCS_DEV_HOME` 指定。**只隔离应用数据和 Codex**；Claude、Gemini 及其他 CLI 默认仍走真实用户目录，不能把整个开发环境视为全量隔离。
+- 前端单元测试使用 `pnpm test:unit`。
+- `pnpm dev` 使用 `scripts/dev-isolated.mjs`，默认目录为 `~/.zhishu-ccs-dev-home`，可用绝对路径 `ZHISHU_CCS_DEV_HOME` 指定。**只隔离应用数据和 Codex**；Claude、Gemini 及其他 CLI 默认仍走真实用户目录，不能把整个开发环境视为全量隔离。
 - 启动器只为子进程设置隔离 `CODEX_HOME`，不复制真实凭证，并为新 Codex 目录初始化文件凭证模式。其他工具写入测试需使用各自目录覆盖/夹具；Rust 测试用 `CC_SWITCH_TEST_HOME`，同时检查已有目录覆盖和 `DSH_HOME`、`WORKBUDDY_CONFIG_DIR` 等变量，不能修改智能体自身的 `HOME`/`CODEX_HOME` 来隔离。
-- Rust 编译前需存在 `dist/`；正式打包启用了更新包签名，无发布密钥时使用 `pnpm build:unsigned`，具体配置见[底层打包命令](docs/zhishu-release.md#打包命令)。CI 后端使用 nextest；本地未安装该扩展时使用上表的 `cargo test`，不要把扩展缺失报告成代码失败。
+- Rust 编译前需存在 `dist/`；打包始终启用更新包签名，需要配置发布私钥，具体配置见[底层打包命令](docs/zhishu-release.md#打包命令)。CI 后端使用 nextest；本地未安装该扩展时使用上表的 `cargo test`，不要把扩展缺失报告成代码失败。
 
 ### 打包、发布与更新
 
-- **唯一操作文档：[智枢客户端下载、打包、发布与更新](docs/zhishu-release.md)。** 涉及打包、签名、上传、网页下载清单或客户端自动更新时，先读该文档；具体参数、产物路径、首次平台接入及故障处理以它和当前脚本为准。
-
-| 用途 | 从仓库根目录执行 |
-| --- | --- |
-| 首次初始化本机发布配置与更新密钥 | `pnpm release:init` |
-| 日常打包（替换为本次新版本号） | `pnpm release:build <新版本号>` |
-| 本地发布预演（不连接服务器） | `pnpm release:publish --dry-run` |
-| 发布刚打包的版本 | `pnpm release:publish` |
-| 汇入其他系统同版本构建产物 | `pnpm release:import <版本号> <产物目录>` |
-| 只读检查平台下载与更新入口 | `pnpm release:check` |
-| 发布脚本回归（不连接生产服务器） | `pnpm test:release` |
-| 查看命令帮助 | `pnpm release:help` |
-
-- `release:build` 自动同步版本、执行检查、打包并签名；macOS 默认生成 Intel/Apple Silicon 通用包。Windows/Linux 需在对应系统构建，再按文档汇总产物；未在目标系统验证时不能声称已完成真实打包。
-- `release:publish` 上传安装包并更新网页下载、客户端自动更新清单；已上线版本不可覆盖，代码有变更时使用新版本号，同一批产物发布失败可重试。unsigned/editable 内测包关闭自动更新，不能通过正式发布流程上线。
-- 首次接入用 `pnpm release:server` 创建远端目录并上传发布工具；它不部署或重启网关。日常客户端发布无需重新部署平台，网关接入和异常处理按[首次平台接入](docs/zhishu-release.md#首次平台接入单独操作)执行。
-- 备份原更新签名密钥 `~/.tauri/zhishu-ccs.key` 与 `.pub`，换机沿用同一身份；私钥不提交 Git、不上传服务器。updater 签名与 Apple Developer ID 签名、公证是不同环节，不能混称已公证。
-- 发布验收范围见[验证边界](docs/zhishu-release.md#验证边界)：脚本验签和公网文件检查之外，还需在目标系统验证安装、登录、工具接入及旧版升级。
+- **唯一操作文档：[智枢客户端下载、打包、发布与更新](docs/zhishu-release.md)。** 涉及发布、签名、安装包、下载清单或更新时先读该文档。
+- 正式发布只走 `zws-code/zhishu-ccs` 的 GitHub Actions → 腾讯云 COS/CDN。手动运行或推送专用分支 `codex/cos-validation` 只构建并校验；推 `vX.Y.Z` tag 才上传并切换稳定清单，COS 成功后由独立作业复用同一份 payload 创建 GitHub Release 下载入口。首次正式发布不兼容旧测试客户端更新入口。当前无自有域名，先用广州桶 `zhishu-ccs-release-1252121424` 的 COS 默认 HTTPS 地址直连，CDN 尚未接入。
+- 二开旧 SSH 发布工具、服务器脚本和配置示例已删除；原 `release:init/server/build/publish/import/help` 命令已移除。上游 GitHub Release/R2 实现保留，但不在智枢仓库执行；智枢使用独立 Release 作业，仅该作业授予 `contents: write`。
+- `pnpm release:check` 校验 COS 配置（不连接云端）；`pnpm test:release` 运行 Node 发布回归；`pnpm test:release-cos` 运行 Python 模拟上传回归。底层 `build` 仅用于本机构建验证。
+- GitHub Repository Variables 配置平台与 CDN 地址、公钥及 COS 桶/地域/前缀；更新私钥放 Repository Secrets，COS 凭据可放 `cos-production` Environment Secrets。不提交或输出密钥。
+- 正式构建已保存原 payload、上传脚本需要修复时，可用 `resume-cos-release.yml` 恢复：核对原正式 tag/提交/产物来源并再次验签与校验哈希，不重编译、不移动 tag；该工作流的手动运行会实际发布。后台专用分支 `codex/cos-resume` 需提交说明带 `Resume-Release-Run: <原正式run_id>`。
+- 0.0.1 已于 2026-10-29 正式发布至 COS 与 GitHub Release（Latest），原构建 run `40825474319`，成功恢复 run `40834709561`；实际 macOS 包已核对更新源/公钥并下载验签，跨版本安装升级仍待后续正式版本验收。上传器四路并发，`COS_UPLOAD_ACCELERATE` 默认关闭；仅显式启用时使用已开启的桶全球加速，累计上传读取上限 3 GB/次（含重试），不改变客户端更新地址。
+- COS 版本目录不可覆盖，全部文件与签名校验并通过公网检查后才发布稳定清单；禁止降版本或遗漏已发布平台。失败重试复用原产物，不重新编译覆盖同版本。两个清单逐个发布，不宣称对象存储支持跨对象事务。
+- 默认 macOS 使用 Developer ID 签名/公证；显式 `adhoc` 模式跳过公证，不能称已公证。Tauri 更新签名始终独立保留。
+- 当前 Git remote 仍须核对：`origin` 是上游，`zhishu-origin` 是二开 GitLab，`zhishu-git` 是自己的 GitHub；发布 tag 推到 `zhishu-git`，不推上游。
+- 云端资源与真实平台验收状态以文档和本次实测为准，不以工作流存在推断桶、CDN、证书、Secrets 已配置或安装/升级已验收。
 
 ## 4. 主干禁区
 

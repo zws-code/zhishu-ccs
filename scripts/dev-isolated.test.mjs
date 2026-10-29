@@ -88,19 +88,15 @@ test("rejects real homes, protected configuration paths, and symlink escapes", (
   assert.throws(() => resolveEnvironment({}, userHome), /Broken symlink/);
 });
 
-test("app and CLI launch plans use the production Tauri config", () => {
-  const launch = buildCommand("app", ["--no-watch"], "darwin");
+test("app launch plans use the production Tauri config", () => {
+  const launch = buildCommand(["--no-watch"], "darwin");
   assert.equal(launch.command, "sh");
   assert.deepEqual(launch.args, [
     path.join(projectRoot, "scripts/dev-macos.sh"),
     "--no-watch",
   ]);
-  assert.deepEqual(buildCommand("codex", ["--version"]), {
-    command: "codex",
-    args: ["--version"],
-  });
-  assert.throws(() => buildCommand("app", ["--config", "real.json"]), /owns/);
-  assert.deepEqual(buildCommand("app", [], "linux"), {
+  assert.throws(() => buildCommand(["--config", "real.json"]), /owns/);
+  assert.deepEqual(buildCommand([], "linux"), {
     command: "pnpm",
     args: ["tauri", "dev"],
   });

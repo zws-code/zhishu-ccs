@@ -88,13 +88,15 @@ describe("Zhishu release configuration", () => {
       /public key/,
     );
   });
-  it("allows an unsigned build without updater configuration", () => {
-    const result = validateReleaseConfig(
-      { ...config, updateUrl: "", updatePublicKey: "" },
-      { requireUpdater: false },
+  it("requires both an updater URL and a signing public key", () => {
+    assert.throws(
+      () => validateReleaseConfig({ ...config, updateUrl: "" }),
+      /updateUrl/,
     );
-    assert.equal(result.updateUrl, null);
-    assert.equal(result.updatePublicKey, null);
+    assert.throws(
+      () => validateReleaseConfig({ ...config, updatePublicKey: "" }),
+      /public key/,
+    );
   });
 });
 
@@ -160,28 +162,6 @@ it("writes matching public renderer and native updater configuration only after 
       join(dir, "release.config.local.json"),
       JSON.stringify({
         ...config,
-        updateUrl: "",
-        updatePublicKey: "",
-      }),
-    );
-    prepareRelease(root, { ZHISHU_UNSIGNED_BUILD: "true" });
-    const unsignedEnv = readFileSync(
-      join(dir, "src/.env.production.local"),
-      "utf8",
-    );
-    assert.match(unsignedEnv, /VITE_ZHISHU_UPDATES_ENABLED=false/);
-    const unsigned = JSON.parse(
-      readFileSync(
-        join(dir, "src-tauri/tauri.release.local.conf.json"),
-        "utf8",
-      ),
-    );
-    assert.equal(unsigned.bundle.createUpdaterArtifacts, false);
-    assert.deepEqual(unsigned.plugins.updater, { endpoints: [], pubkey: "" });
-    writeFileSync(
-      join(dir, "release.config.local.json"),
-      JSON.stringify({
-        ...config,
         updateUrl: "http://192.168.20.10:8080/client-downloads/latest.json",
         updateAllowInsecureHttp: true,
       }),
@@ -197,28 +177,6 @@ it("writes matching public renderer and native updater configuration only after 
       httpConfig.plugins.updater.dangerousInsecureTransportProtocol,
       true,
     );
-    writeFileSync(
-      join(dir, "release.config.local.json"),
-      JSON.stringify({ ...config, updateUrl: "", updatePublicKey: "" }),
-    );
-    prepareRelease(root, { ZHISHU_EDITABLE_BUILD: "true" });
-    const editableEnv = readFileSync(
-      join(dir, "src/.env.production.local"),
-      "utf8",
-    );
-    assert.doesNotMatch(
-      editableEnv,
-      /VITE_ZHISHU_PLATFORM_SERVER_LOCKED/,
-    );
-    assert.match(editableEnv, /VITE_ZHISHU_UPDATES_ENABLED=false/);
-    const editable = JSON.parse(
-      readFileSync(
-        join(dir, "src-tauri/tauri.release.local.conf.json"),
-        "utf8",
-      ),
-    );
-    assert.equal(editable.bundle.createUpdaterArtifacts, false);
-    assert.deepEqual(editable.plugins.updater, { endpoints: [], pubkey: "" });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -275,7 +233,7 @@ it("generates a website manifest from real installer files and rejects upstream 
   }
 });
 
-it("build entry preserves signed, unsigned and editable modes when preparing config in process", () => {
+it("build entry enables signed updates and forwards Tauri arguments", () => {
   const dir = mkdtempSync(join(tmpdir(), "zhishu-build-entry-"));
   try {
     for (const name of ["scripts", "src", "src-tauri"])
@@ -294,63 +252,56 @@ it("build entry preserves signed, unsigned and editable modes when preparing con
     const capture = join(dir, "invocation.json");
     writeFileSync(
       manager,
-      `require("node:fs").writeFileSync(process.env.ZHISHU_TEST_CAPTURE, JSON.stringify({ args: process.argv.slice(2), unsigned: process.env.ZHISHU_UNSIGNED_BUILD, editable: process.env.ZHISHU_EDITABLE_BUILD }));`,
+      `require("node:fs").writeFileSync(process.env.ZHISHU_TEST_CAPTURE, JSON.stringify({ args: process.argv.slice(2) }));`,
     );
-    for (const mode of ["signed", "unsigned", "editable"]) {
-      const result = spawnSync(
-        process.execPath,
-        [
-          join(dir, "scripts/build-release.mjs"),
-          ...(mode === "signed" ? [] : [`--${mode}`]),
-          "--",
-          "--target",
-          "fixture-target",
-          "--ci",
-        ],
-        {
-          cwd: dir,
-          encoding: "utf8",
-          env: {
-            ...process.env,
-            npm_execpath: manager,
-            ZHISHU_TEST_CAPTURE: capture,
-            ZHISHU_UNSIGNED_BUILD: "false",
-            ZHISHU_EDITABLE_BUILD: "false",
-            VITE_PLATFORM_API_URL: config.platformApiUrl,
-            VITE_PLATFORM_WEB_URL: config.platformWebUrl,
-            ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP: "false",
-            ZHISHU_UPDATE_URL: config.updateUrl,
-            ZHISHU_UPDATE_PUBLIC_KEY: config.updatePublicKey,
-            ZHISHU_UPDATE_ALLOW_INSECURE_HTTP: "false",
-          },
-        },
-      );
-      assert.equal(result.status, 0, result.stderr);
-      const invocation = JSON.parse(readFileSync(capture));
-      assert.deepEqual(invocation.args, [
-        "tauri",
-        "build",
-        "--config",
-        "src-tauri/tauri.release.local.conf.json",
+    const result = spawnSync(
+      process.execPath,
+      [
+        join(dir, "scripts/build-release.mjs"),
+        "--",
         "--target",
         "fixture-target",
         "--ci",
-      ]);
-      assert.equal(invocation.unsigned, String(mode !== "signed"));
-      assert.equal(invocation.editable, String(mode === "editable"));
-      const renderer = readFileSync(
-        join(dir, "src/.env.production.local"),
-        "utf8",
-      );
-      assert.ok(!renderer.includes("VITE_ZHISHU_PLATFORM_SERVER_LOCKED"));
-      assert.ok(
-        renderer.includes(`VITE_ZHISHU_UPDATES_ENABLED=${mode === "signed"}`),
-      );
-      const native = JSON.parse(
-        readFileSync(join(dir, "src-tauri/tauri.release.local.conf.json")),
-      );
-      assert.equal(native.bundle.createUpdaterArtifacts, mode === "signed");
-    }
+      ],
+      {
+        cwd: dir,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          npm_execpath: manager,
+          ZHISHU_TEST_CAPTURE: capture,
+          VITE_PLATFORM_API_URL: config.platformApiUrl,
+          VITE_PLATFORM_WEB_URL: config.platformWebUrl,
+          ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP: "false",
+          ZHISHU_UPDATE_URL: config.updateUrl,
+          ZHISHU_UPDATE_PUBLIC_KEY: config.updatePublicKey,
+          ZHISHU_UPDATE_ALLOW_INSECURE_HTTP: "false",
+        },
+      },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    const invocation = JSON.parse(readFileSync(capture));
+    assert.deepEqual(invocation.args, [
+      "tauri",
+      "build",
+      "--config",
+      "src-tauri/tauri.release.local.conf.json",
+      "--target",
+      "fixture-target",
+      "--ci",
+    ]);
+    const renderer = readFileSync(
+      join(dir, "src/.env.production.local"),
+      "utf8",
+    );
+    assert.ok(!renderer.includes("VITE_ZHISHU_PLATFORM_SERVER_LOCKED"));
+    assert.ok(
+      renderer.includes("VITE_ZHISHU_UPDATES_ENABLED=true"),
+    );
+    const native = JSON.parse(
+      readFileSync(join(dir, "src-tauri/tauri.release.local.conf.json")),
+    );
+    assert.equal(native.bundle.createUpdaterArtifacts, true);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

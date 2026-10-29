@@ -6,18 +6,14 @@ export function prepareRelease(
   root = new URL("../", import.meta.url),
   env = process.env,
 ) {
-  const editable = env.ZHISHU_EDITABLE_BUILD === "true";
-  const unsigned = env.ZHISHU_UNSIGNED_BUILD === "true" || editable;
-  const config = readReleaseConfig(root, env, {
-    requireUpdater: !unsigned,
-  });
+  const config = readReleaseConfig(root, env);
   writeIfChanged(
     new URL("src/.env.production.local", root),
     [
       `VITE_PLATFORM_API_URL=${config.platformApiUrl}`,
       `VITE_PLATFORM_WEB_URL=${config.platformWebUrl}`,
       `VITE_ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP=${config.platformAllowInsecureHttp}`,
-      `VITE_ZHISHU_UPDATES_ENABLED=${!unsigned}`,
+      "VITE_ZHISHU_UPDATES_ENABLED=true",
       "",
     ].join("\n"),
   );
@@ -25,11 +21,11 @@ export function prepareRelease(
     new URL("src-tauri/tauri.release.local.conf.json", root),
     JSON.stringify(
       {
-        bundle: { createUpdaterArtifacts: !unsigned },
+        bundle: { createUpdaterArtifacts: true },
         plugins: {
           updater: {
-            endpoints: config.updateUrl ? [config.updateUrl] : [],
-            pubkey: config.updatePublicKey || "",
+            endpoints: [config.updateUrl],
+            pubkey: config.updatePublicKey,
             ...(config.updateAllowInsecureHttp
               ? { dangerousInsecureTransportProtocol: true }
               : {}),

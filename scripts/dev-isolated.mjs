@@ -108,8 +108,7 @@ export function prepareEnvironment(environment) {
   }
 }
 
-export function buildCommand(action, args, platform = process.platform) {
-  if (action === "codex") return { command: "codex", args };
+export function buildCommand(args, platform = process.platform) {
   if (
     args.some(
       (arg) =>
@@ -131,28 +130,25 @@ export function buildCommand(action, args, platform = process.platform) {
 async function main(args) {
   if (args.includes("--help") || args.includes("-h")) {
     console.log(
-      "Usage: node scripts/dev-isolated.mjs [app|prepare|codex] [--dry-run] [arguments...]\nEnvironment: ZHISHU_CCS_DEV_HOME (absolute path)",
+      "Usage: node scripts/dev-isolated.mjs [app] [--dry-run] [arguments...]\nEnvironment: ZHISHU_CCS_DEV_HOME (absolute path)",
     );
     return;
   }
-  const action = ["app", "prepare", "codex"].includes(args[0])
-    ? args.shift()
-    : "app";
+  if (args[0] === "app") args.shift();
   const dryRun = args.includes("--dry-run");
   args = args.filter((arg) => arg !== "--dry-run");
   const environment = resolveEnvironment();
-  const launch = action === "prepare" ? null : buildCommand(action, args);
+  const launch = buildCommand(args);
   console.log(
     `[DEV] App data: ${path.join(environment.home, ".zhishu-ccs")}\n[DEV] Codex: ${environment.codexHome}\n[DEV] Claude/Gemini and other CLI paths: production HOME`,
   );
   if (dryRun) {
-    console.log(JSON.stringify({ action, ...launch }, null, 2));
+    console.log(JSON.stringify({ action: "app", ...launch }, null, 2));
     return;
   }
   prepareEnvironment(environment);
-  if (!launch) return;
   const child = spawn(launch.command, launch.args, {
-    cwd: action === "codex" ? process.cwd() : projectRoot,
+    cwd: projectRoot,
     env: environment.env,
     stdio: "inherit",
     shell: process.platform === "win32",

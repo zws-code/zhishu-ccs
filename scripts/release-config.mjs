@@ -90,7 +90,7 @@ export function parseUpdatePublicKey(value) {
   return bytes;
 }
 
-export function validateReleaseConfig(input, { requireUpdater = true } = {}) {
+export function validateReleaseConfig(input) {
   const platformAllowInsecureHttp = input.platformAllowInsecureHttp === true;
   const api = productionUrl(input.platformApiUrl, "platformApiUrl", {
     originOnly: true,
@@ -101,20 +101,14 @@ export function validateReleaseConfig(input, { requireUpdater = true } = {}) {
     allowInsecureHttp: platformAllowInsecureHttp,
   });
   const updateAllowInsecureHttp = input.updateAllowInsecureHttp === true;
-  const hasUpdaterConfig =
-    Boolean(input.updateUrl) || Boolean(input.updatePublicKey);
-  const updateUrl =
-    requireUpdater || hasUpdaterConfig
-      ? productionUrl(input.updateUrl, "updateUrl", {
-          allowInsecureHttp: updateAllowInsecureHttp,
-        })
-      : null;
-  const rawPubkey =
+  const updateUrl = productionUrl(input.updateUrl, "updateUrl", {
+    allowInsecureHttp: updateAllowInsecureHttp,
+  });
+  const pubkey =
     typeof input.updatePublicKey === "string"
       ? input.updatePublicKey.trim()
       : input.updatePublicKey;
-  const pubkey = requireUpdater || hasUpdaterConfig ? rawPubkey : null;
-  if (pubkey !== null) parseUpdatePublicKey(pubkey);
+  parseUpdatePublicKey(pubkey);
 
   return {
     platformApiUrl: api,
@@ -126,7 +120,7 @@ export function validateReleaseConfig(input, { requireUpdater = true } = {}) {
   };
 }
 
-export function readReleaseConfig(root, env = process.env, options = {}) {
+export function readReleaseConfig(root, env = process.env) {
   let file = {};
   try {
     file = JSON.parse(
@@ -154,7 +148,6 @@ export function readReleaseConfig(root, env = process.env, options = {}) {
               "ZHISHU_UPDATE_ALLOW_INSECURE_HTTP",
             ),
     },
-    options,
   );
 }
 

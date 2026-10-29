@@ -50,8 +50,6 @@ pnpm dev
 |---------|-------------|
 | `pnpm dev` | Start dev server (hot reload) |
 | `pnpm build` | Production build and packaging; configure [Zhishu release settings](docs/zhishu-release.md) first |
-| `pnpm build:unsigned` | Fixed-server build without updater artifacts |
-| `pnpm build:editable` | Internal build with an editable platform server |
 | `pnpm build:renderer --mode development` | Build the frontend only, output to `dist/` |
 | `pnpm typecheck` | TypeScript type checking (strict; unused imports or parameters are errors) |
 | `pnpm format` | Format `src/` with Prettier |
@@ -73,15 +71,9 @@ cargo test some_test_name     # Run tests matching a name
 
 ### Local Build
 
-As its final step, `pnpm build` signs the auto-update bundles, which requires the release private key `TAURI_SIGNING_PRIVATE_KEY`. Configure [Zhishu release settings](docs/zhishu-release.md) first. If you don't have the key locally, use the controlled unsigned build that keeps the production server lock:
+As its final step, `pnpm build` signs the auto-update bundles, which requires the release private key `TAURI_SIGNING_PRIVATE_KEY`. Configure [Zhishu release settings](docs/zhishu-release.md) first. Update signing is required for local packages as well. For development without a release key, use `pnpm dev`.
 
-```bash
-pnpm build:unsigned
-```
-
-For a debug build, run `pnpm build:unsigned -- --debug`.
-
-Use `pnpm build:editable` for an internal package that exposes the platform address field. The complete command, parameter default, target, bundle, signing, and output-path reference is in [docs/zhishu-release.md](docs/zhishu-release.md#打包命令).
+The complete command, parameter default, target, bundle, signing, and output-path reference is in [docs/zhishu-release.md](docs/zhishu-release.md#打包命令).
 
 ## Testing
 
@@ -311,8 +303,6 @@ pnpm dev
 |------|------|
 | `pnpm dev` | 启动开发服务器（热重载） |
 | `pnpm build` | 构建生产版本并打包；先配置[智枢发布参数](docs/zhishu-release.md) |
-| `pnpm build:unsigned` | 锁定服务器地址并关闭 updater 产物 |
-| `pnpm build:editable` | 可修改平台服务器地址的内测包 |
 | `pnpm build:renderer --mode development` | 只构建前端，输出到 `dist/` |
 | `pnpm typecheck` | TypeScript 类型检查（strict，未使用的 import 或参数会报错） |
 | `pnpm format` | 用 Prettier 格式化 `src/` |
@@ -334,15 +324,9 @@ cargo test some_test_name     # 按名称运行部分测试
 
 ### 本地打包
 
-`pnpm build` 最后会为自动更新包签名，这一步需要发布用的私钥 `TAURI_SIGNING_PRIVATE_KEY`。执行前请先配置[智枢发布参数](docs/zhishu-release.md)。本地没有私钥时，使用仍保留正式服务器锁定的无签名构建：
+`pnpm build` 最后会为自动更新包签名，这一步需要发布用的私钥 `TAURI_SIGNING_PRIVATE_KEY`。执行前请先配置[智枢发布参数](docs/zhishu-release.md)。本机打包同样需要更新签名私钥；没有发布私钥时，使用 `pnpm dev` 进行开发。
 
-```bash
-pnpm build:unsigned
-```
-
-需要调试版本时，运行 `pnpm build:unsigned -- --debug`。
-
-需要显示平台服务器地址输入框时运行 `pnpm build:editable`。完整命令、参数默认值、target、bundle、签名和产物路径见 [docs/zhishu-release.md](docs/zhishu-release.md#打包命令)。
+完整命令、参数默认值、target、bundle、签名和产物路径见 [docs/zhishu-release.md](docs/zhishu-release.md#打包命令)。
 
 ## 测试
 
