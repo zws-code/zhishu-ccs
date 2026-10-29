@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 import sys
 import time
+import traceback
 from urllib.request import Request, urlopen
 from urllib.parse import urlsplit
 
@@ -50,7 +51,13 @@ def safe_error(error):
     cause = error.__cause__ or error.__context__
     if cause is not None:
         kind += "/" + type(cause).__name__
-    return "COS publication failed (" + kind + "); check credentials, bucket permissions and network"
+    frames = [
+        Path(frame.filename).name + ":" + str(frame.lineno) + "/" + frame.name
+        for frame in traceback.extract_tb(error.__traceback__)
+        if Path(frame.filename).name in {"cos_client.py", "cos_comm.py", "cos_auth.py"}
+    ]
+    location = " at " + " -> ".join(frames[-3:]) if frames else ""
+    return "COS publication failed (" + kind + ")" + location + "; check credentials, bucket permissions and network"
 
 
 def version(value):
