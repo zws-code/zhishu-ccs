@@ -11,9 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { test } from "node:test";
 import {
   assembleRelease,
@@ -25,10 +23,8 @@ import {
   verifySignature,
   versionNumber,
 } from "./release-artifacts.mjs";
-import { checkDownloadService, readPublishConfig } from "./release-cli.mjs";
 import { validateReleaseConfig } from "./release-config.mjs";
 
-const here = dirname(fileURLToPath(import.meta.url));
 function fixture(fn) {
   const dir = mkdtempSync(join(tmpdir(), "zhishu-publish-test-"));
   try {
@@ -262,130 +258,3 @@ test("a missing signature cannot become a published updater", () =>
       /ENOENT/,
     );
   }));
-test("publishing config rejects shell injection and path traversal before SSH", () =>
-  fixture((dir) => {
-    const config = {
-      ...publish,
-      server: "root@192.168.20.10",
-      sshPort: 22,
-      sshKey: "~/ssh-key",
-      signingKey: "~/signing-key",
-      remoteRoot: "/opt/zhishu-release-test",
-      proxyManifest: "/opt/zhishu-proxy/data/public/client-release.json",
-    };
-    const path = join(dir, "release.publish.local.json");
-    for (const change of [
-      { server: "root@host;id" },
-      { remoteRoot: "/opt/../etc" },
-      { sshPort: 0 },
-      { proxyManifest: "/etc/space name" },
-    ]) {
-      writeFileSync(path, JSON.stringify({ ...config, ...change }));
-      assert.throws(() => readPublishConfig(dir));
-    }
-    writeFileSync(path, JSON.stringify(config));
-    assert.equal(
-      readPublishConfig(dir).downloadBaseUrl,
-      publish.downloadBaseUrl,
-    );
-  }));
-function server(mode, root, stage, proxy) {
-  return spawnSync(
-    "python3",
-    [
-      join(here, "../deploy/client-download/server.py"),
-      mode,
-      root,
-      stage,
-      proxy,
-    ],
-    { encoding: "utf8", env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } },
-  );
-}
-test(
-  "server prepares files before switching manifests, safely retries, and refuses replacing a published version",
-  {
-    skip:
-      process.platform === "win32"
-        ? "POSIX server integration is checked on macOS/Linux"
-        : false,
-  },
-  () =>
-    fixture((dir) => {
-      const { out } = assembled(dir);
-      const proxy = join(dir, "proxy/client-release.json");
-      mkdirSync(dirname(proxy));
-      writeFileSync(proxy, '{"files":[]}');
-      let result = server("prepare", dir, out, proxy);
-      assert.equal(result.status, 0, result.stderr);
-      assert.equal(existsSync(join(dir, "current")), false);
-      assert.equal(readFileSync(proxy, "utf8"), '{"files":[]}');
-      const version = join(dir, "versions/v4.0.20");
-      result = server("publish", dir, version, proxy);
-      assert.equal(result.status, 0, result.stderr);
-      assert.equal(JSON.parse(readFileSync(proxy)).version, "4.0.20");
-      assert.equal(server("publish", dir, version, proxy).status, 0);
-      const other = join(dir, "other");
-      mkdirSync(other);
-      const changed = assembled(other);
-      const stage = join(dir, ".staging/changed/payload");
-      mkdirSync(stage, { recursive: true });
-      for (const name of [
-        "release.json",
-        "SHA256SUMS",
-        ...JSON.parse(
-          readFileSync(join(changed.out, "release.json")),
-        ).files.map((file) => file.name),
-      ])
-        copyFileSync(join(changed.out, name), join(stage, name));
-      assert.notEqual(server("prepare", dir, stage, proxy).status, 0);
-    }),
-);
-test(
-  "server rejects upload corruption, dropped targets, and downgrade without moving the active release",
-  {
-    skip:
-      process.platform === "win32"
-        ? "POSIX server integration is checked on macOS/Linux"
-        : false,
-  },
-  () =>
-    fixture((dir) => {
-      const first = assembled(dir, "4.0.20", ["macos", "windows-x64"]);
-      const proxy = join(dir, "proxy/client-release.json");
-      let result = server("publish", dir, first.out, proxy);
-      assert.equal(result.status, 0, result.stderr);
-      const second = assembled(dir, "4.0.21");
-      result = server("publish", dir, second.out, proxy);
-      assert.notEqual(result.status, 0);
-      assert.match(result.stderr, /Missing previously/);
-      const older = assembled(dir, "4.0.19", ["macos", "windows-x64"]);
-      result = server("publish", dir, older.out, proxy);
-      assert.notEqual(result.status, 0);
-      assert.match(result.stderr, /older version/);
-      assert.equal(JSON.parse(readFileSync(proxy)).version, "4.0.20");
-      const broken = assembled(dir, "4.0.22", ["macos", "windows-x64"]);
-      writeFileSync(
-        join(broken.out, "Zhishu-Ccs-v4.0.22-Windows.msi"),
-        "corrupt upload",
-      );
-      result = server("publish", dir, broken.out, proxy);
-      assert.notEqual(result.status, 0);
-      assert.match(result.stderr, /Corrupt/);
-      assert.equal(JSON.parse(readFileSync(proxy)).version, "4.0.20");
-    }),
-);
-
-test("publication preflight rejects SPA fallback before any SSH upload", async () => {
-  await assert.rejects(
-    checkDownloadService(
-      publish,
-      async () => new Response("<html>SPA</html>", { status: 200 }),
-    ),
-    /未上传/,
-  );
-  await checkDownloadService(
-    publish,
-    async () => new Response("", { status: 404 }),
-  );
-});

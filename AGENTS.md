@@ -67,24 +67,15 @@
 
 ### 打包、发布与更新
 
-- **唯一操作文档：[智枢客户端下载、打包、发布与更新](docs/zhishu-release.md)。** 涉及打包、签名、上传、网页下载清单或客户端自动更新时，先读该文档；具体参数、产物路径、首次平台接入及故障处理以它和当前脚本为准。
-
-| 用途 | 从仓库根目录执行 |
-| --- | --- |
-| 首次初始化本机发布配置与更新密钥 | `pnpm release:init` |
-| 日常打包（替换为本次新版本号） | `pnpm release:build <新版本号>` |
-| 本地发布预演（不连接服务器） | `pnpm release:publish --dry-run` |
-| 发布刚打包的版本 | `pnpm release:publish` |
-| 汇入其他系统同版本构建产物 | `pnpm release:import <版本号> <产物目录>` |
-| 只读检查平台下载与更新入口 | `pnpm release:check` |
-| 发布脚本回归（不连接生产服务器） | `pnpm test:release` |
-| 查看命令帮助 | `pnpm release:help` |
-
-- `release:build` 自动同步版本、执行检查、打包并签名；macOS 默认生成 Intel/Apple Silicon 通用包。Windows/Linux 需在对应系统构建，再按文档汇总产物；未在目标系统验证时不能声称已完成真实打包。
-- `release:publish` 上传安装包并更新网页下载、客户端自动更新清单；已上线版本不可覆盖，代码有变更时使用新版本号，同一批产物发布失败可重试。unsigned/editable 内测包关闭自动更新，不能通过正式发布流程上线。
-- 首次接入用 `pnpm release:server` 创建远端目录并上传发布工具；它不部署或重启网关。日常客户端发布无需重新部署平台，网关接入和异常处理按[首次平台接入](docs/zhishu-release.md#首次平台接入单独操作)执行。
-- 备份原更新签名密钥 `~/.tauri/zhishu-ccs.key` 与 `.pub`，换机沿用同一身份；私钥不提交 Git、不上传服务器。updater 签名与 Apple Developer ID 签名、公证是不同环节，不能混称已公证。
-- 发布验收范围见[验证边界](docs/zhishu-release.md#验证边界)：脚本验签和公网文件检查之外，还需在目标系统验证安装、登录、工具接入及旧版升级。
+- **唯一操作文档：[智枢客户端下载、打包、发布与更新](docs/zhishu-release.md)。** 涉及发布、签名、安装包、下载清单或更新时先读该文档。
+- 正式发布只走 `zws-code/zhishu-ccs` 的 GitHub Actions → 腾讯云 COS/CDN。手动运行工作流只构建并校验；推 `vX.Y.Z` tag 才上传并切换稳定清单。首次正式发布不兼容旧测试客户端更新入口。当前无自有域名，先用广州桶 `zhishu-ccs-release-1252121424` 的 COS 默认 HTTPS 地址直连，CDN 尚未接入。
+- 二开旧 SSH 发布工具、服务器脚本和配置示例已删除；原 `release:init/server/build/publish/import/help` 命令已移除。上游 GitHub Release/R2 实现保留，但不在智枢仓库执行。
+- `pnpm release:check` 校验 COS 配置（不连接云端）；`pnpm test:release` 运行 Node 发布回归；`pnpm test:release-cos` 运行 Python 模拟上传回归。底层 `build`/`build:unsigned`/`build:editable` 仅用于开发或内部验证。
+- GitHub Repository Variables 配置平台与 CDN 地址、公钥及 COS 桶/地域/前缀；更新私钥放 Repository Secrets，COS 凭据可放 `cos-production` Environment Secrets。不提交或输出密钥。
+- COS 版本目录不可覆盖，全部文件与签名校验并通过公网检查后才发布稳定清单；禁止降版本或遗漏已发布平台。失败重试复用原产物，不重新编译覆盖同版本。两个清单逐个发布，不宣称对象存储支持跨对象事务。
+- 默认 macOS 使用 Developer ID 签名/公证；显式 `adhoc` 模式跳过公证，不能称已公证。Tauri 更新签名始终独立保留。
+- 当前 Git remote 仍须核对：`origin` 是上游，`zhishu-origin` 是二开 GitLab，`zhishu-git` 是自己的 GitHub；发布 tag 推到 `zhishu-git`，不推上游。
+- 云端资源与真实平台验收状态以文档和本次实测为准，不以工作流存在推断桶、CDN、证书、Secrets 已配置或安装/升级已验收。
 
 ## 4. 主干禁区
 

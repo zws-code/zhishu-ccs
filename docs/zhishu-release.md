@@ -1,304 +1,224 @@
-# 智枢客户端下载、打包、发布与更新
+# 智枢客户端：GitHub Actions + 腾讯云 COS/CDN 发布
 
-这是客户端发布的唯一操作文档。所有命令由你执行；客户端发布脚本只上传安装包和清单，首次网关接入单独处理。
+客户端正式发布只使用本流程：GitHub Actions 构建和签名 → COS 保存版本文件 → HTTPS 分发安装包和更新清单；有自有域名后再接 CDN。此文档是唯一发布操作入口。
 
-## 日常发布：只用两条命令
+仓库：<https://github.com/zws-code/zhishu-ccs>。旧本地打包后 SSH 上传的二开脚本和配置示例已删除；本仓库不发布 GitHub Release，也不运行上游 R2 镜像。上游相关实现保留，仅允许在上游仓库执行。
 
-在客户端仓库执行，把版本号改为本次的新版本：
+本次作为首次正式发布，不兼容旧测试包的更新入口；旧测试用户直接安装正式包。后续正式版本必须沿用本次的应用身份、Windows 安装身份及更新公钥。
 
-```sh
-cd /Users/wenszou/IdeaProjects/zhishu/zhishu-cc-switch
-pnpm release:build 4.0.20
-pnpm release:publish
-```
+## 首次接入进度
 
-第一条自动同步版本号、打包和签名；第二条使用刚才打包的版本，上传安装包并更新网页下载、客户端自动更新清单。macOS 默认生成 Intel/Apple Silicon 通用包。
+- 已知 GitHub 仓库：`zws-code/zhishu-ccs`。
+- 已实现仓库中的多平台构建、COS 发布、两份清单和回归验证。
+- 已创建广州普通桶 `zhishu-ccs-release-1252121424`，地域 `ap-guangzhou`；用户已将桶设为公有读私有写，仅保存公开发布产物。
+- 当前没有自己的域名，先以 COS 默认 HTTPS 域名直连验证发布/更新，尚未启用 CDN。下载根地址为 `https://zhishu-ccs-release-1252121424.cos.ap-guangzhou.myqcloud.com/ccs/stable`。
+- 用户已在 GitHub 添加桶/平台变量、COS 上传凭据及更新签名密钥，macOS 选择 `adhoc`。这些配置仍须通过实际 Actions 演练验证；不能称已完成 Apple 公证。
+- 本次没有部署/重启平台，没有上传安装包，没有触发 GitHub 构建，也没有验证真实系统安装与更新。
 
-首次使用先完成下面的准备。已经上线的版本不可覆盖，改代码后使用新版本号；同一批产物发布失败时可以重试。
+## 1. 准备腾讯云 COS 和 CDN
 
-发布前可用 `pnpm release:publish --dry-run` 做本地预演，不连接服务器；它不会执行真正发布。`pnpm release:help` 显示各命令用途。
+### 当前接入：COS 默认域名直连
 
-## 首次准备（一次即可）
+当前无自有域名，先使用上述 COS 默认 HTTPS 地址，`COS_PREFIX=ccs/stable`，`ZHISHU_UPDATE_URL` 为下载根地址加 `/latest.json`。此模式下桶使用公有读私有写，让客户端匿名下载公开安装包和清单；私钥和云凭据只保存到 GitHub Secrets，不上传到桶。
 
-安装项目指定的 Node.js、pnpm、Rust 与系统构建依赖，然后：
+默认域名的强制下载响应头不表示禁止程序读取 JSON；仍需实际验证更新清单和安装包下载。这个阶段没有 CDN 缓存/加速，不把 COS 直连描述为 CDN 已接入。
 
-```sh
-pnpm install --frozen-lockfile
-pnpm release:init
-```
+### 后续接入：自有域名与 CDN
 
-`release:init` 创建本机配置和专用更新密钥，不连接服务器。这台 Mac 已完成初始化，换电脑要使用原密钥与公钥，不要重新生成另一套更新身份。
+以下步骤用于准备 CDN；当前直连模式不执行改回私有桶，避免客户端无法下载。
 
-**备份 `~/.tauri/zhishu-ccs.key` 和 `.pub`。私钥不提交 Git、不上传服务器。** 默认私钥不带口令、权限 600；使用带口令密钥时，在打包进程设置 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。
+1. 在腾讯云 COS 控制台创建**专用普通存储桶**，选择实际使用的地域，例如 `ap-guangzhou`。记录完整桶名（含 APPID 后缀）和地域。
+2. 桶使用私有读写、标准存储；**不启用 COS 版本控制**。发布脚本使用不可变的版本目录和禁止覆盖写入保护历史产物，启用桶版本控制会让 COS 的禁止覆盖头失效，因此脚本会拒绝此类桶。
+3. 准备下载域名，例如 `download.你的域名`。在 CDN 控制台接入域名，以该 COS 桶为源站，开启 CDN 服务授权和私有桶回源鉴权；配置 CNAME 和有效 HTTPS 证书。
+4. 本发布前缀保存公开安装包，用户访问 CDN 时应允许匿名 GET/HEAD；不要使用会过期的临时签名下载地址、登录门禁或依赖 Referer 的防盗链规则。源站 COS 保持私有。
+5. CDN 缓存配置：`/ccs/stable/v*/` 为长期缓存；`/ccs/stable/latest.json` 和 `/ccs/stable/client-release.json` 的有效缓存时间最多 60 秒。不要为 404 设置长时间负缓存。发布器会等待短缓存过期并核对公开清单，不依赖刷新 API 权限。
+6. 保留历史版本，不配置会自动删除正式版本的生命周期规则。
 
-macOS/Linux 的发布回归会调用 Python 3；Windows 运行跨平台部分，服务器事务回归由 POSIX 主机验证。Windows 需要 VS C++ 构建工具、WebView2；Linux 需要 GTK/WebKit2GTK、AppImage、rpm 等依赖。
+中国境内/全球 CDN 接入域名需要完成 ICP 备案；境外加速要求不同，以[腾讯云域名接入要求](https://intl.cloud.tencent.com/zh/document/product/228/31476?lang=zh)为准。[COS/CDN 回源授权说明](https://cloud.tencent.com/document/product/436/18670)。没有自有域名时可先使用上述 COS 默认 HTTPS 地址；只有直连下载与签名验收通过后才推正式 tag。
 
-## 首次平台接入（单独操作）
-
-先只读检查：
-
-```sh
-pnpm release:check
-```
-
-如果下载目录已就绪，不要为了客户端重新部署平台。准备发布工具：
-
-```sh
-pnpm release:server
-```
-
-`release:server` 只创建远端目录、上传客户端发布工具，不部署或重启网关。SSH 使用 BatchMode 和已有 known_hosts；先人工核对首次连接指纹，带口令 SSH 私钥需加入 ssh-agent。
-
-只有 `release:check` 不通过且确认网关缺少 `/client-downloads/` 支持时，才需要人工检查现有下载支持改动，在测试环境验收后按平台流程升级一次。客户端发布脚本不会替你升级平台。平台仍有白屏或其他访问问题时，先处理平台问题，不继续发布客户端。
-
-平台自己的部署命令（会构建、备份并重启网关；由你单独执行）：
-
-```sh
-cd /Users/wenszou/IdeaProjects/zhishu/zhishu-proxy
-bash deploy/rocky10/deploy.sh "client-downloads-$(date +%Y%m%d-%H%M%S)"
-```
-
-这个入口自行构建，不要先 `build.sh` 再用同一个 ID 执行 `deploy.sh`。升级后用浏览器验证登录、控制台和 `/download`，不能只看 `/health`。后台模式下当前下载页可能要求先登录。
-
-平台异常时停止客户端发布，使用该次部署输出中的备份 ID：
-
-```sh
-ssh -i /Users/wenszou/IdeaProjects/zhishu/zhishu-proxy/veee-rocky-ed25519 root@43.136.64.205 \
-  'bash /opt/zhishu-proxy/rocky10/rollback.sh <该次部署输出的备份ID>'
-```
-
-平台验收通过后回到客户端仓库，执行 `pnpm release:server` 和 `pnpm release:check`，再按开头两步发布。日常客户端发布无需再次部署网关。
-
-## 本机配置与地址
-
-| 项目 | 地址/位置 |
-| --- | --- |
-| 平台与下载页 | `http://43.136.64.205/download` |
-| 安装包根地址 | `http://43.136.64.205/client-downloads` |
-| 客户端自动更新清单 | `http://43.136.64.205/client-downloads/latest.json` |
-| 网页读取的下载清单 | `http://43.136.64.205/client-release.json` |
-| SSH 服务器 | `root@43.136.64.205` |
-| 服务器发布目录 | `/opt/zhishu-proxy/data/public/client-downloads` |
-| 平台清单覆盖文件 | `/opt/zhishu-proxy/data/public/client-release.json` |
-| 本机发布配置 | `release.publish.local.json` |
-| 本机应用配置 | `release.config.local.json` |
-| 本机更新签名私钥 | `~/.tauri/zhishu-ccs.key` |
-
-下载使用服务器默认 HTTP 端口，不需要额外域名、HTTPS 证书、GitHub 仓库或单独开放下载端口。服务器只需要现有平台、SSH 和 Python 3；日常客户端发布不重启网关，也不构建网关镜像。
-
-HTTP 不加密网络流量，登录密码仍有明文传输风险。更新包始终由独立私钥签名，客户端先验签再安装；这不能替代 HTTPS 对登录和网络传输的保护。以后有域名时按本文末尾迁移。
-
-## Windows / Linux 打包与汇总
-
-在对应系统上检出相同源码、配置相同的生产地址和原签名密钥，使用项目指定 pnpm 版本安装依赖。然后在该系统的终端运行：
-
-```sh
-# Windows x64
-pnpm release:build 4.0.21 --target windows-x64
-# Windows ARM64
-pnpm release:build 4.0.21 --target windows-arm64
-# Linux x64
-pnpm release:build 4.0.21 --target linux-x64
-# Linux ARM64
-pnpm release:build 4.0.21 --target linux-arm64
-```
-
-Mac 不会生成 Windows/Linux 原生安装包；这两类入口已实现，真实打包待对应机器验证。Windows 需要 C++ 构建工具和 WebView2，Linux 需要 GTK/WebKit2GTK 等依赖。
-
-多平台统一发布：把各机器的 `release/v4.0.21/<目标>/` 目录完整复制到发布机（包括 `build.json`），然后执行：
-
-```sh
-pnpm release:import 4.0.21 /你复制过来的目录/windows-x64
-pnpm release:import 4.0.21 /你复制过来的目录/linux-x64
-pnpm release:publish 4.0.21
-```
-
-同一下载源一旦上线过多种平台，以后每次都要把这些平台的产物收齐再发布，脚本会阻止漏发已有平台。
-
-## 配置和其他命令
-
-| 文件/命令 | 用途 |
-| --- | --- |
-| `release.publish.local.json` | 服务器、SSH 私钥路径、下载地址、远端静态目录 |
-| `release.config.local.json` | 客户端生产 API/Web 地址、更新地址、公钥与 HTTP 开关 |
-| `~/.tauri/zhishu-ccs.key`、`.pub` | 本机更新身份；备份原件，不上传私钥、不随意换密钥 |
-| `pnpm release:help` | 显示命令用途 |
-| `pnpm test:release` | 本地发布回归，不连接生产服务器 |
-
-## 打包具体做什么
-
-`pnpm release:build [版本号] [--target 目标]`：
-
-1. 校验平台地址、HTTP 开关、稳定更新地址和专用签名密钥。
-2. 同步 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 的版本。原文件备份在 `release/.source-backups/`；Cargo 构建自动更新 Cargo.lock。缺少新版应用内摘要时创建 `src/whats-new/<版本>.json`，默认 `items: []`，不会编造功能说明。
-3. 运行 TypeScript 和发布脚本回归，调用原有正式 Tauri 构建。
-4. 输出安装包、更新包和 `.sig`，直接在构建目录验签后记录 `build.json`，包含生产配置指纹、文件大小和 SHA-256；验签无需额外复制安装包。
-
-macOS 未配置 `APPLE_SIGNING_IDENTITY` 时，脚本自动做 ad-hoc 签名，再重新压缩并签署更新包；配置了 Apple 证书时保留正式签名。
-
-构建会保留旧 bundle 为 `bundle.previous-时间戳`，避免把旧安装包混进新版本。成功后可自行清理这些旧构建目录。
-
-| 目标 | 在哪种机器执行 | 默认产物 |
-| --- | --- | --- |
-| `macos` | macOS | universal DMG、ZIP、签名 `.tar.gz` 更新包 |
-| `windows-x64` | Windows（VS C++ 构建工具、WebView2） | x64 MSI 及签名 |
-| `windows-arm64` | Windows（安装 ARM64 C++ 工具链/对应 Rust target） | ARM64 MSI 及签名 |
-| `linux-x64` | x64 Linux（GTK/WebKit2GTK、AppImage、rpm 工具） | AppImage、DEB、RPM 及签名 |
-| `linux-arm64` | ARM64 Linux（同上） | ARM64 AppImage、DEB、RPM 及签名 |
-
-不指定目标时根据本机系统和架构选择，macOS 始终选择 universal。Windows/Linux 安装依赖可参考已有 `.github/workflows/release.yml` 和 Tauri [构建前置条件](https://tauri.app/start/prerequisites/)。
-
-macOS 命令不会把 Windows、Linux 模拟成已完成。现有 GitHub Actions 可以提供对应构建机，但两个仓库当前 origin 指向上游，脚本不推送上游、不创建上游 Release。需要云端构建时，先配置自己的仓库及 CI 密钥。
-
-macOS updater 签名与 Apple Developer ID 签名是两件事。没有 Apple Developer ID/公证配置时，产物可用于内部测试，首次下载可能被 Gatekeeper 拦截；不能声称已经 Apple 公证。正式面向公众外发时按 Tauri [macOS 签名文档](https://tauri.app/distribute/sign/macos/)设置证书和公证凭据后重新打包。
-
-原有 `pnpm build:unsigned`、`pnpm build:editable` 继续用于内测，但关闭了自动更新，不能通过此正式发布流程上线。已安装这两种内测包的机器，首次需要手动安装一次本流程的签名正式包。
-
-## 发布具体做什么
-
-`pnpm release:publish [版本号] [--dry-run]`：
-
-1. 校验构建记录、生产地址与公钥一致性、所有文件 SHA-256 和更新签名。
-2. 汇总到 `release/v<版本>/publish/`，自动生成网页 `client-release.json` 和 Tauri `latest.json`，两者格式不同，不用手写。
-3. 先探测网关下载目录，旧网关返回 SPA 页面时会在上传前失败；通过后上传到服务器 `.staging/`；服务器重新校验全部文件，随后以不可变版本目录保存。只上传安装包和公开元数据，不上传源码、SSH/更新私钥或本机配置。
-4. 从公网逐个检查安装包可下载且大小正确；这一步失败时保留旧版清单。
-5. 使用发布锁，检查未降版本、未漏已支持平台；原子切换 `current`，替换平台下载清单。
-6. 从公网核对两份更新/下载清单和平台清单与本地完全一致，成功后打印下载页地址。
-
-缓存中的 `publish/` 用于失败重试，因此同一批文件重试不会刷新发布时间或覆盖不同安装包。如果打包产物变了但尚未上线，先把原 `publish/` 和 `publish-inputs.json` 移到别处再汇总。已经上线就必须增加版本号。
-
-服务器目录：
-
-截至 2026-10-25，线上 `current` 指向 `versions/v4.0.19`。下方 `v4.0.20` 是目录结构示例；实际线上版本以 `current` 和 `pnpm release:check` 为准。
+对象路径和下载 URL 一一对应，不配置 CDN 路径重写：
 
 ```text
-/opt/zhishu-proxy/data/public/
-  client-release.json                 # 网页下载清单
-  client-downloads/
-    tools/server.py                   # 只通过 SSH 执行，不对外开放
-    .staging/                         # 上传暂存，不对外开放
-    .publish.lock
-    current -> versions/v4.0.20        # 两份公共清单使用同一发布快照
-    versions/v4.0.20/                  # 不可变安装包、签名、两份清单和校验记录
+COS 桶
+└── ccs/stable/
+    ├── latest.json                  # Tauri 自动更新清单
+    ├── client-release.json          # 网页下载清单
+    └── v1.0.0/                      # 版本路径不可覆盖
+        ├── release.json             # 本版本文件大小、SHA-256 与输入记录
+        ├── latest.json
+        ├── client-release.json
+        ├── Zhishu-Ccs-v1.0.0-macOS.dmg
+        ├── Zhishu-Ccs-v1.0.0-macOS.tar.gz
+        ├── Zhishu-Ccs-v1.0.0-macOS.tar.gz.sig
+        └── Windows/Linux 安装包与签名
 ```
 
-网关仅开放两份公共清单与版本目录中的安装包，不开放目录列表、工具、staging、任意路径或越界符号链接。安装包支持 HEAD/断点范围请求；版本文件长期缓存，最新清单不缓存。
+`COS_PUBLIC_BASE_URL` 例如 `https://download.你的域名/ccs/stable`；其 URL 路径必须与 `COS_PREFIX` 一致。以上域名与版本仅是示例，不能直接当成已配置的地址。
 
-## 常见失败
+## 2. 创建发布凭证
 
-| 提示 | 处理 |
+在腾讯云 CAM 创建专用发布子账户或凭证，仅授权目标桶。桶级需要 `cos:GetBucketVersioning`；对象级限定到 `ccs/stable/*`，允许 `cos:HeadObject`、`cos:GetObject`、`cos:PutObject`。本实现使用单文件 PUT，不需要删除对象、修改 ACL 或管理其他云资源的权限；单个文件超过 5 GiB 时拒绝发布。
+
+将 `SecretId`、`SecretKey` 直接填写到 GitHub Secrets。不要提交到 Git、应用配置或聊天，不使用腾讯云主账户密钥。若使用临时凭证，还需设置 `COS_SESSION_TOKEN`，并确保发布期间凭证有效。
+
+## 3. 配置 GitHub Variables 和 Secrets
+
+打开仓库 `Settings → Secrets and variables → Actions`。**共享构建配置和更新签名凭据放 Repository 级**，因为预检和多平台作业都需要读取。
+
+### Repository Variables
+
+| 名称 | 内容 |
 | --- | --- |
-| SSH host key verification failed | 人工核对服务器指纹后加入 known_hosts，不关闭校验 |
-| Permission denied / BatchMode | 检查 `sshKey`、SSH 用户、私钥权限与 ssh-agent |
-| 缺少更新私钥 / 公钥不匹配 | 找回原密钥与 `.pub`，不随意更换 |
-| 同一版本已打包 / 不可覆盖 | 新代码使用新版本号；未完成的本地残留先移走 |
-| 线上 URL 是网页 HTML | 网关未包含 `/client-downloads/` 支持，先部署一次新版网关 |
-| 缺少以前已发布的平台 | 在对应系统打包并 import 后再发布 |
-| 公网验证失败 | 检查平台 HTTP 服务、文件挂载/权限和路由；旧清单保持不变，修好后重试 |
-| 页面显示暂未发布，但更新清单已有版本 | 检查 `/client-release.json` 的 `files` 是否为空；用原产物重新执行 `pnpm release:publish <版本>`，无需重新打包 |
-| 自动更新提示未配置 | 当前是 unsigned/editable 老包，手动安装一次新的签名正式包 |
+| `ZHISHU_PLATFORM_API_URL` | 正式平台 API origin，不含 `/api/v1` 或其他路径 |
+| `ZHISHU_PLATFORM_WEB_URL` | 正式平台网页 origin |
+| `ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP` | `true` 或 `false`；平台仍是 HTTP 时显式设为 `true` |
+| `ZHISHU_UPDATE_URL` | `https://下载域名/ccs/stable/latest.json` |
+| `ZHISHU_UPDATE_PUBLIC_KEY` | 更新公钥 `.pub` 文件的完整 base64 内容 |
+| `COS_BUCKET` | 完整桶名，例如 `zhishu-downloads-1234567890` |
+| `COS_REGION` | 实际地域，例如 `ap-guangzhou` |
+| `COS_PREFIX` | `ccs/stable`，未设置也使用此值 |
+| `COS_PUBLIC_BASE_URL` | `https://下载域名/ccs/stable`，不带末尾斜杠 |
+| `ZHISHU_MACOS_SIGNING_MODE` | 默认 `developer-id`；显式设置 `adhoc` 可构建未公证包 |
 
-清理 `.staging/` 时先确认没有正在上传的发布，只清理确认失败的目录。版本目录不自动删除，以免破坏下载和仍在进行中的更新。不能通过重新发布旧版本给客户端自动降级；修复问题后发布更高补丁版本。
+COS/CDN 更新地址强制 HTTPS。平台 API 的 HTTP 开关不影响更新地址，不应把更新源也降级为 HTTP。
 
-## 迁移到 HTTPS
+### Secrets
 
-先配置域名和反向代理证书，保留旧 HTTP 更新入口可用。修改本机发布配置的 `downloadBaseUrl`，关闭 `allowInsecureHttp`；修改应用配置的平台 API/Web 地址并关闭 `platformAllowInsecureHttp`，再执行 `release:init` 同步更新地址与开关。保留同一套签名密钥，发布更高版本。
+| 名称 | 内容 |
+| --- | --- |
+| `TAURI_SIGNING_PRIVATE_KEY` | 更新私钥文件的完整内容；也兼容上游 helper 支持的格式 |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | 更新私钥口令；无口令可不设置 |
+| `COS_SECRET_ID` | 腾讯云发布凭证 SecretId |
+| `COS_SECRET_KEY` | 腾讯云发布凭证 SecretKey |
+| `COS_SESSION_TOKEN` | 可选，仅临时凭证需要 |
 
-在所有旧客户端迁移前保留旧 HTTP 更新入口，并让它返回指向新 HTTPS 安装包的有效签名清单。新包会内置 HTTPS 更新地址。网页切换 HTTPS 后拒绝 HTTP 安装包链接，必须一起切换清单地址。
+COS 凭据建议放在 `cos-production` Environment Secrets，构建作业无需读取；也支持 Repository Secrets。预检阶段不连接腾讯云，真正发布前上传器会检查凭据与权限。
 
-## 验证边界
+现有密钥位置为 `~/.tauri/zhishu-ccs.key` 和 `.pub`，可以用于这次首次正式发布。若决定为正式版新建身份，仅在首次发布前执行一次：
 
-发布回归：`pnpm test:release`。真实上线还要在目标系统验证安装、平台登录、工具接入和从旧签名版本升级到新签名版本。脚本验签和公网文件验证不代替桌面安装/重启验证，也不代替真实模型请求和计费验收。具体本次执行结果记录在平台仓库 `docs/zhishu/客户端发布与接入.md`。
+```sh
+pnpm tauri signer generate -w ~/.tauri/zhishu-ccs-production.key
+```
 
-macOS 产物可用 `lipo -info` 检查双架构、`codesign --verify --deep --strict` 检查应用签名、`hdiutil verify` 检查 DMG。各目标系统全新安装还需验证协议注册、2FA 和自动同步。平台开启人机验证时，当前密码登录会明确拒绝；浏览器授权仍是后续需求。
+妥善备份正式私钥、公钥及口令。正式版发布后不得随意替换公钥；更新签名私钥不是 Apple 代码签名证书。
 
-更新配置依据 Tauri [官方 updater 文档](https://tauri.app/plugin/updater/)：HTTP 使用明确的传输开关，签名验证始终保留。
+### macOS Developer ID 签名与公证
 
-<details>
-<summary>底层构建参数与 GitHub/R2 配置（可选）</summary>
+`developer-id` 模式需要以下 Repository Secrets：
 
-## 本地生产配置
+| 名称 | 内容 |
+| --- | --- |
+| `APPLE_CERTIFICATE` | Developer ID Application 的 `.p12` 证书 base64 |
+| `APPLE_CERTIFICATE_PASSWORD` | `.p12` 导出口令 |
+| `KEYCHAIN_PASSWORD` | CI 临时 keychain 使用的密码 |
+| `APPLE_ID` | 公证使用的 Apple ID |
+| `APPLE_PASSWORD` | Apple App 专用密码 |
+| `APPLE_TEAM_ID` | Apple Developer Team ID |
 
-手动配置或 CI 使用时，复制 `release.config.example.json` 为 `release.config.local.json`：
+默认缺少证书/公证凭据会在编译前失败。没有证书时可以明确选择 `adhoc`：保留 Tauri 更新签名与 ad-hoc 代码签名，跳过 Apple 公证和 Gatekeeper 公证验收；首次下载可能被系统拦截，不得宣称已公证。面向公众正式分发优先完成 Developer ID 证书配置。
 
-| 配置项                      | 默认值与要求                                                | 覆盖环境变量                          |
-| --------------------------- | ----------------------------------------------------------- | ------------------------------------- |
-| `platformApiUrl`            | 所有构建必填；仅 origin，不含 `/api/v1`、账号密码或查询参数 | `VITE_PLATFORM_API_URL`               |
-| `platformWebUrl`            | 所有构建必填；仅 origin                                     | `VITE_PLATFORM_WEB_URL`               |
-| `platformAllowInsecureHttp` | 默认 `false`；临时 HTTP 平台需明确开启                      | `ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP` |
-| `updateUrl`                 | 正式包必填；自己的稳定更新清单地址                          | `ZHISHU_UPDATE_URL`                   |
-| `updatePublicKey`           | 正式包必填；原更新身份 `.pub` 文件的完整 base64 内容        | `ZHISHU_UPDATE_PUBLIC_KEY`            |
-| `updateAllowInsecureHttp`   | 默认 `false`；HTTP 更新源需单独开启，仍校验签名             | `ZHISHU_UPDATE_ALLOW_INSECURE_HTTP`   |
+Windows 更新包始终有 Tauri 更新签名；这不表示已经配置 Windows 系统代码签名或消除 SmartScreen 提示。首次正式发布前确认 Tauri 的 productName、identifier、协议、安装身份，后续保持一致。
 
-环境变量覆盖本地 JSON。私钥通过 `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 或 CI Secret 提供，不写入应用配置。
+### 发布审批
+
+在 `Settings → Environments` 创建 `cos-production`。如仓库套餐支持，可设置 Required reviewers 和 tag 部署规则。这样推 tag 会自动构建，验证通过后由批准者决定何时切换稳定更新。
+
+手动演练使用 `release-validation` 环境，不上传 COS；已有构建作业继续使用 `release` 环境。不要只把共享变量或签名私钥放在 `cos-production`，构建阶段无法读取它们。
+
+## 4. 首次演练
+
+先把源码与工作流推到自己的 GitHub 仓库。`origin` 仍可能指向上游，**不要用默认 origin 推送二开代码**：
+
+```sh
+git remote -v
+# 本机已存在 zhishu-git → git@github.com:zws-code/zhishu-ccs.git
+git push zhishu-git <你的发布分支>
+```
+
+版本必须在 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 保持一致；Rust 构建会更新 Cargo.lock，提交版本变更时也应同步核对。新增 `src/whats-new/<版本>.json`，无应用内公告时使用真实版本与 `items: []`。
+
+在 GitHub `Actions → Release to Tencent COS → Run workflow` 选择该分支。手动运行会完成配置检查、多平台构建、签名校验和本地发布预演，产物保存为 Actions artifact；**不会上传 COS、不会替换正式清单、不会创建 GitHub Release**。
+
+支持的构建产物：
+
+| 构建机 | 产物 |
+| --- | --- |
+| macOS | Intel/Apple Silicon universal DMG、ZIP、签名 tar.gz 更新包 |
+| Windows x64 / ARM64 | MSI、签名及继承的便携包 |
+| Linux x64 / ARM64 | AppImage、DEB、RPM 和各自签名 |
+
+工作流使用 `package.json` 指定的 pnpm 和 `rust-toolchain.toml` 指定的 Rust，不在本机模拟其他系统已完成构建。
+
+## 5. 正式发布
+
+1. 更新并提交一致的版本号、真实变更说明与待发布代码。
+2. 在已推送的提交上创建新的稳定版本 tag，仅接受 `vX.Y.Z`。
+3. 推送 tag 到自己的仓库：
+
+```sh
+git tag v<新版本号>
+git push zhishu-git v<新版本号>
+```
+
+工作流会：
+
+1. 检查 tag、三个源码版本、应用内公告及发布配置。
+2. 构建全部平台，并按选择完成 Apple 签名/公证。
+3. 验证安装包与每个更新包的 minisign 签名；生成 CDN URL、真实文件大小、SHA-256 和两份不同用途的清单。
+4. 保存已验证的 `cos-payload-v<版本>` artifact，供失败后使用原产物重试。
+5. 检查 COS 旧版清单，拒绝降版本、漏已发布平台和同版本不同内容。
+6. 先预留不可变版本输入，再上传版本目录，检查 COS 对象和 CDN 公网文件。
+7. 公网检查通过后，依次发布根目录 `client-release.json`、`latest.json`，读回校验并等待 CDN 清单与本地一致。
+
+两个 COS 对象不能作为一个事务同时替换。若第二份清单发布失败，网站可能先看到新版，但客户端仍使用旧更新清单；此时应重试同一批原产物，不自动回滚已验证的安装包。正式客户端的更新入口最后切换。
+
+发布阶段在仓库内串行执行，并在切换前再次检查线上版本；只允许这一个工作流写该发布前缀，不同时从其他仓库或本机修改稳定清单。
+
+## 6. 失败与重试
+
+| 情况 | 处理 |
+| --- | --- |
+| 缺少配置/版本不一致 | 修好 Variables、版本和摘要后先手动演练 |
+| 缺少 Apple 凭据 | 配齐 Developer ID 凭据；无证书需显式选择 `adhoc` 并接受未公证分发限制 |
+| COS 权限失败 | 检查桶名、地域、凭据和 CAM 对应前缀权限；不要给主账户全权限兜底 |
+| 开启 COS 版本控制 | 使用未开启版本控制的专用普通桶 |
+| CDN 403/404 或大小不符 | 检查回源授权、CNAME、HTTPS、匿名访问和负缓存；未验证前不会切换更新清单 |
+| 清单 CDN 验证失败 | 检查清单 TTL 是否超过 60 秒；修复后重试，不要重编译覆盖原版本 |
+| 同版本输入不同 | 若原版本已预留/上传，使用更高版本，不能覆盖历史产物 |
+| 旧版本晚于新版构建完成 | 拒绝把稳定源降回旧版本；使用更高补丁版本修复 |
+
+发布失败时在 Actions 使用 **Re-run failed jobs**，复用原构建 artifacts。清单时间取提交时间，重试不会因当前时间改变生成不同的输入。不要重跑全部构建后用不同安装包覆盖已预留的版本；超过 artifact 保存期限时优先发新版本。
+
+本地只读验证与隔离回归：
+
+```sh
+pnpm release:check                 # 需已设置相关环境变量；只校验配置，不连接腾讯云
+pnpm test:release                  # Node 配置、签名与产物回归
+pnpm test:release-cos              # Python 上传/失败/重试回归，无需安装 COS SDK
+python3 -B scripts/publish-cos.py <已验证的cos-payload目录> --dry-run
+```
 
 ## 打包命令
 
-底层构建与内测入口如下；日常发布仍使用文档开头的 `release:build` 和 `release:publish`。
+构建配置仍由 `release.config.local.json` 或现有环境变量读取，`release:prepare` 与底层 `build`/`build:unsigned`/`build:editable` 保留用于开发和内部验证，不是正式发布入口。正式 GitHub 构建使用 Repository Variables，不提交本机配置。
 
-| 命令                  | 服务器地址                 | 自动更新 / updater 产物  | 用途                 |
-| --------------------- | -------------------------- | ------------------------ | -------------------- |
-| `pnpm build`          | 登录页可修改，配置为默认值 | 开启，需要更新签名密钥   | 底层正式构建         |
-| `pnpm build:unsigned` | 登录页可修改，配置为默认值 | 关闭，无需更新配置或密钥 | 无更新签名的内测包   |
-| `pnpm build:editable` | 登录页可修改，配置为默认值 | 关闭，无需更新配置或密钥 | 可切换服务器的内测包 |
+| 命令 | 更新签名 | 用途 |
+| --- | --- | --- |
+| `pnpm build` | 开启，需私钥 | 本机正式配置验证，不上传产物 |
+| `pnpm build:unsigned` | 关闭 | 内部测试 |
+| `pnpm build:editable` | 关闭 | 可编辑服务器地址的内部测试 |
+| `pnpm release:prepare` | 仅生成配置 | 校验配置，不编译 |
 
-三个模式均校验平台 API/Web 地址，并把配置地址作为登录页默认值；用户可以修改服务器地址。构建脚本生成忽略文件 `src/.env.production.local` 与 `src-tauri/tauri.release.local.conf.json`，再调用 Tauri。未配置更新的开发包跳过自动检查，手动检查会提示未配置。
+底层参数由包装脚本传给 Tauri，例如 `pnpm build -- --target universal-apple-darwin --bundles app,dmg --ci`。不得额外传 `--config` 覆盖发布策略。默认目标为本机架构，默认 bundle 来自 `tauri.conf.json`；Windows/Linux 安装包需对应系统构建。产物在 `src-tauri/target/[<target>/]release/bundle/`，设置 `CARGO_TARGET_DIR` 时以该目录为准。
 
-辅助入口：`pnpm release:prepare` 仅校验和生成配置；`pnpm test:release` 运行完整发布回归；`pnpm test:release-config` 仅运行配置和网页下载清单测试；`pnpm build:renderer --mode development` 仅构建前端。
+配置环境变量沿用 `VITE_PLATFORM_API_URL`、`VITE_PLATFORM_WEB_URL`、`ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP`、`ZHISHU_UPDATE_URL`、`ZHISHU_UPDATE_PUBLIC_KEY`、`ZHISHU_UPDATE_ALLOW_INSECURE_HTTP`。私钥只通过 `TAURI_SIGNING_PRIVATE_KEY` 和可选的 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 注入，不写入应用配置。
 
-包装脚本接受 `--unsigned`、`--editable`，移除 pnpm 分隔符 `--`，其他参数传给 `tauri build`。禁止额外传入 `-c` / `--config` 覆盖发布策略。
+## 7. 官网下载页和安装验收
 
-| Tauri 参数          | 默认行为与说明                                                                                      |
-| ------------------- | --------------------------------------------------------------------------------------------------- |
-| `--target <triple>` | 当前机器架构；支持 `universal-apple-darwin`、`x86_64-pc-windows-msvc`、`aarch64-pc-windows-msvc` 等 |
-| `--bundles <列表>`  | 默认读取 `bundle.targets: "all"`；可指定 `app,dmg`、`msi`、`appimage,deb,rpm`                       |
-| `--debug`           | 默认 release；debug 仅用于排错                                                                      |
-| `--no-bundle`       | 仅编译可执行文件                                                                                    |
-| `--features <列表>` | 启用 Cargo features                                                                                 |
-| `--no-sign`         | 跳过平台代码签名，与 updater 签名分开                                                               |
-| `--ci`              | 非交互模式                                                                                          |
+Tauri 客户端读取当前下载源的 `latest.json`；目前为 COS 默认域名，接入 CDN 后使用 CDN 域名。网页下载列表读取的是 `client-release.json`，两者不能互换。
 
-完整参数以 `pnpm tauri build --help` 为准。示例：
+若继续使用智枢平台原有 `/download` 页面，需要让平台网关的 `/client-release.json` 转发/读取新的 CDN 下载清单；这是平台部署配置的单独接入项，本客户端工作流不连接 SSH、不改网关、不重启平台。未完成这项接入时，先使用本次 artifact/版本清单里的实际 CDN 安装包 URL 进行安装验收，不能声称旧下载页已接通。
 
-```sh
-# macOS universal 内测包；需要预先安装两个 Rust target
-rustup target add aarch64-apple-darwin x86_64-apple-darwin
-pnpm build:editable -- --target universal-apple-darwin --bundles app
-# 在 Windows 构建 ARM64 内测包；x64 使用 x86_64-pc-windows-msvc
-pnpm build:unsigned -- --target aarch64-pc-windows-msvc --bundles msi
-# 在 Linux 构建内测包
-pnpm build:unsigned -- --bundles appimage,deb,rpm
-```
+首次正式包手动安装验收 macOS、Windows、Linux 的安装、启动、登录和工具接入。以后用两个真实正式版本验证发现更新、下载、验签、安装和重启。脚本和模拟回归通过不代表跨平台安装、Apple 公证、真实模型请求或计费已验收。
 
-底层 Tauri 产物位于 `src-tauri/target/[<target>/]release/bundle/`，设置 `CARGO_TARGET_DIR` 时以该目录为准。正式 CLI 整理后的产物位于 `release/v<版本>/<目标>/`。macOS 无 Finder 环境下，日常发布 CLI 已使用 `hdiutil` 封装 DMG，无需另跑一套手工打包步骤。
-
-## GitHub Actions 与签名
-
-`release:init` 已初始化的机器沿用原密钥。手工配置新发布身份时只生成一次：
-
-```sh
-pnpm tauri signer generate -w ~/.tauri/zhishu-ccs.key
-```
-
-配置 Repository Variables（macOS 合并打包作业也会读取，不要只放 Environment Variables）：
-
-- `ZHISHU_PLATFORM_API_URL`、`ZHISHU_PLATFORM_WEB_URL`、`ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP`
-- `ZHISHU_UPDATE_URL`、`ZHISHU_UPDATE_PUBLIC_KEY`
-
-更新签名使用 Secret `TAURI_SIGNING_PRIVATE_KEY` 和 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`；Apple 证书、公证及 Windows 代码签名沿用既有发布流程。CI 的安装包整理、签名、公证与重试仍由原工作流负责。
-
-`ZHISHU_UPDATE_URL` 必须允许终端用户匿名访问，例如自己公开仓库的 `https://github.com/<组织>/<仓库>/releases/latest/download/latest.json`，或自己的 HTTPS 对象存储地址。私有仓库的产物需另发到公开可下载的服务。公钥、私钥和更新源必须属于自己的发布身份。
-
-启用 R2 镜像需配置 `ZHISHU_R2_BUCKET`、`ZHISHU_R2_PUBLIC_BASE_URL` 和既有 R2 Secrets。镜像会清理所配置桶的旧版本，须使用专属客户端发布桶；配置不齐时不上传。
-
-## 平台下载清单
-
-单独生成网页下载清单的兼容入口继续保留：
-
-```sh
-node scripts/generate-download-manifest.mjs <安装包目录> <版本tag> <自己的下载根地址> <输出文件> <真实发布时间>
-```
-
-安装包位于 `<下载根地址>/<版本tag>/<文件名>`。GitHub Release 和 R2 镜像都会附带 `client-release.json`，平台将它提供为 `/client-release.json`；可部署到平台 `frontend/public/` 后构建，或由网关代理。SHA-256 和大小由真实文件计算。网页 `client-release.json` 与 updater `latest.json` 格式不同。
-
-</details>
+参考：[Tauri Updater](https://tauri.app/plugin/updater/)、[腾讯云 PUT Object 禁止覆盖规则](https://intl.cloud.tencent.com/document/product/436/7749?lang=en)、[COS Python SDK](https://cloud.tencent.com/document/product/436/12269)。

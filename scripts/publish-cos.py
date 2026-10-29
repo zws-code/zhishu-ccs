@@ -1,0 +1,218 @@
+#!/usr/bin/env python3
+"""Publish a verified CI payload to COS. Imports cloud SDK only for actual uploads."""
+import argparse
+import hashlib
+import json
+import logging
+import os
+from pathlib import Path
+import re
+import sys
+import time
+from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
+
+
+class ReleaseError(Exception):
+    pass
+
+
+def version(value):
+    if not isinstance(value, str) or not re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)", value):
+        raise ReleaseError("Invalid stable version")
+    return tuple(map(int, value.split(".")))
+
+
+def digest(path):
+    with path.open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def load_payload(directory):
+    directory = Path(directory)
+    receipt = json.loads((directory / "release.json").read_text())
+    version(receipt["version"])
+    if receipt["tag"] != "v" + receipt["version"]:
+        raise ReleaseError("Receipt tag mismatch")
+    names = set()
+    for item in receipt["files"]:
+        name = item["name"]
+        if not re.fullmatch(r"[A-Za-z0-9._-]+", name) or name in names or name in (".", "..", "release.json"):
+            raise ReleaseError("Invalid or duplicate payload name")
+        names.add(name)
+        path = directory / name
+        if path.is_symlink() or not path.is_file() or not 0 < item["size"] <= 5 * 1024**3:
+            raise ReleaseError("Invalid payload file")
+        if path.stat().st_size != item["size"] or digest(path) != item["sha256"]:
+            raise ReleaseError("Payload checksum mismatch: " + name)
+    if not {"latest.json", "client-release.json"} <= names:
+        raise ReleaseError("Missing release manifests")
+    if {p.name for p in directory.iterdir()} != names | {"release.json"}:
+        raise ReleaseError("Unexpected payload files")
+    latest = json.loads((directory / "latest.json").read_text())
+    website = json.loads((directory / "client-release.json").read_text())
+    if latest["version"] != receipt["version"] or website["version"] != receipt["version"]:
+        raise ReleaseError("Manifest version mismatch")
+    expected = receipt["downloadBaseUrl"] + "/" + receipt["tag"] + "/"
+    if not latest.get("platforms") or not website.get("files"):
+        raise ReleaseError("Empty release manifests")
+    for entry in [*latest["platforms"].values(), *website["files"]]:
+        if not entry["url"].startswith(expected) or entry["url"][len(expected):] not in names:
+            raise ReleaseError("Manifest references a missing or unexpected file")
+    return receipt, latest
+
+
+def check_promotion(current, incoming):
+    if current is None:
+        return
+    if version(current["version"]) > version(incoming["version"]):
+        raise ReleaseError("Refusing to downgrade the stable release")
+    if not set(current["platforms"]) <= set(incoming["platforms"]):
+        raise ReleaseError("Previously released platforms are missing")
+    if current["version"] == incoming["version"] and current != incoming:
+        raise ReleaseError("A published version is immutable; use a new version")
+
+
+class CosStore:
+    def __init__(self, env):
+        from qcloud_cos import CosConfig, CosS3Client
+        self.bucket = env["COS_BUCKET"]
+        self.client = CosS3Client(CosConfig(
+            Region=env["COS_REGION"], SecretId=env["COS_SECRET_ID"],
+            SecretKey=env["COS_SECRET_KEY"], Token=env.get("COS_SESSION_TOKEN") or None,
+            Scheme="https", Timeout=120,
+        ))
+
+    def head(self, key):
+        from qcloud_cos.cos_exception import CosServiceError
+        try:
+            return self.client.head_object(Bucket=self.bucket, Key=key)
+        except CosServiceError as error:
+            # Do not mistake authorization/network failures for missing objects.
+            if error.get_status_code() == 404 and error.get_error_code() in ("NoSuchKey", "NoSuchResource"):
+                return None
+            raise
+
+    def read(self, key):
+        if self.head(key) is None:
+            return None
+        stream = self.client.get_object(Bucket=self.bucket, Key=key)["Body"].get_raw_stream()
+        try:
+            return stream.read()
+        finally:
+            stream.close()
+
+    def put(self, key, path, immutable):
+        with path.open("rb") as stream:
+            self.client.put_object(
+                Bucket=self.bucket, Key=key, Body=stream, EnableMD5=True,
+                ForbidOverwrite="true" if immutable else "false",
+                Metadata={"x-cos-meta-sha256": digest(path)},
+                ContentType="application/json" if path.suffix == ".json" else "application/octet-stream",
+                CacheControl="public, max-age=31536000, immutable" if immutable else "public, max-age=60",
+            )
+
+    def ensure(self, key, path):
+        existing = self.head(key)
+        if existing is None:
+            self.put(key, path, True)
+            existing = self.head(key)
+        normalized = {k.lower(): v for k, v in existing.items()}
+        if int(normalized.get("content-length", -1)) != path.stat().st_size or normalized.get("x-cos-meta-sha256") != digest(path):
+            raise ReleaseError("An immutable object differs: " + key)
+
+
+def public_check(url, path, manifest=False):
+    request = Request(url, method="GET" if manifest else "HEAD", headers={"Cache-Control": "no-cache"})
+    with urlopen(request, timeout=30) as response:
+        if urlsplit(response.url).scheme != "https":
+            raise ReleaseError("Public URL redirected away from HTTPS")
+        if response.status != 200:
+            raise ReleaseError("Public URL is not available")
+        if manifest:
+            if hashlib.sha256(response.read(2 * 1024**2)).hexdigest() != digest(path):
+                raise ReleaseError("CDN manifest is stale or differs")
+        elif int(response.headers.get("Content-Length", -1)) != path.stat().st_size:
+            raise ReleaseError("Public artifact size mismatch")
+
+
+def retry_public(check, url, path, manifest=False):
+    for attempt in range(10):
+        try:
+            check(url, path, manifest)
+            return
+        except Exception:
+            if attempt == 9:
+                raise ReleaseError("CDN validation failed: " + url) from None
+            time.sleep(10)
+
+
+def publish(directory, store, prefix, base, check=public_check, wait=retry_public):
+    directory = Path(directory)
+    receipt, latest = load_payload(directory)
+    if base != receipt["downloadBaseUrl"]:
+        raise ReleaseError("Public download base differs from the verified payload")
+    stable_key = prefix + "/latest.json"
+    current_bytes = store.read(stable_key)
+    check_promotion(json.loads(current_bytes) if current_bytes else None, latest)
+    website_bytes = store.read(prefix + "/client-release.json")
+    if website_bytes and version(json.loads(website_bytes)["version"]) > version(latest["version"]):
+        raise ReleaseError("Website manifest already points to a newer version")
+    # Reserve the exact inputs before any installer upload, so a failed upload can
+    # resume but another build cannot replace this version's contents.
+    version_prefix = prefix + "/" + receipt["tag"] + "/"
+    store.ensure(version_prefix + "release.json", directory / "release.json")
+    for item in receipt["files"]:
+        print("Uploading/verifying " + item["name"], flush=True)
+        store.ensure(version_prefix + item["name"], directory / item["name"])
+    # All referenced files must be downloadable before changing either pointer.
+    for item in receipt["files"]:
+        wait(check, base + "/" + receipt["tag"] + "/" + item["name"], directory / item["name"], item["name"].endswith(".json"))
+    # Concurrency in the workflow serializes all releases of this repository.
+    # Recheck just before promotion as protection against out-of-order builds.
+    current_bytes = store.read(stable_key)
+    check_promotion(json.loads(current_bytes) if current_bytes else None, latest)
+    for name in ("client-release.json", "latest.json"):
+        store.put(prefix + "/" + name, directory / name, False)
+        if store.read(prefix + "/" + name) != (directory / name).read_bytes():
+            raise ReleaseError("COS manifest read-back mismatch")
+        wait(check, base + "/" + name, directory / name, True)
+    print("Published " + receipt["tag"] + " at " + base, flush=True)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("directory")
+    parser.add_argument("--dry-run", action="store_true", help="Validate local payload only; never contact COS/CDN")
+    args = parser.parse_args()
+    receipt, _ = load_payload(args.directory)
+    if args.dry_run:
+        print("Validated " + receipt["tag"] + "; no network requests or uploads")
+        return
+    for name in ("COS_BUCKET", "COS_REGION", "COS_SECRET_ID", "COS_SECRET_KEY", "COS_PUBLIC_BASE_URL"):
+        if not os.environ.get(name):
+            raise ReleaseError("Missing environment variable: " + name)
+    prefix = os.environ.get("COS_PREFIX") or "ccs/stable"
+    if not re.fullmatch(r"[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*", prefix):
+        raise ReleaseError("Invalid COS_PREFIX")
+    base = os.environ["COS_PUBLIC_BASE_URL"].rstrip("/")
+    url = urlsplit(base)
+    if url.scheme != "https" or url.path != "/" + prefix or url.query or url.fragment or url.username:
+        raise ReleaseError("Invalid COS_PUBLIC_BASE_URL")
+    # COS forbid-overwrite does not protect version-enabled buckets. Explicitly
+    # require versioning disabled; preserve historical versions via immutable paths.
+    store = CosStore(os.environ)
+    status = store.client.get_bucket_versioning(Bucket=store.bucket).get("Status")
+    if status not in (None, ""):
+        raise ReleaseError("Use a dedicated bucket with COS versioning disabled")
+    publish(args.directory, store, prefix, base)
+
+
+if __name__ == "__main__":
+    logging.disable(logging.CRITICAL)  # SDK diagnostics may contain signed URLs.
+    try:
+        main()
+    except Exception as error:
+        # Never echo raw SDK exceptions/headers/credentials into Actions logs.
+        print(str(error) if isinstance(error, ReleaseError) else "COS publication failed (" + type(error).__name__ + "); check credentials, bucket permissions and network", file=sys.stderr)
+        sys.exit(1)

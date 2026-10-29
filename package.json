@@ -27,14 +27,9 @@
     "test:unit:watch": "vitest watch",
     "release:prepare": "node scripts/prepare-release.mjs",
     "test:release-config": "node --test scripts/release-config.test.mjs",
-    "release:init": "node scripts/release-cli.mjs init",
-    "release:server": "node scripts/release-cli.mjs server",
-    "release:build": "node scripts/release-cli.mjs build",
-    "release:publish": "node scripts/release-cli.mjs publish",
-    "release:import": "node scripts/release-cli.mjs import",
-    "test:release": "node --test scripts/release-config.test.mjs scripts/release-cli.test.mjs",
-    "release:check": "node scripts/release-cli.mjs check",
-    "release:help": "node scripts/release-cli.mjs help"
+    "test:release": "node --test scripts/release-config.test.mjs scripts/release-artifacts.test.mjs scripts/cos-release.test.mjs",
+    "release:check": "node scripts/cos-release.mjs check",
+    "test:release-cos": "python3 -B -m unittest discover -s scripts -p 'test_publish_cos.py'"
   },
   "keywords": [],
   "author": "Jason Young",

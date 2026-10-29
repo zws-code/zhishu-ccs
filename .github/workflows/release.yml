@@ -1,4 +1,4 @@
-name: Release
+name: Release to Tencent COS
 
 on:
   push:
@@ -8,12 +8,12 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  # 带上事件名：手动干跑也能选 tag，和正式发布同组会把正在跑的发布取消掉
+  # 演练与正式发布分别排队；不取消正在执行的发布。
   group: release-${{ github.event_name }}-${{ github.ref_name }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   VITE_PLATFORM_API_URL: ${{ vars.ZHISHU_PLATFORM_API_URL }}
@@ -21,6 +21,11 @@ env:
   ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP: ${{ vars.ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP }}
   ZHISHU_UPDATE_URL: ${{ vars.ZHISHU_UPDATE_URL }}
   ZHISHU_UPDATE_PUBLIC_KEY: ${{ vars.ZHISHU_UPDATE_PUBLIC_KEY }}
+  COS_BUCKET: ${{ vars.COS_BUCKET }}
+  COS_REGION: ${{ vars.COS_REGION }}
+  COS_PREFIX: ${{ vars.COS_PREFIX || 'ccs/stable' }}
+  COS_PUBLIC_BASE_URL: ${{ vars.COS_PUBLIC_BASE_URL }}
+  MACOS_SIGNING_MODE: ${{ vars.ZHISHU_MACOS_SIGNING_MODE || 'developer-id' }}
 
 jobs:
   # 应用内更新摘要（src/whats-new/<版本>.json，见同目录 README）随安装包发出。漏写的话
@@ -30,11 +35,14 @@ jobs:
   whats-new-check:
     name: Check in-app what's new summaries
     runs-on: ubuntu-22.04
+    if: github.repository == 'zws-code/zhishu-ccs'
+    outputs:
+      tag: ${{ steps.config.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      # 手动干跑可以在任意分支上跑，那时这一版的摘要可能还没写，只在推 tag 时要求存在
+      # 推 tag 时先快速检查摘要；后续配置预检也会核对源码版本与摘要
       - name: Require this version's summary
         if: github.event_name == 'push' && github.ref_type == 'tag'
         env:
@@ -51,6 +59,34 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '20'
+
+      - name: Validate release configuration and version
+        id: config
+        env:
+          SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          TAG="$(node -p "'v' + require('./package.json').version")"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$TAG" ]; then
+            echo "::error::Tag differs from the committed application version"; exit 1
+          fi
+          node scripts/cos-release.mjs check "$TAG"
+          test -n "$SIGNING_KEY" || { echo "::error::Missing TAURI_SIGNING_PRIVATE_KEY"; exit 1; }
+          case "$MACOS_SIGNING_MODE" in
+            developer-id)
+              for variable in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD KEYCHAIN_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+                test -n "${!variable}" || { echo "::error::Missing $variable for Developer ID signing"; exit 1; }
+              done ;;
+            adhoc) echo "::warning::Ad-hoc macOS build: no Apple notarization; first installation may be blocked by Gatekeeper" ;;
+            *) echo "::error::ZHISHU_MACOS_SIGNING_MODE must be developer-id or adhoc"; exit 1 ;;
+          esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Setup pnpm
         env:
@@ -73,6 +109,15 @@ jobs:
 
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
+
+      - name: Test release scripts
+        run: pnpm test:release
+
+      - name: Test COS publisher
+        run: pnpm test:release-cos
+
+      - name: TypeScript check
+        run: pnpm typecheck
 
       - name: Validate all summaries
         run: pnpm vitest run tests/config/whatsNewEntries.test.ts
@@ -227,8 +272,8 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path release-assets | Out-Null
-          # e.g., v3.5.0；手动干跑时是分支名，斜杠会被当成目录，换成 -
-          $VERSION = $env:GITHUB_REF_NAME -replace '/', '-'
+          # 正式发布与手动演练均使用已提交的应用版本
+          $VERSION = 'v' + (Get-Content package.json -Raw | ConvertFrom-Json).version
           $isArm64 = $env:WINDOWS_RELEASE_ARCH -eq 'arm64'
           $targetRoot = if ($isArm64) { 'src-tauri/target/aarch64-pc-windows-msvc/release' } else { 'src-tauri/target/release' }
           $assetSuffix = if ($isArm64) { '-arm64' } else { '' }
@@ -312,8 +357,8 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p release-assets
-          # e.g., v3.5.0；手动干跑时是分支名，斜杠会被当成目录，换成 -
-          VERSION="${GITHUB_REF_NAME//\//-}"
+          # 正式发布与手动演练均使用已提交的应用版本
+          VERSION="$(node -p "'v' + require('./package.json').version")"
           ARCH="${{ matrix.arch || 'x86_64' }}"
           # Updater artifact: AppImage（含对应 .sig）
           APPIMAGE=$(find src-tauri/target/release/bundle -name "*.AppImage" | head -1 || true)
@@ -466,6 +511,7 @@ jobs:
     name: Bundle macOS release
     runs-on: macos-14
     needs: macos-binary
+    environment: release
 
     steps:
       - name: Checkout
@@ -523,13 +569,22 @@ jobs:
           private-key: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           password: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
+      - name: Select ad-hoc signing for internal distribution
+        if: env.MACOS_SIGNING_MODE == 'adhoc'
+        run: echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+
       - name: Import Apple signing certificate
+        if: env.MACOS_SIGNING_MODE == 'developer-id'
         shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
           set -euo pipefail
           # Decode .p12 certificate from base64
           CERT_PATH="$RUNNER_TEMP/certificate.p12"
-          printf '%s' "${{ secrets.APPLE_CERTIFICATE }}" | (base64 --decode 2>/dev/null || base64 -D) > "$CERT_PATH"
+          printf '%s' "$APPLE_CERTIFICATE" | (base64 --decode 2>/dev/null || base64 -D) > "$CERT_PATH"
 
           # Save original default keychain for cleanup
           ORIGINAL_DEFAULT_KEYCHAIN=$(security default-keychain -d user | tr -d '"' | xargs)
@@ -537,18 +592,18 @@ jobs:
 
           # Create temporary keychain
           KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
-          security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" "$KEYCHAIN_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security default-keychain -s "$KEYCHAIN_PATH"
-          security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
           # Import certificate
           security import "$CERT_PATH" \
             -k "$KEYCHAIN_PATH" \
-            -P "${{ secrets.APPLE_CERTIFICATE_PASSWORD }}" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
             -T /usr/bin/codesign \
             -T /usr/bin/security
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
           # Dynamically resolve signing identity (must be "Developer ID Application")
           IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
@@ -591,9 +646,9 @@ jobs:
         timeout-minutes: 45
         env:
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ env.MACOS_SIGNING_MODE == 'developer-id' && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ env.MACOS_SIGNING_MODE == 'developer-id' && secrets.APPLE_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ env.MACOS_SIGNING_MODE == 'developer-id' && secrets.APPLE_TEAM_ID || '' }}
         run: |
           set -euo pipefail
           max_attempts=3
@@ -628,8 +683,8 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p release-assets
-          # e.g., v3.5.0；手动干跑时是分支名，斜杠会被当成目录，换成 -
-          VERSION="${GITHUB_REF_NAME//\//-}"
+          # 正式发布与手动演练均使用已提交的应用版本
+          VERSION="$(node -p "'v' + require('./package.json').version")"
 
           # Locate bundle artifacts
           TAR_GZ=""; APP_PATH=""
@@ -654,8 +709,10 @@ jobs:
           fi
 
           # Staple notarization ticket to .app (Tauri already notarized it)
-          xcrun stapler staple "$APP_PATH"
-          echo "✅ .app stapled"
+          if [ "$MACOS_SIGNING_MODE" = developer-id ]; then
+            xcrun stapler staple "$APP_PATH"
+            echo "✅ .app stapled"
+          fi
 
           # 1) Collect .tar.gz (updater artifact)
           NEW_TAR_GZ="Zhishu-Ccs-${VERSION}-macOS.tar.gz"
@@ -704,6 +761,7 @@ jobs:
           echo "✅ Styled DMG created: $NEW_DMG"
 
       - name: Notarize macOS DMG
+        if: env.MACOS_SIGNING_MODE == 'developer-id'
         shell: bash
         timeout-minutes: 30
         env:
@@ -768,10 +826,11 @@ jobs:
           echo "=== Verifying .app: $APP_PATH ==="
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
           echo "✅ codesign verification passed"
-          spctl -a -t exec -vv "$APP_PATH"
-          echo "✅ spctl assessment passed"
-          xcrun stapler validate "$APP_PATH"
-          echo "✅ .app stapler validation passed"
+          if [ "$MACOS_SIGNING_MODE" = developer-id ]; then
+            spctl -a -t exec -vv "$APP_PATH"
+            xcrun stapler validate "$APP_PATH"
+            echo "✅ .app notarization verified"
+          fi
 
           # Verify .dmg (from release-assets/, created by create-dmg + notarized)
           DMG_PATH=$(find release-assets -maxdepth 1 -name "*.dmg" -type f | head -1 || true)
@@ -779,10 +838,11 @@ jobs:
             echo "=== Verifying .dmg: $DMG_PATH ==="
             codesign --verify --verbose=2 "$DMG_PATH"
             echo "✅ .dmg codesign verification passed"
-            spctl -a -t open --context context:primary-signature -vv "$DMG_PATH"
-            echo "✅ .dmg spctl assessment passed"
-            xcrun stapler validate "$DMG_PATH"
-            echo "✅ .dmg stapler validation passed"
+            if [ "$MACOS_SIGNING_MODE" = developer-id ]; then
+              spctl -a -t open --context context:primary-signature -vv "$DMG_PATH"
+              xcrun stapler validate "$DMG_PATH"
+              echo "✅ .dmg notarization verified"
+            fi
           else
             echo "❌ No .dmg found for verification — release would ship without verified DMG" >&2
             exit 1
@@ -819,14 +879,16 @@ jobs:
           fi
 
   publish-release:
-    name: Publish GitHub Release
+    name: Validate artifacts and publish to COS
     runs-on: ubuntu-22.04
-    needs: [release, macos-release]
-    # 只有推 tag 才发布。手动触发时也能选 tag 作为运行版本，单看 ref_type 会把干跑当成正式发布，
-    # 覆盖已发布 release 的正文和安装包
-    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [whats-new-check, release, macos-release]
+    # 手动运行只校验并保存产物；仅 push tag 可执行 COS 上传步骤。
+    environment: ${{ github.event_name == 'push' && 'cos-production' || 'release-validation' }}
+    concurrency:
+      group: cos-stable-publication
+      cancel-in-progress: false
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Checkout release manifest tools
         uses: actions/checkout@v6
@@ -856,12 +918,12 @@ jobs:
       - name: Generate latest.json
         env:
           REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ needs.whats-new-check.outputs.tag }}
         run: |
           set -euo pipefail
           VERSION="${TAG#v}"
-          PUB_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          base_url="https://github.com/$REPO/releases/download/$TAG"
+          PUB_DATE=$(git show -s --format=%cI HEAD)
+          base_url="$COS_PUBLIC_BASE_URL/$TAG"
           # 初始化空平台映射
           mac_url=""; mac_sig=""
           win_x64_url=""; win_x64_sig=""
@@ -980,10 +1042,45 @@ jobs:
       - name: Generate platform download manifest
         env:
           RELEASE_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: node scripts/generate-download-manifest.mjs release-assets "$RELEASE_TAG" "https://github.com/$RELEASE_REPO/releases/download" release-assets/client-release.json
+          RELEASE_TAG: ${{ needs.whats-new-check.outputs.tag }}
+        run: node scripts/generate-download-manifest.mjs release-assets "$RELEASE_TAG" "$COS_PUBLIC_BASE_URL" release-assets/client-release.json
 
+      - name: Verify signatures and prepare COS payload
+        env:
+          RELEASE_TAG: ${{ needs.whats-new-check.outputs.tag }}
+        run: node scripts/cos-release.mjs prepare release-assets "$RELEASE_TAG" cos-payload
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Validate publication without uploading
+        run: python scripts/publish-cos.py cos-payload --dry-run
+
+      - name: Save verified payload for retries
+        uses: actions/upload-artifact@v7
+        with:
+          name: cos-payload-${{ needs.whats-new-check.outputs.tag }}
+          path: cos-payload/*
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Install COS SDK
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        run: python -m pip install -r scripts/cos-requirements.txt
+
+      - name: Publish immutable artifacts and stable manifests
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+          COS_SESSION_TOKEN: ${{ secrets.COS_SESSION_TOKEN }}
+        run: python scripts/publish-cos.py cos-payload
+
+      # 上游兼容入口保留；智枢仓库只发布 COS，不执行此步骤。
       - name: Upload Release Assets
+        if: github.repository == 'farion1231/cc-switch'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}

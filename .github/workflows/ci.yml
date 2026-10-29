@@ -43,6 +43,7 @@ jobs:
               - "src/**"
               - "tests/**"
               - "scripts/*release*.mjs"
+              - "scripts/*cos*"
               - "scripts/generate-download-manifest.mjs"
               - "deploy/client-download/**"
               - "index.html"
@@ -112,6 +113,9 @@ jobs:
 
       - name: Test Zhishu release scripts
         run: pnpm test:release
+
+      - name: Test COS publisher
+        run: pnpm test:release-cos
 
       - name: Build frontend
         run: pnpm build:renderer --mode development
