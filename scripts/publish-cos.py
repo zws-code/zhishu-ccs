@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Publish a verified CI payload to COS. Imports cloud SDK only for actual uploads."""
 import argparse
+import base64
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import logging
@@ -120,6 +122,37 @@ def check_promotion(current, incoming):
         raise ReleaseError("A published version is immutable; use a new version")
 
 
+class UploadBody:
+    """Expose a seekable file and report reads by the HTTP uploader, never hash passes."""
+    def __init__(self, stream, name, total):
+        self.stream, self.name, self.total = stream, name, total
+        self.reported = set()
+
+    def __getattr__(self, name):
+        return getattr(self.stream, name)
+
+    def seek(self, offset, whence=0):
+        before = self.stream.tell()
+        result = self.stream.seek(offset, whence)
+        if result < before:
+            self.reported.clear()
+        return result
+
+    def read(self, size=-1):
+        chunk = self.stream.read(size)
+        position = self.stream.tell()
+        if chunk and self.total >= 1024 * 1024:
+            for milestone in (1, 25, 50, 75, 100):
+                threshold = min(1024 * 1024, self.total) if milestone == 1 else self.total * milestone // 100
+                if position >= threshold and milestone not in self.reported:
+                    self.reported.add(milestone)
+                    message = "Upload stream " + self.name + ": " + str(position) + "/" + str(self.total) + " bytes"
+                    print(message, flush=True)
+                    if os.environ.get("GITHUB_ACTIONS") == "true":
+                        print("::notice title=COS upload progress::" + message, flush=True)
+        return chunk
+
+
 class CosStore:
     def __init__(self, env):
         from qcloud_cos import CosConfig, CosS3Client
@@ -151,8 +184,14 @@ class CosStore:
 
     def put(self, key, path, immutable):
         with path.open("rb") as stream:
+            checksum = hashlib.md5()
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                checksum.update(chunk)
+            stream.seek(0)
+            body = UploadBody(stream, path.name, path.stat().st_size)
             self.client.put_object(
-                Bucket=self.bucket, Key=key, Body=stream, EnableMD5=True,
+                Bucket=self.bucket, Key=key, Body=body, EnableMD5=False,
+                ContentMD5=base64.b64encode(checksum.digest()).decode("ascii"),
                 # SDK 1.9.44 has no ForbidOverwrite keyword. Its Metadata map
                 # passes header names through unchanged, including custom COS headers.
                 Metadata={
@@ -214,9 +253,14 @@ def publish(directory, store, prefix, base, check=public_check, wait=retry_publi
     version_prefix = prefix + "/" + receipt["tag"] + "/"
     print("Reserving immutable release inputs", flush=True)
     store.ensure(version_prefix + "release.json", directory / "release.json")
-    for item in receipt["files"]:
+    def upload(item):
         print("Uploading/verifying " + item["name"], flush=True)
         store.ensure(version_prefix + item["name"], directory / item["name"])
+        print("COS verified " + item["name"], flush=True)
+    # Independent immutable objects may upload concurrently. Promotion still waits
+    # for every upload and public check, and the version receipt is reserved first.
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        list(pool.map(upload, receipt["files"]))
     # All referenced files must be downloadable before changing either pointer.
     for item in receipt["files"]:
         wait(check, base + "/" + receipt["tag"] + "/" + item["name"], directory / item["name"], item["name"].endswith(".json"))

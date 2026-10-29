@@ -1,4 +1,8 @@
 import hashlib
+import base64
+from contextlib import redirect_stdout
+import io
+import threading
 import importlib.util
 import json
 from pathlib import Path
@@ -225,10 +229,47 @@ class CosAdapterTests(unittest.TestCase):
             store.put("ccs/stable/v1.0.0/test.msi", path, True)
             self.assertEqual(captured[-1]["Metadata"], {"x-cos-meta-sha256": module.digest(path), "x-cos-forbid-overwrite": "true"})
             self.assertNotIn("ForbidOverwrite", captured[-1])
-            self.assertTrue(captured[-1]["EnableMD5"])
+            self.assertFalse(captured[-1]["EnableMD5"])
+            self.assertEqual(captured[-1]["ContentMD5"], base64.b64encode(hashlib.md5(b"installer").digest()).decode("ascii"))
             store.put("ccs/stable/latest.json", path, False)
             self.assertEqual(captured[-1]["Metadata"]["x-cos-forbid-overwrite"], "false")
             self.assertEqual(captured[-1]["CacheControl"], "public, max-age=60")
+
+
+class UploadProgressTests(unittest.TestCase):
+    def test_progress_wrap_preserves_bytes_and_sdk_retry_seek(self):
+        data = b"installer" * 300000
+        stream = io.BytesIO(data)
+        body = module.UploadBody(stream, "test.msi", len(data))
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(body.read(1024 * 1024), data[:1024 * 1024])
+            body.seek(0)
+            self.assertEqual(body.read(), data)
+        self.assertIn("Upload stream test.msi", output.getvalue())
+        self.assertEqual(body.tell(), len(data))
+
+    def test_concurrent_uploads_finish_before_any_stable_pointer(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            payload(path)
+            store = MemoryStore()
+            original = store.ensure
+            workers = set()
+            gate = threading.Barrier(3)
+            def ensure(key, source):
+                if key.endswith("/release.json"):
+                    return original(key, source)
+                workers.add(threading.get_ident())
+                gate.wait(timeout=5)
+                self.assertNotIn(PREFIX + "/latest.json", store.objects)
+                original(key, source)
+            store.ensure = ensure
+            def check(url, source, manifest=False):
+                self.assertEqual(store.objects[PREFIX + url.removeprefix(BASE)], source.read_bytes())
+            module.publish(path, store, PREFIX, BASE, check, lambda fn, *args: fn(*args))
+            self.assertEqual(len(workers), 3)
+            self.assertEqual([key for key, immutable in store.events if not immutable], [PREFIX + "/client-release.json", PREFIX + "/latest.json"])
 
 
 class CosSdkContractTests(unittest.TestCase):
