@@ -223,6 +223,7 @@ class CosAdapterTests(unittest.TestCase):
         store = module.CosStore.__new__(module.CosStore)
         store.bucket = "test-123"
         store.client = types.SimpleNamespace(put_object=lambda **kwargs: captured.append(kwargs))
+        store.upload_client = store.client
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "test.msi"
             path.write_bytes(b"installer")
@@ -234,6 +235,43 @@ class CosAdapterTests(unittest.TestCase):
             store.put("ccs/stable/latest.json", path, False)
             self.assertEqual(captured[-1]["Metadata"]["x-cos-forbid-overwrite"], "false")
             self.assertEqual(captured[-1]["CacheControl"], "public, max-age=60")
+
+
+class AccelerationConfigTests(unittest.TestCase):
+    def test_acceleration_is_explicit_and_only_changes_upload_endpoint(self):
+        sdk = types.ModuleType("qcloud_cos")
+        sdk.CosConfig = lambda **kwargs: kwargs
+        sdk.CosS3Client = lambda config: types.SimpleNamespace(config=config)
+        env = {"COS_BUCKET": "test-123", "COS_REGION": "ap-guangzhou", "COS_SECRET_ID": "id", "COS_SECRET_KEY": "key"}
+        with patch.dict(sys.modules, {"qcloud_cos": sdk}):
+            normal = module.CosStore(env)
+            self.assertIs(normal.client, normal.upload_client)
+            accelerated = module.CosStore({**env, "COS_UPLOAD_ACCELERATE": "true"})
+            self.assertNotIn("Endpoint", accelerated.client.config)
+            self.assertEqual(accelerated.upload_client.config["Endpoint"], "cos.accelerate.myqcloud.com")
+            self.assertEqual(accelerated.upload_client.config["Scheme"], "https")
+            with self.assertRaises(module.ReleaseError):
+                module.CosStore({**env, "COS_UPLOAD_ACCELERATE": "yes"})
+
+
+class UploadBudgetTests(unittest.TestCase):
+    def test_retry_reads_count_again_and_budget_stops_before_handing_off_bytes(self):
+        budget = module.UploadBudget(10)
+        body = module.UploadBody(io.BytesIO(b"12345678"), "test", 8, budget)
+        self.assertEqual(body.read(6), b"123456")
+        body.seek(0)
+        self.assertEqual(body.read(4), b"1234")
+        with self.assertRaisesRegex(module.ReleaseError, "budget exceeded"):
+            body.read(1)
+        self.assertEqual(budget.used, 10)
+
+    def test_shared_budget_cannot_overrun_when_workers_read_concurrently(self):
+        budget = module.UploadBudget(7)
+        with module.ThreadPoolExecutor(max_workers=4) as pool:
+            futures = [pool.submit(budget.consume, 3) for _ in range(4)]
+        errors = sum(isinstance(f.exception(), module.ReleaseError) for f in futures)
+        self.assertEqual(errors, 2)
+        self.assertEqual(budget.used, 6)
 
 
 class UploadProgressTests(unittest.TestCase):
@@ -273,6 +311,20 @@ class UploadProgressTests(unittest.TestCase):
 
 
 class CosSdkContractTests(unittest.TestCase):
+    def test_real_sdk_separates_accelerated_uploads_from_origin_bucket_api(self):
+        try:
+            import qcloud_cos
+        except ImportError:
+            self.skipTest("COS SDK is checked separately after installation in publication CI")
+        store = module.CosStore({
+            "COS_BUCKET": "sdk-contract-1234567890", "COS_REGION": "ap-guangzhou",
+            "COS_SECRET_ID": "test-id", "COS_SECRET_KEY": "test-key",
+            "COS_UPLOAD_ACCELERATE": "true",
+        })
+        self.assertEqual(store.client._conf.uri(bucket=store.bucket), "https://sdk-contract-1234567890.cos.ap-guangzhou.myqcloud.com/")
+        self.assertEqual(store.upload_client._conf.uri(bucket=store.bucket), "https://sdk-contract-1234567890.cos.accelerate.myqcloud.com/")
+        self.assertEqual(store.upload_budget.maximum, 3 * 1000**3)
+
     def test_real_sdk_serializes_immutable_header_and_md5_without_network(self):
         try:
             import qcloud_cos

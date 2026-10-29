@@ -7,6 +7,11 @@ on:
         description: Original completed formal tag release run ID
         required: true
         type: string
+      accelerate:
+        description: Use enabled COS upload acceleration (additional traffic fees, max 3 GB per run)
+        required: false
+        default: false
+        type: boolean
   push:
     branches: ["codex/cos-resume"]
 
@@ -16,6 +21,7 @@ permissions:
 env:
   COS_BUCKET: ${{ vars.COS_BUCKET }}
   COS_REGION: ${{ vars.COS_REGION }}
+  COS_UPLOAD_ACCELERATE: ${{ vars.COS_UPLOAD_ACCELERATE || 'false' }}
   COS_PREFIX: ${{ vars.COS_PREFIX || 'ccs/stable' }}
   COS_PUBLIC_BASE_URL: ${{ vars.COS_PUBLIC_BASE_URL }}
   ZHISHU_UPDATE_PUBLIC_KEY: ${{ vars.ZHISHU_UPDATE_PUBLIC_KEY }}
@@ -46,6 +52,7 @@ jobs:
         uses: actions/github-script@v8
         env:
           REQUESTED_RUN_ID: ${{ inputs.run_id }}
+          REQUESTED_ACCELERATE: ${{ inputs.accelerate }}
         with:
           script: |
             const { pathToFileURL } = require('node:url');
@@ -55,6 +62,10 @@ jobs:
             core.setOutput('tag', source.tag);
             core.setOutput('run_id', source.runId);
             core.setOutput('artifact', source.artifact);
+            const accelerated = context.eventName === 'workflow_dispatch'
+              ? process.env.REQUESTED_ACCELERATE === 'true'
+              : /^Resume-Release-Accelerate: true$/m.test(context.payload.head_commit?.message || '');
+            core.setOutput('accelerate', String(accelerated));
             core.info(`Reusing verified ${source.tag} payload from run ${source.runId} at ${source.sha}`);
       - name: Download original verified payload
         uses: actions/download-artifact@v8
@@ -90,6 +101,7 @@ jobs:
         run: python -B -m unittest discover -s scripts -p 'test_publish_cos.py' -k CosSdkContractTests
       - name: Resume COS publication without rebuilding
         env:
+          COS_UPLOAD_ACCELERATE: ${{ steps.source.outputs.accelerate }}
           COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
           COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
           COS_SESSION_TOKEN: ${{ secrets.COS_SESSION_TOKEN }}

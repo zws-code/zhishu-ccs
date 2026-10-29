@@ -26,6 +26,7 @@ env:
   ZHISHU_UPDATE_PUBLIC_KEY: ${{ vars.ZHISHU_UPDATE_PUBLIC_KEY }}
   COS_BUCKET: ${{ vars.COS_BUCKET }}
   COS_REGION: ${{ vars.COS_REGION }}
+  COS_UPLOAD_ACCELERATE: ${{ vars.COS_UPLOAD_ACCELERATE || 'false' }}
   COS_PREFIX: ${{ vars.COS_PREFIX || 'ccs/stable' }}
   COS_PUBLIC_BASE_URL: ${{ vars.COS_PUBLIC_BASE_URL }}
   MACOS_SIGNING_MODE: ${{ vars.ZHISHU_MACOS_SIGNING_MODE || 'developer-id' }}

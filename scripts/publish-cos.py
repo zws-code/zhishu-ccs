@@ -12,6 +12,7 @@ import re
 import sys
 import time
 import traceback
+import threading
 from urllib.request import Request, urlopen
 from urllib.parse import urlsplit
 
@@ -36,6 +37,7 @@ def safe_error(error):
     if kind == "CosClientError":
         message = str(error).lower()
         categories = [
+            (("byte budget exceeded",), "accelerated upload byte budget exceeded; stop before retrying"),
             (("secret_id", "secretkey", "secretid", "secret_key"), "credential format; check GitHub COS Secrets"),
             (("ssl", "certificate", "tls"), "TLS connection; check runner-to-COS connectivity"),
             (("proxy",), "proxy connection; check runner network"),
@@ -122,10 +124,24 @@ def check_promotion(current, incoming):
         raise ReleaseError("A published version is immutable; use a new version")
 
 
+class UploadBudget:
+    """Conservatively count all bytes read for accelerated PUTs, including retries."""
+    def __init__(self, maximum):
+        self.maximum, self.used = maximum, 0
+        self.lock = threading.Lock()
+
+    def consume(self, count):
+        with self.lock:
+            if self.used + count > self.maximum:
+                raise ReleaseError("Accelerated upload byte budget exceeded; stop before retrying")
+            self.used += count
+
+
 class UploadBody:
     """Expose a seekable file and report reads by the HTTP uploader, never hash passes."""
-    def __init__(self, stream, name, total):
+    def __init__(self, stream, name, total, budget=None):
         self.stream, self.name, self.total = stream, name, total
+        self.budget = budget
         self.reported = set()
 
     def __getattr__(self, name):
@@ -140,6 +156,8 @@ class UploadBody:
 
     def read(self, size=-1):
         chunk = self.stream.read(size)
+        if self.budget is not None:
+            self.budget.consume(len(chunk))
         position = self.stream.tell()
         if chunk and self.total >= 1024 * 1024:
             for milestone in (1, 25, 50, 75, 100):
@@ -157,11 +175,22 @@ class CosStore:
     def __init__(self, env):
         from qcloud_cos import CosConfig, CosS3Client
         self.bucket = env["COS_BUCKET"]
-        self.client = CosS3Client(CosConfig(
+        accelerate = env.get("COS_UPLOAD_ACCELERATE", "false")
+        if accelerate not in ("true", "false"):
+            raise ReleaseError("COS_UPLOAD_ACCELERATE must be true or false")
+        config = dict(
             Region=env["COS_REGION"], SecretId=credential(env, "COS_SECRET_ID"),
             SecretKey=credential(env, "COS_SECRET_KEY"), Token=credential(env, "COS_SESSION_TOKEN", optional=True),
             Scheme="https", Timeout=120,
-        ))
+        )
+        self.client = CosS3Client(CosConfig(**config))
+        self.upload_client = self.client
+        self.upload_budget = None
+        if accelerate == "true":
+            # <= 3 GB at the current cross-border rate leaves margin under the
+            # explicitly approved CNY 5 acceleration budget for this recovery.
+            self.upload_budget = UploadBudget(3 * 1000**3)
+            self.upload_client = CosS3Client(CosConfig(**config, Endpoint="cos.accelerate.myqcloud.com"))
 
     def head(self, key):
         from qcloud_cos.cos_exception import CosServiceError
@@ -188,8 +217,8 @@ class CosStore:
             for chunk in iter(lambda: stream.read(1024 * 1024), b""):
                 checksum.update(chunk)
             stream.seek(0)
-            body = UploadBody(stream, path.name, path.stat().st_size)
-            self.client.put_object(
+            body = UploadBody(stream, path.name, path.stat().st_size, getattr(self, "upload_budget", None))
+            self.upload_client.put_object(
                 Bucket=self.bucket, Key=key, Body=body, EnableMD5=False,
                 ContentMD5=base64.b64encode(checksum.digest()).decode("ascii"),
                 # SDK 1.9.44 has no ForbidOverwrite keyword. Its Metadata map
