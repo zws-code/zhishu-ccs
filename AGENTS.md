@@ -140,14 +140,15 @@
 - 重启从 keyring 恢复 refresh token，向平台刷新并验证账户；连续超过七天未使用、确认凭据失效或用户身份变化时清除会话。401 按现有路径刷新，轮换结果先保存再继续请求；暂时断网或凭据库故障保留可重试状态。
 - `PlatformAuthContext` 每分钟及窗口重新可见、网络恢复时查询账户。已有账户遇到暂时网络错误仍可使用本地功能；启动恢复失败进入 `recoveryPending` 重试页，可主动退出后重新登录，但没有未验证的离线入口。
 - 认证 HTTP 路径均带 `/api/v1` 前缀：`/settings/public`、`/auth/login`、`/auth/login/2fa`、`/auth/me`、`/auth/refresh`、`/auth/logout`。保留人机验证不支持时明确拒绝的行为，不绕过平台验证。
-- 主动退出先失效本机会话指针并清理 keyring，再尽力撤销服务端 refresh token；同时清理前端查询缓存、本机目录中的分组 Key 和当前账户托管配置凭证。目录元数据、模型参数、Key ID/名称和原同步时间保留；不能承诺退出会删除全部分组 Key 或所有历史备份。
+- 主动退出先失效本机会话指针并清理会话 keyring，再尽力撤销服务端 refresh token，同时清理前端查询缓存；保留本机目录、供应商数据库和工具配置中的 API Key，不改写原生配置。退出后平台目录与 Key 查看/同步仍需登录并校验账户归属；同账号重新登录可继续使用本机目录。
 - 要改先做什么：核对 `platform_auth.rs`、`platform_session.rs`、`platform_login_history.rs`、门禁和 Context；覆盖重启恢复、轮换后断网、凭据库故障、七天边界、2FA、切换账号、主动退出与迟到响应。
 
 ### 平台基础数据与供应商同步
 
 - 为什么：平台拉取会管理服务端 Key，本地同步会写供应商和工具配置；两阶段副作用不同，不能把按钮重新合并为隐式联网与自动应用。
 - 平台层：`platform_sync_catalog()` 获取可用分组、完整订阅、分页 Key 和模型目录，按需创建分组 Key，保存 `platform-catalog.json`，返回目录摘要；不修改 Agent 供应商。整体拉取失败保留上一快照，分组失败保留失败标记。
-- 本地层：`platform_get_catalog()` 返回当前账户本机摘要或 `null`；`platform_sync_providers({ agent })` 只从本机目录生成供应商，不发平台请求、不创建/撤销 Key，也不触发平台额度刷新，且不做同步前检测或覆盖确认。`agent: null` 表示全部已支持应用。缺快照返回 `CATALOG_REQUIRED`；退出清理过 Key 的快照返回 `CATALOG_CREDENTIALS_REQUIRED`，需先手动同步平台数据。
+- 本地层：`platform_get_catalog()` 返回当前账户本机摘要或 `null`；`platform_sync_providers({ agent })` 只从本机目录生成供应商，不发平台请求、不创建/撤销 Key，也不触发平台额度刷新，且不做同步前检测或覆盖确认。`agent: null` 表示全部已支持应用。缺快照返回 `CATALOG_REQUIRED`；旧版本退出或显式清理过 Key 的快照返回 `CATALOG_CREDENTIALS_REQUIRED`，需先手动同步平台数据。
+- 应用页右上角「更多」中的「一键删除平台供应商」调用 `platform_delete_providers({ agent, baseUrl, userId })`，删除当前应用、当前账户的平台托管行；「平台基础数据」页面的同名按钮传 `agent: null`，遍历全部已支持应用（含未显示应用），返回总计及逐应用 `apps` 结果，单个应用失败不阻塞其他应用。复用操作锁和 `ProviderService`，无安全备用项的当前供应商保留并提示。该操作不依赖平台目录、不联网、不改平台目录、不撤销服务端 Key，部分失败也记录 `platform_delete` 报告；后续同步可重新添加供应商。
 - 同步返回 `{ added, removed, skipped, warnings }`，另有可选 `updated`、`nativeFilesChanged`。部分成功仍需展示 warnings。供应商行有变化不代表原生配置文件已变化。
 - 目录摘要为 `{ baseUrl, userId, syncedAt, credentialsCleared, groups, warnings }`，`syncedAt` 为 Unix 毫秒，模型展示字段使用白名单。`platform_get_catalog_key({ baseUrl, userId, groupId })` 只读本机单个 Key，并校验当前身份、快照归属及分组；查看详情不触发同步。
 - 平台层读取 `/api/v1/groups/available`、`/api/v1/subscriptions`、分页 `/api/v1/keys`，按需 `POST /api/v1/keys`，用模型 Key 访问 `/v1/models` 及其能力目录；网页登录 JWT 不能作为模型 Key。订阅分组不受名称前缀限制，普通分组要求 `智枢router-ccs-` 前缀，专用 Key 名为 `zhishu-ccs-<platform>-<group-id>`。
@@ -187,7 +188,7 @@
 - [ ] 平台目录刷新不写 Agent 配置；Agent 同步不发平台请求、不新建/撤销 Key、不刷新额度；缺快照或凭证已清理时提示先同步平台数据。
 - [ ] 覆盖首次已有配置、外部编辑、正常内部切换和部分失败；同步不做检测与确认，外部修改不阻塞同步，报告准确区分数据库与原生文件变化，部分失败同样留痕。
 - [ ] 同步超时或部分失败能提示并重试，不阻塞已登录状态下的本地供应商使用；失败分组、过期/暂停订阅、本地自建项及其他账号项不误删。
-- [ ] 退出后目录元数据保留、Key 不可查看或应用，重新同步后恢复；验证切换账号、托管 Key 清理、缓存清理及迟到响应隔离。
+- [ ] 退出后保留目录、供应商和工具配置中的 API Key，登录会话不可恢复；未登录不能经平台接口查看或同步 Key，同账号重新登录可复用目录。验证切换账号、前端缓存清理、迟到响应隔离及旧版本已清理凭证快照的兼容。
 - [ ] command 改动同时验证前端参数/返回类型、Rust 序列化和 mock；新应用另测原生配置样例及平台白名单边界。
 
 相关回归入口：`tests/lib/platformAuth.test.ts`、`platformModels.test.ts`，`tests/components/PlatformLogin.test.tsx`、`PlatformCatalogPage.test.tsx`、`PlatformConnectButton.test.tsx`、`PlatformUsageFooter.test.tsx`、`ConfigChangeHistory.test.tsx`；后端见 `platform_auth.rs`、`platform_session.rs`、`platform_models.rs` 及其子模块、`config_history.rs` 的同文件测试。

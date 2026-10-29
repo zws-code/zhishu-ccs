@@ -160,6 +160,8 @@ impl SessionStore {
             Err(err) => Err(err),
         }
     }
+    // 保留只读账户元数据入口；退出登录不再据此清理工具凭证。
+    #[allow(dead_code)]
     pub async fn identity(&self) -> Result<Option<(String, i64)>, PlatformAuthError> {
         self.blocking(|store| {
             Ok(store

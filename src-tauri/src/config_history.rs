@@ -627,17 +627,26 @@ pub fn clear() -> Result<usize, AppError> {
 
 /// 独立记录供应商同步的数据库与文件变化；兼容旧报告的备份路径，不伪造文件差异。
 pub(crate) fn record_provider_sync(app: &str, report: ProviderSyncReport) -> Result<(), AppError> {
+    record_provider_change(app, "platform_sync", report)
+}
+
+/// 平台供应商的同步或显式删除报告；均不可作为单文件还原快照。
+pub(crate) fn record_provider_change(
+    app: &str,
+    action: &str,
+    report: ProviderSyncReport,
+) -> Result<(), AppError> {
     let record = ConfigChangeRecord {
         id: event_id(),
         app: app.into(),
         path: report.backup_path.clone().unwrap_or_else(|| {
             DeviceStore::for_device()
-                .file("platform-sync-history.json")
+                .file(&format!("{}-history.json", action.replace('_', "-")))
                 .to_string_lossy()
                 .into_owned()
         }),
         changed_at: Local::now().to_rfc3339(),
-        action: "platform_sync".into(),
+        action: action.into(),
         before: None,
         after: None,
         sensitive: false,

@@ -1,5 +1,14 @@
 {
   "platformCatalog": {
+    "deleteAllHint": "刪除目前帳號在所有 Agent 應用程式中的平台供應商（含未顯示的應用程式），保留平台基礎資料和伺服器端 Key。",
+    "deleteAllResult": "所有 Agent 應用程式刪除結果",
+    "deleteResultApp": "Agent 應用程式",
+    "deleteResultStatus": "刪除結果",
+    "deleteAppFailed": "刪除失敗：{{message}}",
+    "deleteProviders": "一鍵刪除平台供應商",
+    "deletingProviders": "正在刪除平台供應商…",
+    "deleteAction": "平台供應商刪除",
+    "deleteCompleted": "已刪除 {{removed}} 個平台供應商，保留 {{skipped}} 個",
     "syncAction": "平台供應商同步",
     "syncResult": "供應商同步結果",
     "syncResultDescription": "查看本次同步結果、原生設定檔變更與備份位置。",

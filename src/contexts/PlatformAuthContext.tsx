@@ -215,7 +215,7 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
     }
   };
   const logout = async () => {
-    // 先阻断前端旧请求并清空账户缓存，再让 Rust 清理本机会话、目录 Key 和托管凭证。
+    // 先阻断前端旧请求并清空账户缓存，再让 Rust 清理登录会话；本地 API Key 保留。
     const current = ++generation.current;
     accountRef.current = null;
     setAutoSyncing(false);

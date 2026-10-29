@@ -269,6 +269,7 @@ export function ConfigChangeHistoryPanel({
         remove_provider: "settings.configHistory.actions.removeProvider",
         config_update: "settings.configHistory.actions.configUpdate",
         platform_sync: "platformCatalog.syncAction",
+        platform_delete: "platformCatalog.deleteAction",
       };
       return t(keys[action] ?? "settings.configHistory.actions.other", {
         defaultValue: action,

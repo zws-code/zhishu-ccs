@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Database, Loader2, RefreshCw } from "lucide-react";
+import { Database, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { AppPageHeader } from "@/components/shell/AppPageHeader";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetTrigger } from "@/components/ui/sheet";
 import { PlatformConnectButton } from "./PlatformConnectButton";
 import { PlatformCatalogDetails } from "./PlatformCatalogDetails";
+import { PlatformProviderDeletionResult } from "./PlatformProviderDeletionResult";
+import { usePlatformProviderDeletion } from "@/hooks/usePlatformProviderDeletion";
 import { usePlatformAuth } from "@/contexts/PlatformAuthContext";
 import { platformAuthError } from "@/lib/api/platformAuth";
 import { platformModelsApi } from "@/lib/api/platformModels";
@@ -16,13 +18,14 @@ import {
 } from "@/lib/query/platformCatalog";
 import { toast } from "@/lib/toast";
 
-/** 展示设备快照，并分别提供联网更新基础数据和本地同步供应商两个入口。 */
+/** 展示设备快照，提供联网更新基础数据、本地同步及全应用删除供应商入口。 */
 export function PlatformCatalogPage() {
   const { t, i18n } = useTranslation();
   const auth = usePlatformAuth();
   const account = auth?.account;
   const queryClient = useQueryClient();
   const catalog = usePlatformCatalog();
+  const deletion = usePlatformProviderDeletion(null);
   const sync = useMutation({
     mutationFn: () => (auth?.syncCatalog ?? platformModelsApi.syncCatalog)(),
     onSuccess: async (result) => {
@@ -68,16 +71,42 @@ export function PlatformCatalogPage() {
         title={t("platformCatalog.title", "平台基础数据")}
         actions={
           <>
+            <Button
+              variant="outline"
+              className="text-danger hover:text-danger"
+              disabled={deletion.disabled || sync.isPending}
+              aria-busy={deletion.pending}
+              title={t(
+                "platformCatalog.deleteAllHint",
+                "删除当前账号在所有 Agent 应用中的平台供应商（含未显示应用），保留平台基础数据和服务端 Key。",
+              )}
+              onClick={deletion.remove}
+            >
+              {deletion.pending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              {deletion.pending
+                ? t("platformCatalog.deletingProviders", "正在删除平台供应商…")
+                : t("platformCatalog.deleteProviders", "一键删除平台供应商")}
+            </Button>
             <PlatformConnectButton
               disabled={
                 !data ||
                 data.credentialsCleared ||
+                deletion.pending ||
                 sync.isPending ||
                 auth?.catalogSyncing
               }
             />
             <Button
-              disabled={!account || sync.isPending || auth?.catalogSyncing}
+              disabled={
+                !account ||
+                sync.isPending ||
+                auth?.catalogSyncing ||
+                deletion.pending
+              }
               aria-busy={sync.isPending || auth?.catalogSyncing}
               onClick={() => sync.mutate()}
             >
@@ -134,6 +163,14 @@ export function PlatformCatalogPage() {
             )}
           </div>
         </div>
+        {deletion.error && (
+          <p role="alert" className="mb-4 text-danger">
+            {deletion.error}
+          </p>
+        )}
+        {deletion.result && (
+          <PlatformProviderDeletionResult result={deletion.result} />
+        )}
         {catalog.isLoading && (
           <p role="status">
             {t("platformCatalog.loading", "正在读取本地基础数据…")}

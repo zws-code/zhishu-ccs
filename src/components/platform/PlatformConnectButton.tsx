@@ -1,4 +1,8 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useIsMutating,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { Loader2, RefreshCw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { AppId } from "@/lib/api";
@@ -21,7 +25,9 @@ export function PlatformConnectButton({
   const { t } = useTranslation();
   const auth = usePlatformAuth();
   const queryClient = useQueryClient();
+  const deleting = useIsMutating({ mutationKey: ["platformDeleteProviders"] });
   const sync = useMutation({
+    mutationKey: ["platformSyncProviders"],
     mutationFn: (agent: AppId | undefined) => platformModelsApi.sync(agent),
     onSuccess: async (result, agent) => {
       await refreshPlatformProviders(queryClient, agent);
@@ -74,7 +80,7 @@ export function PlatformConnectButton({
     <Button
       variant="outline"
       size="regular"
-      disabled={disabled || sync.isPending}
+      disabled={disabled || sync.isPending || deleting > 0}
       aria-busy={sync.isPending}
       title={t(
         "platformCatalog.localHint",

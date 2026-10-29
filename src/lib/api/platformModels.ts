@@ -11,6 +11,25 @@ export interface PlatformSyncSummary {
   nativeFilesChanged?: number;
 }
 
+/** 显式删除结果；skipped 为未能安全删除的目标数，warnings 包含原因。 */
+export interface PlatformDeleteSummary {
+  removed: number;
+  skipped: number;
+  warnings: string[];
+  nativeFilesChanged: number;
+  /** 全应用删除时返回；应用级失败的数量不可用，应展示 error。 */
+  apps?: PlatformDeleteAppResult[];
+}
+
+export interface PlatformDeleteAppResult {
+  agent: AppId;
+  removed: number;
+  skipped: number;
+  warnings: string[];
+  nativeFilesChanged: number;
+  error?: { code: string; message: string };
+}
+
 /** 当前账户的目录摘要，不含模型 Key；syncedAt 使用 Unix 毫秒。 */
 export interface PlatformCatalog {
   baseUrl: string;
@@ -50,6 +69,13 @@ export interface PlatformCatalogModel {
 }
 
 export const platformModelsApi = {
+  // null 删除当前账户在全部已支持应用中的托管供应商。
+  deleteProviders: (agent: AppId | null, baseUrl: string, userId: number) =>
+    invoke<PlatformDeleteSummary>("platform_delete_providers", {
+      agent,
+      baseUrl,
+      userId,
+    }),
   // 页面读取只访问设备快照，不触发平台拉取或工具配置写入。
   catalog: () => invoke<PlatformCatalog | null>("platform_get_catalog"),
   // 单个 Key 仅用于显式查看/复制，不得放入 TanStack Query 缓存。

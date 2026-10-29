@@ -1,5 +1,14 @@
 {
   "platformCatalog": {
+    "deleteAllHint": "Delete the current account’s platform providers across all Agent apps, including hidden apps. Keep platform base data and server keys.",
+    "deleteAllResult": "Deletion results for all Agent apps",
+    "deleteResultApp": "Agent app",
+    "deleteResultStatus": "Deletion result",
+    "deleteAppFailed": "Deletion failed: {{message}}",
+    "deleteProviders": "Delete all platform providers",
+    "deletingProviders": "Deleting platform providers…",
+    "deleteAction": "Platform provider deletion",
+    "deleteCompleted": "Deleted {{removed}} platform providers; kept {{skipped}}",
     "syncAction": "Platform provider sync",
     "syncResult": "Provider sync result",
     "syncResultDescription": "View this sync's results, native file changes, and backup location.",
