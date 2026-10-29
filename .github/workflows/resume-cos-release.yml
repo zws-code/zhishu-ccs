@@ -86,6 +86,8 @@ jobs:
         run: python scripts/publish-cos.py cos-payload --dry-run
       - name: Install COS SDK
         run: python -m pip install -r scripts/cos-requirements.txt
+      - name: Check actual COS SDK upload contract
+        run: python -B -m unittest discover -s scripts -p 'test_publish_cos.py' -k CosSdkContractTests
       - name: Resume COS publication without rebuilding
         env:
           COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}

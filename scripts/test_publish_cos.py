@@ -223,12 +223,39 @@ class CosAdapterTests(unittest.TestCase):
             path = Path(directory) / "test.msi"
             path.write_bytes(b"installer")
             store.put("ccs/stable/v1.0.0/test.msi", path, True)
-            self.assertEqual(captured[-1]["Metadata"], {"x-cos-meta-sha256": module.digest(path)})
-            self.assertEqual(captured[-1]["ForbidOverwrite"], "true")
+            self.assertEqual(captured[-1]["Metadata"], {"x-cos-meta-sha256": module.digest(path), "x-cos-forbid-overwrite": "true"})
+            self.assertNotIn("ForbidOverwrite", captured[-1])
             self.assertTrue(captured[-1]["EnableMD5"])
             store.put("ccs/stable/latest.json", path, False)
-            self.assertEqual(captured[-1]["ForbidOverwrite"], "false")
+            self.assertEqual(captured[-1]["Metadata"]["x-cos-forbid-overwrite"], "false")
             self.assertEqual(captured[-1]["CacheControl"], "public, max-age=60")
+
+
+class CosSdkContractTests(unittest.TestCase):
+    def test_real_sdk_serializes_immutable_header_and_md5_without_network(self):
+        try:
+            import qcloud_cos
+        except ImportError:
+            self.skipTest("COS SDK is checked separately after installation in publication CI")
+        store = module.CosStore({
+            "COS_BUCKET": "sdk-contract-1234567890", "COS_REGION": "ap-guangzhou",
+            "COS_SECRET_ID": "test-id", "COS_SECRET_KEY": "test-key",
+        })
+        requests = []
+        def capture(**kwargs):
+            requests.append(kwargs)
+            return types.SimpleNamespace(headers={"ETag": "test"})
+        store.client.send_request = capture
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "test.msi"
+            path.write_bytes(b"actual SDK contract")
+            for immutable in (True, False):
+                store.put("ccs/stable/v1.0.0/test.msi", path, immutable)
+                headers = requests[-1]["headers"]
+                self.assertEqual(headers["x-cos-forbid-overwrite"], str(immutable).lower())
+                self.assertEqual(headers["x-cos-meta-sha256"], module.digest(path))
+                self.assertIn("Content-MD5", headers)
+                self.assertEqual(requests[-1]["method"], "PUT")
 
 
 if __name__ == "__main__":

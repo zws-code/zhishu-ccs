@@ -153,8 +153,12 @@ class CosStore:
         with path.open("rb") as stream:
             self.client.put_object(
                 Bucket=self.bucket, Key=key, Body=stream, EnableMD5=True,
-                ForbidOverwrite="true" if immutable else "false",
-                Metadata={"x-cos-meta-sha256": digest(path)},
+                # SDK 1.9.44 has no ForbidOverwrite keyword. Its Metadata map
+                # passes header names through unchanged, including custom COS headers.
+                Metadata={
+                    "x-cos-meta-sha256": digest(path),
+                    "x-cos-forbid-overwrite": "true" if immutable else "false",
+                },
                 ContentType="application/json" if path.suffix == ".json" else "application/octet-stream",
                 CacheControl="public, max-age=31536000, immutable" if immutable else "public, max-age=60",
             )
@@ -208,6 +212,7 @@ def publish(directory, store, prefix, base, check=public_check, wait=retry_publi
     # Reserve the exact inputs before any installer upload, so a failed upload can
     # resume but another build cannot replace this version's contents.
     version_prefix = prefix + "/" + receipt["tag"] + "/"
+    print("Reserving immutable release inputs", flush=True)
     store.ensure(version_prefix + "release.json", directory / "release.json")
     for item in receipt["files"]:
         print("Uploading/verifying " + item["name"], flush=True)
