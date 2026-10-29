@@ -1,8 +1,8 @@
 # 智枢客户端：GitHub Actions + 腾讯云 COS/CDN 发布
 
-客户端正式发布只使用本流程：GitHub Actions 构建和签名 → COS 保存版本文件 → HTTPS 分发安装包和更新清单；有自有域名后再接 CDN。此文档是唯一发布操作入口。
+客户端正式发布只使用本流程：GitHub Actions 构建和签名 → COS 保存版本文件并切换更新清单 → GitHub Release 附上同一批安装包。客户端使用 COS HTTPS 更新源，有自有域名后再接 CDN；GitHub Releases 提供额外的安装包下载入口。此文档是唯一发布操作入口。
 
-仓库：<https://github.com/zws-code/zhishu-ccs>。旧本地打包后 SSH 上传的二开脚本和配置示例已删除；本仓库不发布 GitHub Release，也不运行上游 R2 镜像。上游相关实现保留，仅允许在上游仓库执行。
+仓库：<https://github.com/zws-code/zhishu-ccs>。旧本地打包后 SSH 上传的二开脚本和配置示例已删除；本仓库在 COS 发布成功后自动创建智枢 GitHub Release，不运行上游 R2 镜像。上游相关实现保留，仅允许在上游仓库执行。
 
 本次作为首次正式发布，不兼容旧测试包的更新入口；旧测试用户直接安装正式包。后续正式版本必须沿用本次的应用身份、Windows 安装身份及更新公钥。
 
@@ -15,6 +15,7 @@
 - 用户已在 GitHub 添加桶/平台变量、COS 上传凭据及更新签名密钥，macOS 选择 `adhoc`。构建变量与更新签名已通过实际 Actions 演练，COS 凭据和权限尚未通过真实上传验证；不能称已完成 Apple 公证。
 - 已推送发布流程提交，并启动[首次手动演练](https://github.com/zws-code/zhishu-ccs/actions/runs/40816726762)：配置预检与 Node 回归通过，Python 回归暴露 Ubuntu 22.04 系统 Python 3.10 不支持 `hashlib.file_digest`，已改为兼容的分块哈希并补回归。[第二次演练](https://github.com/zws-code/zhishu-ccs/actions/runs/40817286547)的配置、Node/Python 回归及 TypeScript 预检通过，随后运行被取消，尚未完成各平台编译。
 - [第三次演练（2026-10-29）](https://github.com/zws-code/zhishu-ccs/actions/runs/40818363265)在 `codex/cos-validation` 分支、提交 `7e8b7079fb7d5cdd376b763913860e774602e447` 上全部成功：9 个作业通过，完成 macOS universal、Windows x64/ARM64、Linux x64/ARM64 的编译与打包、更新签名校验、两份清单生成和 COS 发布预演；最终产物 `cos-payload-v0.0.1` 已保存，COS SDK 安装与真实上传步骤按设计跳过。
+- 已新增 COS 成功后创建 GitHub Release 的独立作业，仅正式 tag 触发；该步骤尚未通过真实正式发布验收，已有演练产物不会自动补发到 Releases。
 - 本次没有部署/重启平台，没有上传 COS 安装包，尚未验证真实系统安装与更新。
 
 ## 1. 准备腾讯云 COS 和 CDN
@@ -125,7 +126,9 @@ Windows 更新包始终有 Tauri 更新签名；这不表示已经配置 Windows
 
 在 `Settings → Environments` 创建 `cos-production`。如仓库套餐支持，可设置 Required reviewers 和 tag 部署规则。这样推 tag 会自动构建，验证通过后由批准者决定何时切换稳定更新。
 
-手动演练使用 `release-validation` 环境，不上传 COS；已有构建作业继续使用 `release` 环境。不要只把共享变量或签名私钥放在 `cos-production`，构建阶段无法读取它们。
+GitHub Release 使用工作流自动提供的 `GITHUB_TOKEN`，无需新增个人访问令牌；仅独立 Release 作业申请 `contents: write`，构建与 COS 作业继续使用只读仓库权限。如组织策略限制令牌写入，需要仓库管理员允许该权限。
+
+手动演练使用 `release-validation` 环境，不上传 COS、不创建 GitHub Release；已有构建作业继续使用 `release` 环境。不要只把共享变量或签名私钥放在 `cos-production`，构建阶段无法读取它们。
 
 ## 4. 首次演练
 
@@ -145,7 +148,7 @@ git push zhishu-git <你的发布分支>
 git push zhishu-git HEAD:refs/heads/codex/cos-validation
 ```
 
-该分支推送使用 `release-validation` 环境；COS 上传和 SDK 安装步骤仍要求 `push` 事件且 `ref_type=tag`，分支推送不会发布。只在需要演练时推送该专用分支。
+该分支推送使用 `release-validation` 环境；COS 上传和 SDK 安装步骤仍要求 `push` 事件且 `ref_type=tag`，分支推送不会发布 COS 或创建 GitHub Release。只在需要演练时推送该专用分支。
 
 在 GitHub `Actions → Release to Tencent COS → Run workflow` 选择该分支。手动运行会完成配置检查、多平台构建、签名校验和本地发布预演，产物保存为 Actions artifact；**不会上传 COS、不会替换正式清单、不会创建 GitHub Release**。
 
@@ -179,6 +182,7 @@ git push zhishu-git v<新版本号>
 5. 检查 COS 旧版清单，拒绝降版本、漏已发布平台和同版本不同内容。
 6. 先预留不可变版本输入，再上传版本目录，检查 COS 对象和 CDN 公网文件。
 7. 公网检查通过后，依次发布根目录 `client-release.json`、`latest.json`，读回校验并等待 CDN 清单与本地一致。
+8. COS 作业成功后，独立作业下载同一份 `cos-payload-v<版本>` artifact，创建正式、非预发布的 GitHub Release，设为 Latest，并附上全部已验证安装包、签名及清单。在仓库右侧 **Releases** 或工作流摘要中的下载链接进入。macOS 发布说明按实际签名模式生成，不把 `adhoc` 称为 Apple 公证。
 
 两个 COS 对象不能作为一个事务同时替换。若第二份清单发布失败，网站可能先看到新版，但客户端仍使用旧更新清单；此时应重试同一批原产物，不自动回滚已验证的安装包。正式客户端的更新入口最后切换。
 
@@ -196,6 +200,8 @@ git push zhishu-git v<新版本号>
 | 清单 CDN 验证失败 | 检查清单 TTL 是否超过 60 秒；修复后重试，不要重编译覆盖原版本 |
 | 同版本输入不同 | 若原版本已预留/上传，使用更高版本，不能覆盖历史产物 |
 | 旧版本晚于新版构建完成 | 拒绝把稳定源降回旧版本；使用更高补丁版本修复 |
+
+GitHub Release 失败不会回滚已经发布的 COS 更新源。如果只有 GitHub Release 作业失败，在 Actions 使用 **Re-run failed jobs**，只重试 Release 作业，继续下载原 COS payload，不重编译或再次上传 COS。已存在的同名 GitHub 附件不覆盖；缺少的附件继续上传。
 
 发布失败时在 Actions 使用 **Re-run failed jobs**，复用原构建 artifacts。清单时间取提交时间，重试不会因当前时间改变生成不同的输入。不要重跑全部构建后用不同安装包覆盖已预留的版本；超过 artifact 保存期限时优先发新版本。
 

@@ -1087,7 +1087,7 @@ jobs:
           COS_SESSION_TOKEN: ${{ secrets.COS_SESSION_TOKEN }}
         run: python scripts/publish-cos.py cos-payload
 
-      # 上游兼容入口保留；智枢仓库只发布 COS，不执行此步骤。
+      # 上游兼容入口保留；智枢仓库由后续独立作业创建 Release。
       - name: Upload Release Assets
         if: github.repository == 'farion1231/cc-switch'
         uses: softprops/action-gh-release@v3
@@ -1117,3 +1117,52 @@ jobs:
           files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-github-release:
+    name: Publish GitHub Release after COS
+    needs: [whats-new-check, publish-release]
+    if: github.repository == 'zws-code/zhishu-ccs' && github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified COS payload
+        uses: actions/download-artifact@v8
+        with:
+          name: cos-payload-${{ needs.whats-new-check.outputs.tag }}
+          path: cos-payload
+
+      - name: Publish signed installers on GitHub
+        id: github-release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.whats-new-check.outputs.tag }}
+          name: 智枢 CCS ${{ needs.whats-new-check.outputs.tag }}
+          draft: false
+          prerelease: false
+          make_latest: 'true'
+          overwrite_files: false
+          fail_on_unmatched_files: true
+          files: cos-payload/*
+          body: |
+            智枢 CCS ${{ needs.whats-new-check.outputs.tag }}
+
+            ### 下载安装包
+
+            在下方 Assets 中选择对应系统的文件：
+            - macOS（Intel / Apple Silicon 通用）：`.dmg`，也可使用 `.zip`。
+            - Windows x64：`-Windows.msi`；Windows ARM64：`-Windows-arm64.msi`。
+            - Linux：选择对应架构的 `.AppImage`、`.deb` 或 `.rpm`。
+            - `.tar.gz` 和 `.sig` 用于客户端更新与签名校验。
+
+            [COS 下载清单](${{ env.COS_PUBLIC_BASE_URL }}/${{ needs.whats-new-check.outputs.tag }}/client-release.json)
+
+            客户端自动更新继续使用 COS 更新源；GitHub 提供相同发布文件的下载入口。
+
+            ${{ env.MACOS_SIGNING_MODE == 'developer-id' && 'macOS 安装包已通过 Developer ID 签名与 Apple 公证。' || 'macOS 安装包使用 ad-hoc 签名，未经过 Apple 公证，首次安装可能被系统拦截。' }}
+            Windows 安装包的 Tauri 更新签名不代表 Windows 系统代码签名。
+
+      - name: Show GitHub Release download link
+        env:
+          RELEASE_URL: ${{ steps.github-release.outputs.url }}
+        run: echo "[下载安装包 / GitHub Release]($RELEASE_URL)" >> "$GITHUB_STEP_SUMMARY"
