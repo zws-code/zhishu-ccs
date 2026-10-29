@@ -1,5 +1,11 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PlatformBulkSyncButtons } from "@/zhishu/models/components/PlatformBulkSyncButtons";
 import type { AppId } from "@/lib/api/index";
@@ -43,7 +49,11 @@ import { toast } from "@/lib/toast";
 
 function provider(
   id: string,
-  options: { platform?: boolean; userId?: number; liveConfigManaged?: boolean } = {},
+  options: {
+    platform?: boolean;
+    userId?: number;
+    liveConfigManaged?: boolean;
+  } = {},
 ): Provider {
   return {
     id,
@@ -74,15 +84,18 @@ function renderButtons(
   modeView: AppMode | null,
   providers: Provider[],
 ) {
-  return render(
-    <QueryClientProvider client={createTestQueryClient()}>
+  const client = createTestQueryClient();
+  const ui = () => (
+    <QueryClientProvider client={client}>
       <PlatformBulkSyncButtons
         app={app}
         modeView={modeView}
         providers={providers}
       />
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const view = render(ui());
+  return { ...view, refreshAccount: () => view.rerender(ui()) };
 }
 
 function stackWith(memberIds: string[]): ProxyStack {
@@ -118,20 +131,16 @@ beforeEach(() => {
 
 describe("PlatformBulkSyncButtons visibility", () => {
   it("shows nothing for mode apps outside the stack view", () => {
-    const { container } = renderButtons(
-      "codex",
-      "direct",
-      [provider("p1", { platform: true })],
-    );
+    const { container } = renderButtons("codex", "direct", [
+      provider("p1", { platform: true }),
+    ]);
     expect(container).toBeEmptyDOMElement();
   });
 
   it("shows nothing for mode apps without a stack mode", () => {
-    const { container } = renderButtons(
-      "gemini",
-      null,
-      [provider("p1", { platform: true })],
-    );
+    const { container } = renderButtons("gemini", null, [
+      provider("p1", { platform: true }),
+    ]);
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -153,6 +162,66 @@ describe("PlatformBulkSyncButtons visibility", () => {
 });
 
 describe("PlatformBulkSyncButtons on additive apps", () => {
+  it("keeps bulk writes disabled when the native membership query fails", async () => {
+    vi.mocked(providersApi.getOpenCodeLiveProviderIds).mockRejectedValue(
+      new Error("unreadable config"),
+    );
+    renderButtons("opencode", null, [provider("p1", { platform: true })]);
+    await act(async () => {});
+    await waitFor(() =>
+      expect(providersApi.getOpenCodeLiveProviderIds).toHaveBeenCalled(),
+    );
+    expect(screen.getByRole("button", { name: "一键添加" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "一键移除" })).toBeDisabled();
+    expect(providersApi.switch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["add", "unmount"],
+    ["remove", "unmount"],
+    ["add", "logout"],
+    ["remove", "logout"],
+  ] as const)(
+    "stops remaining bulk %s writes after %s",
+    async (action, change) => {
+      let finish!: (value: boolean) => void;
+      const call =
+        action === "add"
+          ? providersApi.addToLiveConfig
+          : providersApi.removeFromLiveConfig;
+      vi.mocked(call).mockReturnValueOnce(
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+      );
+      const view = renderButtons("kimi", null, [
+        provider("p1", {
+          platform: true,
+          liveConfigManaged: action === "remove",
+        }),
+        provider("p2", {
+          platform: true,
+          liveConfigManaged: action === "remove",
+        }),
+      ]);
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: action === "add" ? "一键添加" : "一键移除",
+        }),
+      );
+      await waitFor(() => expect(call).toHaveBeenCalledTimes(1));
+      if (change === "unmount") view.unmount();
+      else {
+        auth.signedIn = false;
+        view.refreshAccount();
+      }
+      await act(async () => finish(true));
+      expect(call).toHaveBeenCalledTimes(1);
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(toast.warning).not.toHaveBeenCalled();
+    },
+  );
+
   it("adds every unadded platform provider through the app add path", async () => {
     vi.mocked(providersApi.getOpenCodeLiveProviderIds).mockResolvedValue([
       "p2",

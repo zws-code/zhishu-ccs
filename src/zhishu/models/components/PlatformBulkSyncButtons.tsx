@@ -8,10 +8,10 @@ import type { AppId } from "@/lib/api/index";
 import { providersApi } from "@/lib/api/providers";
 import { proxyApi } from "@/lib/api/proxy";
 import { usePlatformAuth } from "@/zhishu/auth/PlatformAuthContext";
+import { usePlatformOperationScope } from "@/zhishu/auth/usePlatformOperationScope";
 import { isAdditiveAppId, isStackAppId } from "@/config/appConfig";
 import { useConfigMembership } from "@/zhishu/integrations/ccswitch/useConfigMembership";
-import { useSwitchProviderMutation } from "@/lib/query/mutations";
-import { refreshAdditiveLiveState } from "@/zhishu/integrations/ccswitch/additiveLiveState";
+import { refreshPlatformProviders } from "@/zhishu/integrations/ccswitch/platformProviders";
 import { useProxyStack } from "@/lib/query/proxy";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/lib/toast";
@@ -37,6 +37,7 @@ export function PlatformBulkSyncButtons({
   const queryClient = useQueryClient();
   const auth = usePlatformAuth();
   const account = auth?.account;
+  const captureScope = usePlatformOperationScope(account, `${app}:${modeView}`);
   const inStackView = modeView === "stack" && isStackAppId(app);
   const applies =
     Boolean(account) &&
@@ -59,14 +60,16 @@ export function PlatformBulkSyncButtons({
   // 纯属「有平台供应商可操作」的副产品，不能干扰列表自己的成员查询
   const active = applies && platformProviders.length > 0;
 
-  const { isInConfig, isPending: membershipPending } = useConfigMembership(
+  const { isInConfig, isReady: membershipReady } = useConfigMembership(
     app,
     active && isAdditiveAppId(app),
   );
-  const { data: stack } = useProxyStack(app, active && inStackView);
+  const { data: stack, isSuccess: stackSuccess } = useProxyStack(
+    app,
+    active && inStackView,
+  );
 
-  const membershipReady = !isAdditiveAppId(app) || !membershipPending;
-  const stackReady = !inStackView || Boolean(stack);
+  const stackReady = !inStackView || stackSuccess;
   const memberIds = useMemo(
     () => new Set((stack?.members ?? []).map((member) => member.providerId)),
     [stack?.members],
@@ -75,7 +78,7 @@ export function PlatformBulkSyncButtons({
   const { addTargets, removeTargets } = useMemo(() => {
     const addTargets: Provider[] = [];
     const removeTargets: Provider[] = [];
-    if (membershipReady && stackReady) {
+    if ((!isAdditiveAppId(app) || membershipReady) && stackReady) {
       for (const provider of platformProviders) {
         const included = inStackView
           ? memberIds.has(provider.id)
@@ -93,13 +96,19 @@ export function PlatformBulkSyncButtons({
     isInConfig,
   ]);
 
-  const switchMutation = useSwitchProviderMutation(app);
   const bulk = useMutation({
-    mutationFn: async (action: "add" | "remove") => {
+    mutationFn: async ({
+      action,
+      isCurrent,
+    }: {
+      action: "add" | "remove";
+      isCurrent: () => boolean;
+    }) => {
       const targets = action === "add" ? addTargets : removeTargets;
       const failures: string[] = [];
       const notices = new Set<string>();
       for (const provider of targets) {
+        if (!isCurrent()) return null;
         try {
           if (isAdditiveAppId(app)) {
             if (action === "add") {
@@ -107,7 +116,8 @@ export function PlatformBulkSyncButtons({
               if (app === "kimi") {
                 await providersApi.addToLiveConfig(provider.id, app);
               } else {
-                await switchMutation.mutateAsync(provider.id);
+                const result = await providersApi.switch(provider.id, app);
+                for (const warning of result.warnings) notices.add(warning);
               }
             } else {
               await providersApi.removeFromLiveConfig(provider.id, app);
@@ -130,13 +140,18 @@ export function PlatformBulkSyncButtons({
       }
       return { action, total: targets.length, failures, notices: [...notices] };
     },
-    onSuccess: async ({ action, total, failures, notices }) => {
-      if (isAdditiveAppId(app)) {
-        // switch 路径的每次成功调用已自带各自的缓存失效，这里补移除路径和 Kimi 添加
-        await refreshAdditiveLiveState(queryClient, app);
-      } else {
-        await queryClient.invalidateQueries({ queryKey: ["providers", app] });
+    onSuccess: async (result, { isCurrent }) => {
+      if (!result || !isCurrent()) return;
+      const { action, total, failures, notices } = result;
+      // Reuse the controlled provider IPC, but refresh once per batch in its originating session.
+      await refreshPlatformProviders(queryClient, app);
+      if (!isCurrent()) return;
+      try {
+        await providersApi.updateTrayMenu();
+      } catch {
+        // Tray refresh must not turn completed config writes into a failed batch.
       }
+      if (!isCurrent()) return;
       if (total === 0) return;
       const done = total - failures.length;
       if (failures.length === 0) {
@@ -172,7 +187,7 @@ export function PlatformBulkSyncButtons({
 
   if (!active) return null;
 
-  const busyAction = bulk.variables;
+  const busyAction = bulk.variables?.action;
   const addHint = t(
     inStackView
       ? "platformCatalog.bulkAddStackHint"
@@ -202,7 +217,9 @@ export function PlatformBulkSyncButtons({
         disabled={bulk.isPending || addTargets.length === 0}
         aria-busy={bulk.isPending && busyAction === "add"}
         title={addHint}
-        onClick={() => bulk.mutate("add")}
+        onClick={() =>
+          bulk.mutate({ action: "add", isCurrent: captureScope() })
+        }
       >
         {bulk.isPending && busyAction === "add" ? (
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -217,7 +234,9 @@ export function PlatformBulkSyncButtons({
         disabled={bulk.isPending || removeTargets.length === 0}
         aria-busy={bulk.isPending && busyAction === "remove"}
         title={removeHint}
-        onClick={() => bulk.mutate("remove")}
+        onClick={() =>
+          bulk.mutate({ action: "remove", isCurrent: captureScope() })
+        }
       >
         {bulk.isPending && busyAction === "remove" ? (
           <Loader2 className="h-4 w-4 animate-spin" />

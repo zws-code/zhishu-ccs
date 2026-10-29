@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PlatformConnectButton } from "@/zhishu/models/components/PlatformConnectButton";
@@ -6,10 +12,16 @@ import { platformModelsApi } from "@/zhishu/api/platformModels";
 import { toast } from "@/lib/toast";
 import type { AppId } from "@/lib/api/index";
 
-const auth = vi.hoisted(() => ({ signedIn: true }));
+const auth = vi.hoisted(() => ({
+  signedIn: true,
+  userId: 1,
+  baseUrl: "https://platform.test",
+}));
 vi.mock("@/zhishu/auth/PlatformAuthContext", () => ({
   usePlatformAuth: () => ({
-    account: auth.signedIn ? { user: { id: 1 } } : null,
+    account: auth.signedIn
+      ? { baseUrl: auth.baseUrl, user: { id: auth.userId } }
+      : null,
   }),
 }));
 vi.mock("@/zhishu/api/platformModels", () => ({
@@ -24,17 +36,20 @@ function renderButton(app: AppId = "claude") {
     defaultOptions: { mutations: { retry: false } },
   });
   const invalidate = vi.spyOn(client, "invalidateQueries");
-  const view = render(
+  const ui = () => (
     <QueryClientProvider client={client}>
       <PlatformConnectButton app={app} />
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
-  return { ...view, invalidate };
+  const view = render(ui());
+  return { ...view, invalidate, refreshAccount: () => view.rerender(ui()) };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   auth.signedIn = true;
+  auth.userId = 1;
+  auth.baseUrl = "https://platform.test";
   vi.mocked(platformModelsApi.sync).mockReset().mockResolvedValue({
     added: 2,
     removed: 1,
@@ -145,6 +160,75 @@ describe("sync current platform service providers", () => {
     );
     expect(toast.success).not.toHaveBeenCalled();
   });
+
+  it.each([false, true])(
+    "ignores a late sync result after unmount (failure=%s)",
+    async (fails) => {
+      let finish!: () => void;
+      vi.mocked(platformModelsApi.sync).mockReturnValueOnce(
+        new Promise((resolve, reject) => {
+          finish = () =>
+            fails
+              ? reject(new Error("old operation"))
+              : resolve({
+                  added: 1,
+                  removed: 0,
+                  skipped: 0,
+                  warnings: [],
+                });
+        }),
+      );
+      const view = renderButton();
+      fireEvent.click(screen.getByRole("button"));
+      await waitFor(() =>
+        expect(platformModelsApi.sync).toHaveBeenCalledTimes(1),
+      );
+      view.unmount();
+      await act(async () => finish());
+      expect(view.invalidate).not.toHaveBeenCalled();
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
+    },
+  );
+
+  it("refreshes the actual Claude Desktop status query after synchronization", async () => {
+    const { invalidate } = renderButton("claude-desktop");
+    fireEvent.click(screen.getByRole("button"));
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: ["claudeDesktopStatus"],
+    });
+  });
+
+  it.each(["logout", "user", "origin"])(
+    "ignores pending sync after an account %s change",
+    async (change) => {
+      let finish!: () => void;
+      vi.mocked(platformModelsApi.sync).mockReturnValueOnce(
+        new Promise((resolve) => {
+          finish = () =>
+            resolve({ added: 1, removed: 0, skipped: 0, warnings: [] });
+        }),
+      );
+      const view = renderButton();
+      fireEvent.click(screen.getByRole("button"));
+      await waitFor(() =>
+        expect(platformModelsApi.sync).toHaveBeenCalledTimes(1),
+      );
+      if (change === "logout") auth.signedIn = false;
+      if (change === "user") auth.userId = 2;
+      if (change === "origin") auth.baseUrl = "https://another.test";
+      view.refreshAccount();
+      // Returning to the same account must not revive the abandoned operation.
+      auth.signedIn = true;
+      auth.userId = 1;
+      auth.baseUrl = "https://platform.test";
+      view.refreshAccount();
+      await act(async () => finish());
+      expect(view.invalidate).not.toHaveBeenCalled();
+      expect(toast.success).not.toHaveBeenCalled();
+    },
+  );
 
   it("allows retry without exposing arbitrary IPC details", async () => {
     vi.mocked(platformModelsApi.sync).mockRejectedValueOnce(

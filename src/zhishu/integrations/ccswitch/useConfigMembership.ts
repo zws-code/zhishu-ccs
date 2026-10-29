@@ -16,18 +16,30 @@ import { isPiFamilyApp } from "@/config/appConfig";
  * 复制一份。`enabled=false` 时不发起查询（isPending 为 false），但已有缓存仍可用于展示。
  */
 export function useConfigMembership(appId: AppId, enabled = true) {
-  const { data: opencodeLiveIds, isPending: isOpencodeLiveIdsPending } =
-    useQuery({
-      queryKey: ["opencodeLiveProviderIds"],
-      queryFn: () => providersApi.getOpenCodeLiveProviderIds(),
-      enabled: enabled && appId === "opencode",
-    });
-  const { data: openclawLiveIds, isPending: isOpenclawLiveIdsPending } =
-    useOpenClawLiveProviderIds(enabled && appId === "openclaw");
-  const { data: hermesLiveIds, isPending: isHermesLiveIdsPending } =
-    useHermesLiveProviderIds(enabled && appId === "hermes");
-  const { data: dshCurrentState, isPending: isDshCurrentStatePending } =
-    useDshCurrentState(enabled && appId === "deepseek-harness");
+  const {
+    data: opencodeLiveIds,
+    isPending: isOpencodeLiveIdsPending,
+    isSuccess: isOpencodeLiveIdsSuccess,
+  } = useQuery({
+    queryKey: ["opencodeLiveProviderIds"],
+    queryFn: () => providersApi.getOpenCodeLiveProviderIds(),
+    enabled: enabled && appId === "opencode",
+  });
+  const {
+    data: openclawLiveIds,
+    isPending: isOpenclawLiveIdsPending,
+    isSuccess: isOpenclawLiveIdsSuccess,
+  } = useOpenClawLiveProviderIds(enabled && appId === "openclaw");
+  const {
+    data: hermesLiveIds,
+    isPending: isHermesLiveIdsPending,
+    isSuccess: isHermesLiveIdsSuccess,
+  } = useHermesLiveProviderIds(enabled && appId === "hermes");
+  const {
+    data: dshCurrentState,
+    isPending: isDshCurrentStatePending,
+    isSuccess: isDshCurrentStateSuccess,
+  } = useDshCurrentState(enabled && appId === "deepseek-harness");
   const {
     data: piCurrentState,
     isSuccess: isPiCurrentStateSuccess,
@@ -89,5 +101,19 @@ export function useConfigMembership(appId: AppId, enabled = true) {
       (appId === "deepseek-harness" && isDshCurrentStatePending) ||
       (isPiFamilyApp(appId) && isPiCurrentStatePending));
 
-  return { isInConfig, isPending };
+  // A failed read is not an empty membership list: bulk writes require a successful snapshot.
+  const isReady =
+    enabled &&
+    (
+      {
+        opencode: isOpencodeLiveIdsSuccess,
+        openclaw: isOpenclawLiveIdsSuccess,
+        hermes: isHermesLiveIdsSuccess,
+        "deepseek-harness": isDshCurrentStateSuccess,
+        pi: isPiCurrentStateSuccess,
+        omp: isPiCurrentStateSuccess,
+      } as Partial<Record<AppId, boolean>>
+    )[appId] !== false;
+
+  return { isInConfig, isPending, isReady };
 }

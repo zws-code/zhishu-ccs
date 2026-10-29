@@ -120,7 +120,7 @@ L3 的统一依据见 [ADR-0002](adr/ADR-0002-structure-and-history.md)，数据
 | ZS-105 | `src-tauri/src/claude_desktop_config.rs` | 品牌/共存；配置历史 | 现有实际写入/切换/路径分派中的扩展与审计挂载必须覆盖原调用链；自有实现迁出，保留核心调用点 | L3 | Provider/MCP/Skills/配置历史隔离回归 | 2026-10-29 / ADR-0002 |
 | ZS-106 | `src-tauri/src/codex_config.rs` | 开发隔离 | 现有实际写入/切换/路径分派中的扩展与审计挂载必须覆盖原调用链；自有实现迁出，保留核心调用点 | L3 | Provider/MCP/Skills/配置历史隔离回归 | 2026-10-29 / ADR-0002 |
 | ZS-107 | `src-tauri/src/commands/config.rs` | 工具扩展 | 现有实际写入/切换/路径分派中的扩展与审计挂载必须覆盖原调用链；自有实现迁出，保留核心调用点 | L3 | Provider/MCP/Skills/配置历史隔离回归 | 2026-10-29 / ADR-0002 |
-| ZS-108 | `src-tauri/src/commands/misc.rs` | 平台目录/供应商 | 遗留启动函数和便携更新 TODO 仍在原位置；本次删除被自动审批拒绝，保留并登记，不能宣称已完全隔离 | L3 | clippy 两项已知失败；后续独立清理 | 2026-10-29 / ADR-0002 |
+| ZS-108 | `src-tauri/src/commands/misc.rs` | 撤销未使用的平台启动扩展；保留便携更新 TODO | 新增 Adapter 无法消除原文件中无调用方函数的 dead-code 告警；本轮删除 76 行旧二开代码，相对 4.0.21 仅剩 TODO 注释，无运行逻辑差异 | L1 | 引用搜索；Rust 全量回归与严格 clippy，结果见 VALIDATION.md | 2026-10-29 / REVIEW-2026-10-29.md |
 | ZS-109 | `src-tauri/src/commands/provider.rs` | 工具扩展 | 现有实际写入/切换/路径分派中的扩展与审计挂载必须覆盖原调用链；自有实现迁出，保留核心调用点 | L3 | Provider/MCP/Skills/配置历史隔离回归 | 2026-10-29 / ADR-0002 |
 | ZS-110 | `src-tauri/src/commands/settings.rs` | 品牌/共存 | 现有实际写入/切换/路径分派中的扩展与审计挂载必须覆盖原调用链；自有实现迁出，保留核心调用点 | L3 | Provider/MCP/Skills/配置历史隔离回归 | 2026-10-29 / ADR-0002 |
 | ZS-111 | `src-tauri/src/config.rs` | 品牌/共存；开发隔离；配置历史 | 现有实际写入/切换/路径分派中的扩展与审计挂载必须覆盖原调用链；自有实现迁出，保留核心调用点 | L3 | Provider/MCP/Skills/配置历史隔离回归 | 2026-10-29 / ADR-0002 |

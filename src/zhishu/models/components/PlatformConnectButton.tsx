@@ -9,6 +9,7 @@ import type { AppId } from "@/lib/api/index";
 import { platformModelsApi } from "@/zhishu/api/platformModels";
 import { platformAuthError } from "@/zhishu/api/platformAuth";
 import { usePlatformAuth } from "@/zhishu/auth/PlatformAuthContext";
+import { usePlatformOperationScope } from "@/zhishu/auth/usePlatformOperationScope";
 import { Button } from "@/components/ui/button";
 import { refreshPlatformProviders } from "@/zhishu/integrations/ccswitch/platformProviders";
 import { toast } from "@/lib/toast";
@@ -24,13 +25,21 @@ export function PlatformConnectButton({
 }) {
   const { t } = useTranslation();
   const auth = usePlatformAuth();
+  const captureScope = usePlatformOperationScope(auth?.account, app ?? "all");
   const queryClient = useQueryClient();
   const deleting = useIsMutating({ mutationKey: ["platformDeleteProviders"] });
   const sync = useMutation({
     mutationKey: ["platformSyncProviders"],
-    mutationFn: (agent: AppId | undefined) => platformModelsApi.sync(agent),
-    onSuccess: async (result, agent) => {
+    mutationFn: ({
+      agent,
+    }: {
+      agent: AppId | undefined;
+      isCurrent: () => boolean;
+    }) => platformModelsApi.sync(agent),
+    onSuccess: async (result, { agent, isCurrent }) => {
+      if (!isCurrent()) return;
       await refreshPlatformProviders(queryClient, agent);
+      if (!isCurrent()) return;
       const reportMessage =
         result.updated !== undefined && result.nativeFilesChanged !== undefined
           ? t("platformCatalog.syncCompleted", {
@@ -68,7 +77,8 @@ export function PlatformConnectButton({
         );
       }
     },
-    onError: (error) => {
+    onError: (error, { isCurrent }) => {
+      if (!isCurrent()) return;
       void queryClient.invalidateQueries({ queryKey: ["configChangeHistory"] });
       toast.error(platformAuthError(error));
     },
@@ -86,7 +96,7 @@ export function PlatformConnectButton({
         "platformCatalog.localHint",
         "使用已同步到本机的平台基础数据生成供应商配置",
       )}
-      onClick={() => sync.mutate(app)}
+      onClick={() => sync.mutate({ agent: app, isCurrent: captureScope() })}
     >
       {sync.isPending ? (
         <Loader2 className="h-4 w-4 animate-spin" />

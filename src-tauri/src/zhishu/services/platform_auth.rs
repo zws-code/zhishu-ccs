@@ -1313,12 +1313,20 @@ impl PlatformAuthState {
                     // A revoked key can still be listed briefly. Recreate it once and retry.
                     match create_group_key(&client, &base_url, &access_token, group).await {
                         Ok(created) => {
-                            match group_key_models(&client, &base_url, &created.key).await {
-                                Ok(models) => {
-                                    key = created;
-                                    (models, None)
-                                }
+                            // Keep the replacement even if model discovery is temporarily down;
+                            // fallback providers must never receive the already rejected key.
+                            key = created;
+                            match group_key_models(&client, &base_url, &key.key).await {
+                                Ok(models) => (models, None),
                                 Err(err) if err.code == "UNAUTHORIZED" => return Err(err),
+                                Err(err) if err.code == "MODEL_AUTH" => {
+                                    failed_group_ids.insert(group.id);
+                                    warnings.push(format!(
+                                        "分组 {} 的新 Key 授权失败，已保留本地供应商：{}",
+                                        group.name, err.message
+                                    ));
+                                    continue;
+                                }
                                 Err(err) => {
                                     failed_group_ids.insert(group.id);
                                     (Vec::new(), Some(err.message))
@@ -1328,7 +1336,11 @@ impl PlatformAuthState {
                         Err(err) if err.code == "UNAUTHORIZED" => return Err(err),
                         Err(err) => {
                             failed_group_ids.insert(group.id);
-                            (Vec::new(), Some(err.message))
+                            warnings.push(format!(
+                                "无法替换分组 {} 的失效 Key，已保留本地供应商：{}",
+                                group.name, err.message
+                            ));
+                            continue;
                         }
                     }
                 }
@@ -1940,6 +1952,46 @@ mod tests {
         assert_eq!(discovery.catalogs[0].credential.key, "group-secret");
         assert_eq!(discovery.catalogs[0].models[0]["context_window"], 1000000);
         server.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn revoked_group_key_never_survives_a_failed_replacement() {
+        for (create_status, model_status) in [(200, 500), (200, 401), (500, 0)] {
+            let mut replies = vec![
+                ("GET /api/v1/auth/me ", 200, profile()),
+                ("GET /api/v1/groups/available |access-secret", 200, json!({"code":0,"data":[
+                    {"id":42,"name":"智枢router-ccs-Claude","platform":"anthropic","status":"active"}
+                ]})),
+                ("GET /api/v1/subscriptions |access-secret", 200, json!({"code":0,"data":[]})),
+                ("GET /api/v1/keys?page=1&page_size=100&sort_by=created_at&sort_order=desc |access-secret", 200,
+                    json!({"code":0,"data":{"items":[
+                        {"id":70,"key":"revoked-key","name":"zhishu-ccs-anthropic-42","group_id":42,"status":"active"}
+                    ],"pages":1}})),
+                ("GET /v1/models |revoked-key", 401, json!({})),
+                ("POST /api/v1/keys |access-secret", create_status, json!({"code":0,"data":{
+                    "id":71,"key":"replacement-key","name":"zhishu-ccs-anthropic-42","group_id":42,"status":"active"
+                }})),
+            ];
+            if create_status == 200 {
+                replies.push(("GET /v1/models |replacement-key", model_status, json!({})));
+            }
+            let (base, server) = mock_server(replies);
+            let discovery = model_session(base).discover_group_catalogs().await.unwrap();
+            server.join().unwrap();
+            assert!(discovery.failed_group_ids.contains(&42));
+            assert!(!serde_json::to_string(&discovery)
+                .unwrap()
+                .contains("revoked-key"));
+            if create_status == 200 && model_status == 500 {
+                assert_eq!(discovery.catalogs.len(), 1);
+                assert_eq!(discovery.catalogs[0].credential.key, "replacement-key");
+                assert_eq!(discovery.catalogs[0].credential.key_id, 71);
+                assert!(discovery.catalogs[0].catalog_error.is_some());
+            } else {
+                assert!(discovery.catalogs.is_empty());
+                assert!(!discovery.warnings.is_empty());
+            }
+        }
     }
 
     #[tokio::test]
