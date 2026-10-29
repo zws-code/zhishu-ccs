@@ -651,6 +651,12 @@ jobs:
           APPLE_TEAM_ID: ${{ env.MACOS_SIGNING_MODE == 'developer-id' && secrets.APPLE_TEAM_ID || '' }}
         run: |
           set -euo pipefail
+          # Tauri treats even empty APPLE_* variables as notarization credentials.
+          # Ad-hoc builds must remove them from the child environment entirely.
+          if [ "$MACOS_SIGNING_MODE" = adhoc ]; then
+            unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
+            unset APPLE_API_KEY APPLE_API_ISSUER APPLE_API_KEY_PATH
+          fi
           max_attempts=3
           for attempt in $(seq 1 "$max_attempts"); do
             echo "=== macOS bundle/notarization attempt ${attempt}/${max_attempts} ==="
