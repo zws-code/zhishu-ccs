@@ -8127,7 +8127,7 @@ dependencies = [
 
 [[package]]
 name = "zhishu-ccs"
-version = "4.0.19"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "arboard",

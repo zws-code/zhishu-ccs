@@ -1,6 +1,6 @@
 [package]
 name = "zhishu-ccs"
-version = "4.0.19"
+version = "0.0.1"
 description = "All-in-One Assistant for Claude Code, Codex & Gemini CLI"
 authors = ["Jason Young"]
 license = "MIT"
