@@ -6,17 +6,134 @@
 
 本次作为首次正式发布，不兼容旧测试包的更新入口；旧测试用户直接安装正式包。后续正式版本必须沿用本次的应用身份、Windows 安装身份及更新公钥。
 
-## 首次接入进度
+## 0.0.1 正式发布结果（2026-10-29）
 
-- 已知 GitHub 仓库：`zws-code/zhishu-ccs`。
-- 已实现仓库中的多平台构建、COS 发布、两份清单和回归验证。
-- 已创建广州普通桶 `zhishu-ccs-release-1252121424`，地域 `ap-guangzhou`；用户已将桶设为公有读私有写，仅保存公开发布产物。
-- 当前没有自己的域名，先以 COS 默认 HTTPS 域名直连验证发布/更新，尚未启用 CDN。下载根地址为 `https://zhishu-ccs-release-1252121424.cos.ap-guangzhou.myqcloud.com/ccs/stable`。
-- 用户已在 GitHub 添加桶/平台变量、COS 上传凭据及更新签名密钥，macOS 选择 `adhoc`。构建变量与更新签名已通过实际 Actions 演练，COS 凭据和权限尚未通过真实上传验证；不能称已完成 Apple 公证。
-- 已推送发布流程提交，并启动[首次手动演练](https://github.com/zws-code/zhishu-ccs/actions/runs/40816726762)：配置预检与 Node 回归通过，Python 回归暴露 Ubuntu 22.04 系统 Python 3.10 不支持 `hashlib.file_digest`，已改为兼容的分块哈希并补回归。[第二次演练](https://github.com/zws-code/zhishu-ccs/actions/runs/40817286547)的配置、Node/Python 回归及 TypeScript 预检通过，随后运行被取消，尚未完成各平台编译。
-- [第三次演练（2026-10-29）](https://github.com/zws-code/zhishu-ccs/actions/runs/40818363265)在 `codex/cos-validation` 分支、提交 `7e8b7079fb7d5cdd376b763913860e774602e447` 上全部成功：9 个作业通过，完成 macOS universal、Windows x64/ARM64、Linux x64/ARM64 的编译与打包、更新签名校验、两份清单生成和 COS 发布预演；最终产物 `cos-payload-v0.0.1` 已保存，COS SDK 安装与真实上传步骤按设计跳过。
-- 已新增 COS 成功后创建 GitHub Release 的独立作业，仅正式 tag 触发；该步骤尚未通过真实正式发布验收，已有演练产物不会自动补发到 Releases。
-- 本次没有部署/重启平台，没有上传 COS 安装包，尚未验证真实系统安装与更新。
+- `v0.0.1` 已正式发布，GitHub 发布时间为北京时间 **2026-10-29 15:21**。源码 tag 固定在 `b7619e916f3d7d1feb2d001c4ca279a99d8e6889`；[原正式构建](https://github.com/zws-code/zhishu-ccs/actions/runs/40825474319)完成全部平台编译与签名，上传参数不兼容的问题修复后，[复用原包的恢复发布](https://github.com/zws-code/zhishu-ccs/actions/runs/40834709561)中 COS 与 GitHub Release 两个作业均成功。没有重新编译或替换同版本安装包。
+- [GitHub Release v0.0.1](https://github.com/zws-code/zhishu-ccs/releases/tag/v0.0.1) 已标记为 Latest；25 个附件的大小和 SHA-256 全部与原发布记录匹配。
+- COS 桶为广州 `zhishu-ccs-release-1252121424`，版本目录为 `ccs/stable/v0.0.1/`。24 个发布文件和独立 `release.json` 已上传；24 个文件均通过公网 HEAD 大小检查。
+- 根目录 `latest.json` 与 `client-release.json` 均已切到 `0.0.1`，并与版本目录对应清单逐字节一致；更新清单含 10 个平台/格式条目，网页清单含 12 个下载条目。
+- 已实际下载 45,320,138 字节的 macOS 更新包，SHA-256 为 `db4f238b4196a4552699b3c05e36f06bc637a605b171add32f7c3a2580d277f3`，用生产公钥验证 Tauri 更新签名成功。包内版本为 `0.0.1`，identifier 为 `com.zhishu.ccswitch.desktop`，包含 Intel 与 Apple Silicon 架构；已在实际二进制中核对 COS 更新地址和生产公钥。
+- 正式包已启用启动时检查更新和“设置 → 关于”检查/安装更新；本次为首次正式版本，尚未做两个正式版本间的实际安装升级验收，也未完成各系统的人工安装、启动与登录验收。旧测试包直接安装本次正式包。
+- macOS 使用 `adhoc`，未经过 Apple 公证；Windows 未配置系统代码签名，Tauri 更新签名独立保留。
+- 当前无自有域名、无 CDN；客户端使用 COS 默认 HTTPS 域名。用户已开启桶全球加速，并授权本次加速费用预算 5 元；仅本次恢复运行显式启用上传加速，累计上传读取上限 3 GB（含重试），未为后续发布自动启用加速。没有部署或重启平台网关，平台原下载页仍需单独接入。
+
+直接下载安装包：
+
+| 平台 | GitHub 下载 | COS 国内直连 |
+| --- | --- | --- |
+| macOS（Intel / Apple Silicon 通用） | [DMG](https://github.com/zws-code/zhishu-ccs/releases/download/v0.0.1/Zhishu-Ccs-v0.0.1-macOS.dmg) | [DMG](https://zhishu-ccs-release-1252121424.cos.ap-guangzhou.myqcloud.com/ccs/stable/v0.0.1/Zhishu-Ccs-v0.0.1-macOS.dmg) |
+| Windows x64 | [MSI](https://github.com/zws-code/zhishu-ccs/releases/download/v0.0.1/Zhishu-Ccs-v0.0.1-Windows.msi) | [MSI](https://zhishu-ccs-release-1252121424.cos.ap-guangzhou.myqcloud.com/ccs/stable/v0.0.1/Zhishu-Ccs-v0.0.1-Windows.msi) |
+| Windows ARM64 | [MSI](https://github.com/zws-code/zhishu-ccs/releases/download/v0.0.1/Zhishu-Ccs-v0.0.1-Windows-arm64.msi) | [MSI](https://zhishu-ccs-release-1252121424.cos.ap-guangzhou.myqcloud.com/ccs/stable/v0.0.1/Zhishu-Ccs-v0.0.1-Windows-arm64.msi) |
+
+Linux、便携包及全部签名见上述 Release 的 **Assets**。
+
+当前下载根地址：`https://zhishu-ccs-release-1252121424.cos.ap-guangzhou.myqcloud.com/ccs/stable`。
+
+## 日常手动发布：以后照此操作
+
+这里的“手动发布”指手动准备版本、提交并推送 tag；编译、签名、COS 上传和 GitHub Release 由 GitHub Actions 自动完成，不需要本机打包或手工往桶里传文件。
+
+### 第一步：准备下一个版本
+
+当前首次正式版本为 `0.0.1`。下一次可以使用 `0.0.2`，以下以它为例；**已经正式发布的版本号不能重复使用**。
+
+1. 在本机仓库完成本次要发布的代码，先用 `git status --short` 核对改动。
+2. 将以下文件中的应用版本统一改为 `0.0.2`：
+   - `package.json` 的顶层 `version`。
+   - `src-tauri/tauri.conf.json` 的顶层 `version`。
+   - `src-tauri/Cargo.toml` 的 `[package] version`。
+3. 修改 Cargo.toml 后，用 Cargo 同步锁文件，再核对 `src-tauri/Cargo.lock` 中 `name = "zhishu-ccs"` 对应的版本；不要手改锁文件或批量升级依赖：
+
+```sh
+cargo update --workspace --manifest-path src-tauri/Cargo.toml
+```
+
+4. 新增 `src/whats-new/0.0.2.json`。如无应用内公告，可使用下面的内容；要展示公告时遵循同目录 README 的多语言格式。
+
+```json
+{
+  "version": "0.0.2",
+  "items": []
+}
+```
+
+保持应用 identifier、产品名、Windows 安装身份、更新地址和更新公钥稳定。不要为每次发布重新生成更新密钥，也不要把私钥或腾讯云凭据提交到 Git。
+
+### 第二步：检查并提交到自己的仓库
+
+在项目根目录执行：
+
+```sh
+pnpm typecheck
+pnpm test:release
+pnpm test:release-cos
+git diff --check
+git remote -v
+```
+
+确认 `zhishu-git` 指向 `git@github.com:zws-code/zhishu-ccs.git`。本机 `origin` 是上游，不能用它发布二开代码。`pnpm test` 会使用真实用户配置启动应用，不用于本步骤。
+
+先用 `git add <具体源码文件>` 加入本次需要发布的代码，再加入版本文件和新公告。执行 `git diff --cached` 审查本次暂存内容后，再继续提交和推送：
+
+```sh
+git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock src/whats-new/0.0.2.json
+git diff --cached
+git commit -m "chore(release): prepare 0.0.2"
+git push zhishu-git HEAD:refs/heads/ccw-dev
+```
+
+如需先演练，可到 [Actions 发布工作流](https://github.com/zws-code/zhishu-ccs/actions/workflows/release.yml) 点击 **Run workflow**，选择 `ccw-dev`。**Run workflow 只演练，不会正式上传 COS，也不会创建 GitHub Release。**
+
+### 第三步：推送正式 tag
+
+确认代码已提交、版本一致，而且不存在同名正式 tag，再执行：
+
+```sh
+git tag v0.0.2
+git push zhishu-git v0.0.2
+```
+
+推送 tag 才是正式发布开关。之后在 [Actions](https://github.com/zws-code/zhishu-ccs/actions) 打开 `v0.0.2` 对应运行，等待构建、COS 发布和 **Publish GitHub Release after COS** 全部成功。如环境显示 **Review deployments**，由已配置的审核者批准本次部署。
+
+不要在工作流运行时取消任务、移动 tag 或重新上传同版本文件。首个 `v0.0.1` 曾有未成功的测试 tag，首次上线前做过一次修正；这不适用于以后已正式发布的 tag。
+
+### 第四步：从三个位置验收
+
+| 验收位置 | 应该看到什么 |
+| --- | --- |
+| [GitHub Releases](https://github.com/zws-code/zhishu-ccs/releases) | `智枢 CCS v0.0.2`，标记 Latest；下方 Assets 可直接下载 `.dmg`、`.msi`、Linux 包和签名 |
+| 腾讯云 COS 控制台 | 打开 `zhishu-ccs-release-1252121424`，进入 `ccs/stable/v0.0.2/`，看到安装包和清单；`ccs/stable/` 下有 `latest.json`、`client-release.json` |
+| 客户端 | 用正式安装版启动，启动时会检查更新；也可进入“设置 → 关于”检查更新，有新版时按提示安装并重启 |
+
+公网更新清单为 [latest.json](https://zhishu-ccs-release-1252121424.cos.ap-guangzhou.myqcloud.com/ccs/stable/latest.json)，网页下载清单为 [client-release.json](https://zhishu-ccs-release-1252121424.cos.ap-guangzhou.myqcloud.com/ccs/stable/client-release.json)。清单中的版本应等于本次发布版本，下载链接应指向该版本目录。
+
+第一次安装选择 macOS `.dmg` 或 Windows `.msi`。Windows 便携版使用手动下载方式，不将其当作安装版自动更新验收；Linux 使用相应包格式的更新行为。`0.0.1` 是首次正式版本，同版本检查应显示已是最新；完整升级验收需要后续 `0.0.2` 从正式 `0.0.1` 实际完成下载、验签、安装与重启。
+
+当前 macOS 使用 `adhoc`，没有 Apple 公证；Tauri 更新签名仍启用。当前分发使用 COS 默认域名，CDN 尚未接入。
+
+上传器同时传输最多四个独立文件，仍在全部文件完成、签名与公网检查通过后才切换稳定清单。日志中的 `Upload stream` 是数据流读取进度，`COS verified` 表示对象已写入并核对大小与哈希元数据。
+
+GitHub 的海外构建机直传广州桶可能很慢；本次普通上传遇到了这一情况。若希望以后每次正式 tag 发布也加速，可自行在 Repository Variables 设置 `COS_UPLOAD_ACCELERATE=true`；不设置则默认 `false`。上传才使用 `cos.accelerate.myqcloud.com`，桶检查与客户端更新/下载地址继续使用原域名。此选项需要桶已开启全球加速，并会额外按流量计费；当前跨境上行公布价为 1.25 元/GB，实际以[腾讯云控制台与定价](https://buy.cloud.tencent.com.cn/price/cos)为准。
+
+也可只在下面的恢复工作流中勾选一次 `accelerate`，不改变后续发布默认行为。当前实现对每次加速运行限制累计上传读取量 3 GB（包含 SDK 重试）；触及上限时终止，不切换清单。这个保护限制本次上传的数据量，不是整个腾讯云账户的账单限额。
+
+### 第五步：失败时如何处理
+
+- 打开 Actions 中失败的作业和红色步骤，先保存错误信息；不要反复点击发布，也不要重建同版本覆盖。
+- 配置或编译阶段失败、还没上传 COS：修好后根据失败原因处理。不要把后续新提交误当成旧 tag 自动包含；重跑旧运行仍使用原提交。
+- COS 上传或清单切换阶段失败：保留该次构建产物，使用 **Re-run failed jobs** 复用原包；凭据/权限改在 GitHub Settings 或腾讯云 CAM，不在聊天里发送密钥。
+- 只有 GitHub Release 失败：使用 **Re-run failed jobs**，只补发 Release，COS 已上线的文件保持原样。
+- 代码需修复、同版本已预留或上传：发布更高版本，不能移动已发布 tag 或覆盖桶内版本文件。
+
+### 上传脚本修复后：用原包恢复发布
+
+如果正式 tag 的安装包已构建成功并保存，但需要修复上传脚本，重跑旧的正式工作流仍使用旧脚本。此时到 [Resume verified COS release](https://github.com/zws-code/zhishu-ccs/actions/workflows/resume-cos-release.yml)，点击 **Run workflow**，选择已修复脚本所在的 `ccw-dev` 分支，填写原正式构建的 **run_id**。桶全球加速已开启且愿意承担本次流量费用时，可勾选 `accelerate`；默认不勾选。
+
+run_id 是原 Actions 页面地址末尾的数字。例如本次原正式运行是 `40825474319`，网址为 `https://github.com/zws-code/zhishu-ccs/actions/runs/40825474319`。恢复入口会核对原工作流、正式 tag、原提交和未过期的 `cos-payload-v<版本>`，再次验证签名与哈希后实际上传 COS，再创建 GitHub Release。它不编译、不移动 tag、不生成另一套同版本包；原产物已过期时不能使用，应发新版本。
+
+注意：**这个恢复工作流会实际发布**，与 `Release to Tencent COS` 的手动演练不同。后台也可推送专用分支 `codex/cos-resume` 触发恢复，但提交说明必须带单独一行 `Resume-Release-Run: <原正式run_id>`；本次需要加速时再加单独一行 `Resume-Release-Accelerate: true`。日常优先使用上述页面输入方式。
+
+更详细的首次云端配置、权限与签名说明见下文。
 
 ## 1. 准备腾讯云 COS 和 CDN
 
@@ -60,7 +177,7 @@ COS 桶
 
 ## 2. 创建发布凭证
 
-在腾讯云 CAM 创建专用发布子账户或凭证，仅授权目标桶。桶级需要 `cos:GetBucketVersioning`；对象级限定到 `ccs/stable/*`，允许 `cos:HeadObject`、`cos:GetObject`、`cos:PutObject`。本实现使用单文件 PUT，不需要删除对象、修改 ACL 或管理其他云资源的权限；单个文件超过 5 GiB 时拒绝发布。
+在腾讯云 CAM 创建专用发布子账户或凭证，仅授权目标桶。桶级需要 `cos:GetBucketVersioning`；对象级限定到 `ccs/stable/*`，允许 `cos:HeadObject`、`cos:GetObject`、`cos:PutObject`。本实现使用最多四路并发的单文件 PUT，不需要分块上传、删除对象、修改 ACL 或管理其他云资源的权限；单个文件超过 5 GiB 时拒绝发布。
 
 将 `SecretId`、`SecretKey` 直接填写到 GitHub Secrets。不要提交到 Git、应用配置或聊天，不使用腾讯云主账户密钥。若使用临时凭证，还需设置 `COS_SESSION_TOKEN`，并确保发布期间凭证有效。
 
@@ -79,6 +196,7 @@ COS 桶
 | `ZHISHU_UPDATE_PUBLIC_KEY` | 更新公钥 `.pub` 文件的完整 base64 内容 |
 | `COS_BUCKET` | 完整桶名，例如 `zhishu-downloads-1234567890` |
 | `COS_REGION` | 实际地域，例如 `ap-guangzhou` |
+| `COS_UPLOAD_ACCELERATE` | 可选，默认 `false`；显式 `true` 仅加速上传，会产生额外流量费，须先开启桶全球加速 |
 | `COS_PREFIX` | `ccs/stable`，未设置也使用此值 |
 | `COS_PUBLIC_BASE_URL` | `https://下载域名/ccs/stable`，不带末尾斜杠 |
 | `ZHISHU_MACOS_SIGNING_MODE` | 默认 `developer-id`；显式设置 `adhoc` 可构建未公证包 |
@@ -182,7 +300,7 @@ git push zhishu-git v<新版本号>
 5. 检查 COS 旧版清单，拒绝降版本、漏已发布平台和同版本不同内容。
 6. 先预留不可变版本输入，再上传版本目录，检查 COS 对象和 CDN 公网文件。
 7. 公网检查通过后，依次发布根目录 `client-release.json`、`latest.json`，读回校验并等待 CDN 清单与本地一致。
-8. COS 作业成功后，独立作业下载同一份 `cos-payload-v<版本>` artifact，创建正式、非预发布的 GitHub Release，设为 Latest，并附上全部已验证安装包、签名及清单。在仓库右侧 **Releases** 或工作流摘要中的下载链接进入。macOS 发布说明按实际签名模式生成，不把 `adhoc` 称为 Apple 公证。
+8. COS 作业成功后，独立作业下载同一份 `cos-payload-v<版本>` artifact，创建正式、非预发布的 GitHub Release，设为 Latest，并附上全部已验证安装包、签名及清单。在仓库右侧 **Releases** 或工作流摘要中的下载链接进入，在版本页面展开 **Assets** 选择安装包。macOS 发布说明按实际签名模式生成，不把 `adhoc` 称为 Apple 公证。
 
 两个 COS 对象不能作为一个事务同时替换。若第二份清单发布失败，网站可能先看到新版，但客户端仍使用旧更新清单；此时应重试同一批原产物，不自动回滚已验证的安装包。正式客户端的更新入口最后切换。
 
