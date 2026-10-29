@@ -1,8 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import { PlatformAuthProvider } from "./contexts/PlatformAuthContext";
-import { PlatformAuthGate } from "./components/platform/PlatformLogin";
+import { PlatformAuthProvider } from "@/zhishu/auth/PlatformAuthContext";
+import { PlatformAuthGate } from "@/zhishu/auth/PlatformLogin";
 import { DatabaseUpgrade } from "./components/DatabaseUpgrade";
 import { UpdateProvider } from "./contexts/UpdateContext";
 import "./index.css";

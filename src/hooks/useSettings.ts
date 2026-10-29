@@ -17,7 +17,7 @@ import {
   type ResolvedDirectories,
 } from "./useDirectorySettings";
 import { useSettingsMetadata } from "./useSettingsMetadata";
-import { invalidateDshProviderCaches } from "@/lib/query/dsh";
+import { invalidateDshProviderCaches } from "@/zhishu/tools/deepseek-harness/query/dsh";
 
 interface SaveResult {
   requiresRestart: boolean;

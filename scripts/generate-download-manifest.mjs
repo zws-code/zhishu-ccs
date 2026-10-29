@@ -8,7 +8,7 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { productionUrl } from "./release-config.mjs";
+import { productionUrl } from "./zhishu/release-config.mjs";
 
 const [assetsDir, tag, baseUrl, output = "manifest.json", pubDateArg] =
   process.argv.slice(2);

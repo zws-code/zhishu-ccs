@@ -153,7 +153,7 @@ vi.mock("@/components/settings/GlobalProxySettings", () => ({
 vi.mock("@/components/settings/CodexAuthSettings", () => ({
   CodexAuthSettings: () => <div>codex-auth-settings</div>,
 }));
-vi.mock("@/components/settings/ConfigChangeHistoryPanel", () => ({
+vi.mock("@/zhishu/config-history/ConfigChangeHistoryPanel", () => ({
   ConfigChangeHistoryPanel: () => <div>config-change-history-panel</div>,
 }));
 

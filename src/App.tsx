@@ -13,8 +13,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ExternalLink,
   KeyRound,
-  Loader2,
-  Trash2,
   MoreHorizontal,
   Plus,
   Search,
@@ -30,7 +28,7 @@ import {
   useProvidersQuery,
   useSettingsQuery,
 } from "@/lib/query";
-import { refreshAdditiveLiveState } from "@/lib/query/additiveLiveState";
+import { refreshAdditiveLiveState } from "@/zhishu/integrations/ccswitch/additiveLiveState";
 import {
   piApi,
   providersApi,
@@ -40,7 +38,7 @@ import {
 } from "@/lib/api";
 import { checkAllEnvConflicts, checkEnvConflicts } from "@/lib/api/env";
 import { useProviderActions } from "@/hooks/useProviderActions";
-import { usePlatformProviderDeletion } from "@/hooks/usePlatformProviderDeletion";
+import { usePlatformProviderDeletion } from "@/zhishu/models/usePlatformProviderDeletion";
 import { openclawKeys, useOpenClawHealth } from "@/hooks/useOpenClaw";
 import { hermesKeys, useOpenHermesWebUI } from "@/hooks/useHermes";
 import { hermesApi } from "@/lib/api/hermes";
@@ -83,9 +81,10 @@ import { WindowControls } from "@/components/shell/WindowControls";
 import { APP_DISPLAY_NAME, AppGlyph } from "@/components/shell/AppGlyph";
 import { ProfileSwitcher } from "@/components/profiles/ProfileSwitcher";
 import { ProviderList } from "@/components/providers/ProviderList";
-import { PlatformConnectButton } from "@/components/platform/PlatformConnectButton";
-import { PlatformBulkSyncButtons } from "@/components/platform/PlatformBulkSyncButtons";
-import { PlatformCatalogPage } from "@/components/platform/PlatformCatalogPage";
+import { PlatformConnectButton } from "@/zhishu/models/components/PlatformConnectButton";
+import { PlatformBulkSyncButtons } from "@/zhishu/models/components/PlatformBulkSyncButtons";
+import { PlatformProviderDeletionMenuItem } from "@/zhishu/models/components/PlatformProviderDeletionMenuItem";
+import { PlatformCatalogPage } from "@/zhishu/models/components/PlatformCatalogPage";
 import { AddProviderDialog } from "@/components/providers/AddProviderDialog";
 import {
   hasOpencodeDefinition,
@@ -95,7 +94,7 @@ import { EditProviderDialog } from "@/components/providers/EditProviderDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { OpenTerminalDialog } from "@/components/providers/OpenTerminalDialog";
 import { discardUnsavedChanges, hasUnsavedChanges } from "@/lib/unsavedChanges";
-import { AppConfigHistoryButton } from "@/components/settings/AppConfigHistoryButton";
+import { AppConfigHistoryButton } from "@/zhishu/config-history/AppConfigHistoryButton";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { AuthCenterPanel } from "@/components/settings/AuthCenterPanel";
 import { AppsPage } from "@/components/apps/AppsPage";
@@ -1332,27 +1331,7 @@ function App() {
         <DropdownMenuItem onSelect={() => openPage("apps")}>
           {t("appPage.installAndUpgrade")}
         </DropdownMenuItem>
-        {platformDeletion.visible && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              disabled={platformDeletion.disabled}
-              onSelect={platformDeletion.remove}
-              className="text-destructive focus:text-destructive"
-            >
-              {platformDeletion.pending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="mr-2 h-4 w-4" />
-              )}
-              {t(
-                platformDeletion.pending
-                  ? "platformCatalog.deletingProviders"
-                  : "platformCatalog.deleteProviders",
-              )}
-            </DropdownMenuItem>
-          </>
-        )}
+        <PlatformProviderDeletionMenuItem deletion={platformDeletion} />
         <DropdownMenuSeparator />
         <DropdownMenuItem
           disabled={Object.values(visibleApps).filter(Boolean).length <= 1}

@@ -45,8 +45,8 @@ import { cn } from "@/lib/utils";
 import { isTextEditableTarget } from "@/utils/domUtils";
 import { extractProviderBaseUrl } from "@/utils/providerConfigUtils";
 import { usePiCurrentState } from "@/lib/query/pi";
-import { useDshCurrentState } from "@/lib/query/dsh";
-import { useConfigMembership } from "@/hooks/useConfigMembership";
+import { useDshCurrentState } from "@/zhishu/tools/deepseek-harness/query/dsh";
+import { useConfigMembership } from "@/zhishu/integrations/ccswitch/useConfigMembership";
 import { isPiFamilyApp } from "@/config/appConfig";
 import { isHermesReadOnlyProvider } from "@/config/hermesProviderPresets";
 import {

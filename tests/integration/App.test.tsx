@@ -27,7 +27,7 @@ const platformDeletion = vi.hoisted(() => ({
   pending: false,
   remove: vi.fn(),
 }));
-vi.mock("@/hooks/usePlatformProviderDeletion", () => ({
+vi.mock("@/zhishu/models/usePlatformProviderDeletion", () => ({
   usePlatformProviderDeletion: () => platformDeletion,
 }));
 

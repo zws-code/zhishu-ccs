@@ -35,7 +35,7 @@ import { AppPageHeader } from "@/components/shell/AppPageHeader";
 import { DirectoryInput } from "@/components/settings/DirectorySettings";
 import { ImportExportSection } from "@/components/settings/ImportExportSection";
 import { BackupListSection } from "@/components/settings/BackupListSection";
-import { ConfigChangeHistoryPanel } from "@/components/settings/ConfigChangeHistoryPanel";
+import { ConfigChangeHistoryPanel } from "@/zhishu/config-history/ConfigChangeHistoryPanel";
 import { WebdavSyncSection } from "@/components/settings/WebdavSyncSection";
 import { AboutSection } from "@/components/settings/AboutSection";
 import { RoutingSection } from "@/components/settings/sections/RoutingSection";

@@ -2,7 +2,7 @@ import path from "node:path";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { codeInspectorPlugin } from "code-inspector-plugin";
-import { productionUrl } from "./scripts/release-config.mjs";
+import { productionUrl } from "./scripts/zhishu/release-config.mjs";
 
 export default defineConfig(({ command, mode }) => {
   if (command === "build" && mode === "production") {
@@ -14,7 +14,7 @@ export default defineConfig(({ command, mode }) => {
       env.VITE_ZHISHU_UPDATES_ENABLED !== "false"
     ) {
       throw new Error(
-        "Configure VITE_ZHISHU_UPDATES_ENABLED as true or false before a production build (see docs/zhishu-release.md)",
+        "Configure VITE_ZHISHU_UPDATES_ENABLED as true or false before a production build (see docs/zhishu/zhishu-release.md)",
       );
     }
     for (const key of ["VITE_PLATFORM_API_URL", "VITE_PLATFORM_WEB_URL"]) {

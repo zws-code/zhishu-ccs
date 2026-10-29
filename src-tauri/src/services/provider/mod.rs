@@ -11,7 +11,7 @@ pub(crate) mod codex_direct;
 mod codex_editor;
 mod codex_login;
 pub(crate) mod codex_official_models;
-mod deepseek_harness;
+use crate::zhishu::integrations::ccswitch::deepseek_harness;
 mod editor_toml;
 mod endpoints;
 mod gemini_auth;
@@ -26,7 +26,7 @@ mod omp;
 mod opencode_tests;
 mod pi;
 mod usage;
-mod workbuddy;
+use crate::zhishu::integrations::ccswitch::workbuddy;
 
 use indexmap::IndexMap;
 use regex::Regex;
@@ -5449,7 +5449,10 @@ impl ProviderService {
             .live_config_managed = Some(managed);
     }
 
-    fn normalize_usage_script_credential_overrides(app_type: &AppType, provider: &mut Provider) {
+    pub(crate) fn normalize_usage_script_credential_overrides(
+        app_type: &AppType,
+        provider: &mut Provider,
+    ) {
         let current_credentials = provider.resolve_usage_credentials(app_type);
 
         let Some(usage_script) = provider
@@ -8072,7 +8075,10 @@ impl ProviderService {
         .await
     }
 
-    fn validate_provider_settings(app_type: &AppType, provider: &Provider) -> Result<(), AppError> {
+    pub(crate) fn validate_provider_settings(
+        app_type: &AppType,
+        provider: &Provider,
+    ) -> Result<(), AppError> {
         icon::validate_icon(provider.icon.as_deref())?;
         match app_type {
             AppType::Claude => {

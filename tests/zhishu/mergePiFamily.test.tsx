@@ -2,8 +2,8 @@ import type { PropsWithChildren } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
-import { useConfigMembership } from "@/hooks/useConfigMembership";
-import { refreshAdditiveLiveState } from "@/lib/query/additiveLiveState";
+import { useConfigMembership } from "@/zhishu/integrations/ccswitch/useConfigMembership";
+import { refreshAdditiveLiveState } from "@/zhishu/integrations/ccswitch/additiveLiveState";
 import { piApi } from "@/lib/api/pi";
 import type { Provider } from "@/types";
 

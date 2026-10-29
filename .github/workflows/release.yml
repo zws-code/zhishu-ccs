@@ -80,7 +80,7 @@ jobs:
           if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$TAG" ]; then
             echo "::error::Tag differs from the committed application version"; exit 1
           fi
-          node scripts/cos-release.mjs check "$TAG"
+          node scripts/zhishu/cos-release.mjs check "$TAG"
           test -n "$SIGNING_KEY" || { echo "::error::Missing TAURI_SIGNING_PRIVATE_KEY"; exit 1; }
           case "$MACOS_SIGNING_MODE" in
             developer-id)
@@ -242,7 +242,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Prepare Zhishu production configuration
-        run: node scripts/prepare-release.mjs
+        run: node scripts/zhishu/prepare-release.mjs
 
       - name: Prepare Tauri signing key
         uses: ./.github/actions/prepare-tauri-signing-key
@@ -493,7 +493,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Prepare Zhishu production configuration
-        run: node scripts/prepare-release.mjs
+        run: node scripts/zhishu/prepare-release.mjs
 
       # 编译只做一次：编译失败是确定性的，重试没有意义。签名和公证依赖 Apple 的服务，
       # 在 macos-release 里单独重试，不会再重编。
@@ -565,7 +565,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Prepare Zhishu production configuration
-        run: node scripts/prepare-release.mjs
+        run: node scripts/zhishu/prepare-release.mjs
 
       - name: Prepare Tauri signing key
         uses: ./.github/actions/prepare-tauri-signing-key
@@ -1058,7 +1058,7 @@ jobs:
       - name: Verify signatures and prepare COS payload
         env:
           RELEASE_TAG: ${{ needs.whats-new-check.outputs.tag }}
-        run: node scripts/cos-release.mjs prepare release-assets "$RELEASE_TAG" cos-payload
+        run: node scripts/zhishu/cos-release.mjs prepare release-assets "$RELEASE_TAG" cos-payload
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -1066,7 +1066,7 @@ jobs:
           python-version: '3.12'
 
       - name: Validate publication without uploading
-        run: python scripts/publish-cos.py cos-payload --dry-run
+        run: python scripts/zhishu/publish-cos.py cos-payload --dry-run
 
       - name: Save verified payload for retries
         uses: actions/upload-artifact@v7
@@ -1078,7 +1078,7 @@ jobs:
 
       - name: Install COS SDK
         if: github.event_name == 'push' && github.ref_type == 'tag'
-        run: python -m pip install -r scripts/cos-requirements.txt
+        run: python -m pip install -r scripts/zhishu/cos-requirements.txt
 
       - name: Check actual COS SDK upload contract
         if: github.event_name == 'push' && github.ref_type == 'tag'
@@ -1090,7 +1090,7 @@ jobs:
           COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
           COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
           COS_SESSION_TOKEN: ${{ secrets.COS_SESSION_TOKEN }}
-        run: python scripts/publish-cos.py cos-payload
+        run: python scripts/zhishu/publish-cos.py cos-payload
 
       # 上游兼容入口保留；智枢仓库由后续独立作业创建 Release。
       - name: Upload Release Assets

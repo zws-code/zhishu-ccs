@@ -17,7 +17,7 @@ import type { HermesProviderPreset } from "@/config/hermesProviderPresets";
 import type { McodeProviderPreset } from "@/config/mcodeProviderPresets";
 import type { KimiProviderPreset } from "@/config/kimiProviderPresets";
 import type { PiProviderPreset } from "@/config/piProviderPresets";
-import type { DeepSeekHarnessProviderPreset } from "@/config/deepseekHarnessProviderPresets";
+import type { DeepSeekHarnessProviderPreset } from "@/zhishu/tools/deepseek-harness/deepseekHarnessProviderPresets";
 import type { OmpProviderPreset } from "@/config/ompProviderPresets";
 import type { ProviderCategory } from "@/types";
 import type { AppId } from "@/lib/api";

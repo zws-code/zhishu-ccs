@@ -61,12 +61,12 @@ import {
 import {
   getDeepSeekHarnessPresetEntries,
   type DeepSeekHarnessProviderPreset,
-} from "@/config/deepseekHarnessProviderPresets";
+} from "@/zhishu/tools/deepseek-harness/deepseekHarnessProviderPresets";
 import { isHermesBuiltinProviderId } from "@/config/hermesBuiltinProviderIds";
 import { OpenCodeFormFields } from "./OpenCodeFormFields";
 import { OpenClawFormFields } from "./OpenClawFormFields";
 import { HermesFormFields } from "./HermesFormFields";
-import { DeepSeekHarnessFormFields } from "./DeepSeekHarnessFormFields";
+import { DeepSeekHarnessFormFields } from "@/zhishu/tools/deepseek-harness/DeepSeekHarnessFormFields";
 import type { UniversalProviderPreset } from "@/config/universalProviderPresets";
 import {
   applyTemplateValues,
@@ -108,7 +108,7 @@ import { ClaudeAccountSelect } from "./ClaudeOfficialSection";
 import { isMac } from "@/lib/platform";
 import { McodeProviderForm } from "./McodeProviderForm";
 import { PiProviderForm } from "./PiProviderForm";
-import { WorkBuddyProviderForm } from "./WorkBuddyProviderForm";
+import { WorkBuddyProviderForm } from "@/zhishu/tools/workbuddy/WorkBuddyProviderForm";
 import { OmoFormFields } from "./OmoFormFields";
 import { parseOmoOtherFieldsObject } from "@/types/omo";
 import type { AppMode } from "@/types/proxy";
@@ -150,11 +150,11 @@ import {
   DSH_CUSTOM_DEFAULT_CONFIG,
   isValidCredentialRef,
   pruneDshModelRows,
-} from "./helpers/deepseekHarnessFormUtils";
+} from "@/zhishu/tools/deepseek-harness/deepseekHarnessFormUtils";
 import { resolveManagedAccountId } from "@/lib/authBinding";
 import { useOpenClawLiveProviderIds } from "@/hooks/useOpenClaw";
 import { useHermesLiveProviderIds } from "@/hooks/useHermes";
-import { useDshCurrentState } from "@/lib/query/dsh";
+import { useDshCurrentState } from "@/zhishu/tools/deepseek-harness/query/dsh";
 import { resolveCodexOfficialIdentity } from "@/utils/providerCapabilities";
 
 type PresetEntry = {

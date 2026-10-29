@@ -22,7 +22,7 @@ import SubscriptionQuotaFooter from "@/components/SubscriptionQuotaFooter";
 import CopilotQuotaFooter from "@/components/CopilotQuotaFooter";
 import CodexOauthQuotaFooter from "@/components/CodexOauthQuotaFooter";
 import XaiOauthQuotaFooter from "@/components/XaiOauthQuotaFooter";
-import { PlatformUsageFooter } from "@/components/providers/PlatformUsageFooter";
+import { PlatformUsageFooter } from "@/zhishu/models/components/PlatformUsageFooter";
 import AgyAccountQuotaFooter from "@/components/AgyAccountQuotaFooter";
 import { ClaudeBoundAccountLine } from "@/components/providers/forms/ClaudeOfficialSection";
 import ClaudeAccountQuotaFooter from "@/components/ClaudeAccountQuotaFooter";
@@ -42,7 +42,7 @@ import {
   supportsConnectivityCheck,
 } from "@/utils/providerCapabilities";
 import { useProviderHealth } from "@/lib/query/failover";
-import { usePlatformCatalog } from "@/lib/query/platformCatalog";
+import { usePlatformCatalog } from "@/zhishu/models/query/platformCatalog";
 import { useUsageQuery } from "@/lib/query/queries";
 import { resolveProviderIcon } from "@/utils/providerIcon";
 import { isAdditiveAppId, isProxyAppId } from "@/config/appConfig";

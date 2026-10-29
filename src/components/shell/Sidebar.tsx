@@ -41,8 +41,8 @@ import {
 import { useSidebarStatus, type AppNavStatus } from "@/hooks/useSidebarStatus";
 import { HoverTip } from "@/components/ui/hover-tip";
 import { cn } from "@/lib/utils";
-import { PlatformAccountMenu } from "@/components/platform/PlatformLogin";
-import { SidebarTopBar } from "./SidebarTopBar";
+import { PlatformAccountMenu } from "@/zhishu/auth/PlatformLogin";
+import { SidebarTopBar } from "@/zhishu/app/SidebarTopBar";
 import { APP_DISPLAY_NAME, AppGlyph } from "./AppGlyph";
 
 type IconComponent = ComponentType<{ className?: string }>;

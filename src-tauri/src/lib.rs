@@ -1,3 +1,7 @@
+mod zhishu;
+pub use zhishu::commands::*;
+use zhishu::integrations::ccswitch::{deepseek_harness_config, workbuddy_config};
+use zhishu::storage::config_history;
 mod agy_config;
 #[cfg(all(test, unix))]
 mod agy_smoke_tests;
@@ -13,10 +17,8 @@ mod codex_rollout_file;
 mod codex_state_db;
 mod commands;
 mod config;
-mod config_history;
 mod database;
 mod deeplink;
-mod deepseek_harness_config;
 mod error;
 mod gemini_config;
 mod gemini_mcp;
@@ -52,7 +54,6 @@ mod tray;
 mod tray_panel;
 mod usage_events;
 mod usage_script;
-mod workbuddy_config;
 
 pub use app_config::{AppType, InstalledSkill, McpApps, McpServer, MultiAppConfig, SkillApps};
 pub use codex_config::{
@@ -1305,7 +1306,7 @@ pub fn run() {
             );
             // 将同一个实例注入到全局状态，避免重复创建导致的不一致
             app.manage(app_state);
-            app.manage(commands::PlatformAuthState::default());
+            app.manage(zhishu::services::platform_auth::PlatformAuthState::default());
             app.manage(services::kimi_oauth::KimiOAuthManager::default());
 
             // 初始化 SkillService
@@ -1574,21 +1575,21 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::platform_cancel_login,
-            commands::platform_login_history,
-            commands::platform_saved_password,
-            commands::platform_forget_password,
-            commands::platform_remove_login,
-            commands::platform_login,
-            commands::platform_login_2fa,
-            commands::platform_get_account,
-            commands::platform_get_subscription_usage,
-            commands::platform_sync_providers,
-            commands::platform_delete_providers,
-            commands::platform_get_catalog,
-            commands::platform_get_catalog_key,
-            commands::platform_sync_catalog,
-            commands::platform_logout,
+            zhishu::commands::platform_cancel_login,
+            zhishu::commands::platform_login_history,
+            zhishu::commands::platform_saved_password,
+            zhishu::commands::platform_forget_password,
+            zhishu::commands::platform_remove_login,
+            zhishu::commands::platform_login,
+            zhishu::commands::platform_login_2fa,
+            zhishu::commands::platform_get_account,
+            zhishu::commands::platform_get_subscription_usage,
+            zhishu::commands::platform_sync_providers,
+            zhishu::commands::platform_delete_providers,
+            zhishu::commands::platform_get_catalog,
+            zhishu::commands::platform_get_catalog_key,
+            zhishu::commands::platform_sync_catalog,
+            zhishu::commands::platform_logout,
             commands::get_providers,
             commands::get_current_provider,
             commands::add_provider,
@@ -1624,11 +1625,11 @@ pub fn run() {
             commands::set_common_config_snippet,
             commands::extract_common_config_snippet,
             commands::read_live_provider_settings,
-            commands::list_config_change_history,
-            commands::open_config_sync_backup,
-            commands::get_config_change_history,
-            commands::clear_config_change_history,
-            commands::restore_config_change_history,
+            zhishu::commands::list_config_change_history,
+            zhishu::commands::open_config_sync_backup,
+            zhishu::commands::get_config_change_history,
+            zhishu::commands::clear_config_change_history,
+            zhishu::commands::restore_config_change_history,
             commands::get_settings,
             commands::save_settings,
             commands::has_codex_unify_history_backup,
@@ -1909,8 +1910,8 @@ pub fn run() {
             commands::import_opencode_providers_from_live,
             commands::import_deepseek_harness_providers_from_live,
             commands::import_workbuddy_providers_from_live,
-            commands::get_dsh_current_state,
-            commands::set_dsh_current_model,
+            zhishu::commands::get_dsh_current_state,
+            zhishu::commands::set_dsh_current_model,
             commands::get_opencode_live_provider_ids,
             commands::get_opencode_default_model,
             commands::set_opencode_default_model,

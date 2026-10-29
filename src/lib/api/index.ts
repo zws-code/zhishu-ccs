@@ -1,7 +1,7 @@
 export type { AppId } from "./types";
 export { piApi } from "./pi";
-export { dshApi } from "./dsh";
-export { configHistoryApi } from "./configHistory";
+export { dshApi } from "@/zhishu/tools/deepseek-harness/api/dsh";
+export { configHistoryApi } from "@/zhishu/config-history/api/configHistory";
 export { providersApi, universalProvidersApi } from "./providers";
 export { settingsApi } from "./settings";
 export { backupsApi } from "./settings";
@@ -23,7 +23,7 @@ export type {
   ConfigChangeDetail,
   ConfigChangeFileSummary,
   ConfigChangeGroup,
-} from "./configHistory";
+} from "@/zhishu/config-history/api/configHistory";
 export type { Prompt } from "./prompts";
 export type { Profile, ProfilePayload, ProfilesResponse } from "./profiles";
 export type {

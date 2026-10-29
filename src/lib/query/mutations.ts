@@ -18,7 +18,7 @@ import { proxyKeys } from "@/lib/query/proxy";
 import { usageKeys } from "@/lib/query/usage";
 import { sessionKeys } from "@/lib/query/sessions";
 import { invalidatePiProviderCaches } from "@/lib/query/pi";
-import { invalidateDshProviderCaches } from "@/lib/query/dsh";
+import { invalidateDshProviderCaches } from "@/zhishu/tools/deepseek-harness/query/dsh";
 import { isPiFamilyApp } from "@/config/appConfig";
 import { GROKBUILD_OFFICIAL_PROVIDER_ID } from "@/utils/providerCapabilities";
 

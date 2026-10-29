@@ -56,7 +56,7 @@ jobs:
         with:
           script: |
             const { pathToFileURL } = require('node:url');
-            const { resolveReleaseSource } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/resume-release.mjs`).href);
+            const { resolveReleaseSource } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/zhishu/resume-release.mjs`).href);
             const trailer = context.payload.head_commit?.message?.match(/^Resume-Release-Run: ([1-9][0-9]*)$/m)?.[1];
             const source = await resolveReleaseSource(github, context.repo, process.env.REQUESTED_RUN_ID || trailer || '');
             core.setOutput('tag', source.tag);
@@ -81,7 +81,7 @@ jobs:
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs';
           import assert from 'node:assert/strict';
-          import { collectUpdaterPlatforms, targets } from './scripts/release-artifacts.mjs';
+          import { collectUpdaterPlatforms, targets } from './scripts/zhishu/release-artifacts.mjs';
           const receipt = JSON.parse(readFileSync('cos-payload/release.json'));
           assert.equal(receipt.tag, process.env.SOURCE_TAG);
           assert.equal(receipt.downloadBaseUrl, process.env.COS_PUBLIC_BASE_URL.replace(/\/+$/, ''));
@@ -94,9 +94,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Validate original payload checksums
-        run: python scripts/publish-cos.py cos-payload --dry-run
+        run: python scripts/zhishu/publish-cos.py cos-payload --dry-run
       - name: Install COS SDK
-        run: python -m pip install -r scripts/cos-requirements.txt
+        run: python -m pip install -r scripts/zhishu/cos-requirements.txt
       - name: Check actual COS SDK upload contract
         run: python -B -m unittest discover -s scripts -p 'test_publish_cos.py' -k CosSdkContractTests
       - name: Resume COS publication without rebuilding
@@ -105,7 +105,7 @@ jobs:
           COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
           COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
           COS_SESSION_TOKEN: ${{ secrets.COS_SESSION_TOKEN }}
-        run: python scripts/publish-cos.py cos-payload
+        run: python scripts/zhishu/publish-cos.py cos-payload
 
   resume-github:
     name: Publish GitHub Release after resumed COS

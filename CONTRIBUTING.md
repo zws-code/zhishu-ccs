@@ -49,7 +49,7 @@ pnpm dev
 | Command | Description |
 |---------|-------------|
 | `pnpm dev` | Start dev server (hot reload) |
-| `pnpm build` | Production build and packaging; configure [Zhishu release settings](docs/zhishu-release.md) first |
+| `pnpm build` | Production build and packaging; configure [Zhishu release settings](docs/zhishu/zhishu-release.md) first |
 | `pnpm build:renderer --mode development` | Build the frontend only, output to `dist/` |
 | `pnpm typecheck` | TypeScript type checking (strict; unused imports or parameters are errors) |
 | `pnpm format` | Format `src/` with Prettier |
@@ -71,9 +71,9 @@ cargo test some_test_name     # Run tests matching a name
 
 ### Local Build
 
-As its final step, `pnpm build` signs the auto-update bundles, which requires the release private key `TAURI_SIGNING_PRIVATE_KEY`. Configure [Zhishu release settings](docs/zhishu-release.md) first. Update signing is required for local packages as well. For development without a release key, use `pnpm dev`.
+As its final step, `pnpm build` signs the auto-update bundles, which requires the release private key `TAURI_SIGNING_PRIVATE_KEY`. Configure [Zhishu release settings](docs/zhishu/zhishu-release.md) first. Update signing is required for local packages as well. For development without a release key, use `pnpm dev`.
 
-The complete command, parameter default, target, bundle, signing, and output-path reference is in [docs/zhishu-release.md](docs/zhishu-release.md#打包命令).
+The complete command, parameter default, target, bundle, signing, and output-path reference is in [docs/zhishu/zhishu-release.md](docs/zhishu/zhishu-release.md#打包命令).
 
 ## Testing
 
@@ -303,7 +303,7 @@ pnpm dev
 | 命令 | 说明 |
 |------|------|
 | `pnpm dev` | 启动开发服务器（热重载） |
-| `pnpm build` | 构建生产版本并打包；先配置[智枢发布参数](docs/zhishu-release.md) |
+| `pnpm build` | 构建生产版本并打包；先配置[智枢发布参数](docs/zhishu/zhishu-release.md) |
 | `pnpm build:renderer --mode development` | 只构建前端，输出到 `dist/` |
 | `pnpm typecheck` | TypeScript 类型检查（strict，未使用的 import 或参数会报错） |
 | `pnpm format` | 用 Prettier 格式化 `src/` |
@@ -325,9 +325,9 @@ cargo test some_test_name     # 按名称运行部分测试
 
 ### 本地打包
 
-`pnpm build` 最后会为自动更新包签名，这一步需要发布用的私钥 `TAURI_SIGNING_PRIVATE_KEY`。执行前请先配置[智枢发布参数](docs/zhishu-release.md)。本机打包同样需要更新签名私钥；没有发布私钥时，使用 `pnpm dev` 进行开发。
+`pnpm build` 最后会为自动更新包签名，这一步需要发布用的私钥 `TAURI_SIGNING_PRIVATE_KEY`。执行前请先配置[智枢发布参数](docs/zhishu/zhishu-release.md)。本机打包同样需要更新签名私钥；没有发布私钥时，使用 `pnpm dev` 进行开发。
 
-完整命令、参数默认值、target、bundle、签名和产物路径见 [docs/zhishu-release.md](docs/zhishu-release.md#打包命令)。
+完整命令、参数默认值、target、bundle、签名和产物路径见 [docs/zhishu/zhishu-release.md](docs/zhishu/zhishu-release.md#打包命令)。
 
 ## 测试
 
