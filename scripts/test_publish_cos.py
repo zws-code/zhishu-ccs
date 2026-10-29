@@ -181,6 +181,10 @@ class CredentialAndDiagnosticTests(unittest.TestCase):
             result = module.safe_error(ClientError(message))
             self.assertIn(expected, result)
             self.assertNotIn(secret, result)
+        wrapped = ClientError("opaque " + secret)
+        wrapped.__context__ = TypeError("private header " + secret)
+        self.assertIn("CosClientError/TypeError", module.safe_error(wrapped))
+        self.assertNotIn(secret, module.safe_error(wrapped))
         ServiceError = type("CosServiceError", (Exception,), {
             "get_error_code": lambda _: "AccessDenied",
             "get_status_code": lambda _: 403,

@@ -47,6 +47,9 @@ def safe_error(error):
         status = str(error.get_status_code())
         if re.fullmatch(r"[A-Za-z][A-Za-z0-9]{0,63}", code) and re.fullmatch(r"[1-5][0-9]{2}", status):
             return "COS service error: HTTP " + status + " / " + code
+    cause = error.__cause__ or error.__context__
+    if cause is not None:
+        kind += "/" + type(cause).__name__
     return "COS publication failed (" + kind + "); check credentials, bucket permissions and network"
 
 
@@ -253,5 +256,10 @@ if __name__ == "__main__":
         main()
     except Exception as error:
         # Never echo raw SDK exceptions/headers/credentials into Actions logs.
-        print(safe_error(error), file=sys.stderr)
+        message = safe_error(error)
+        print(message, file=sys.stderr)
+        if os.environ.get("GITHUB_ACTIONS") == "true":
+            # Publish only the already-sanitized diagnostic as a check annotation.
+            annotation = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+            print("::error::" + annotation, flush=True)
         sys.exit(1)
