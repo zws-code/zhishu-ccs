@@ -31,11 +31,11 @@
 
 隔离目录 Rust 全量回归已完成：4361 项单元测试 + 212 项集成测试通过，11 项忽略，无失败。使用 `CC_SWITCH_TEST_HOME` 独立临时目录，命令为 `cargo test --locked --manifest-path src-tauri/Cargo.toml -- --test-threads=1`。
 
-云端演练：`41027890897`，候选提交 `c397fd1b0d4e58735976ef78e766f9d82b4feffc`，分支 `codex/release-0.0.2`。手动演练仅构建/验签，不上传 COS，不创建 Release。
+云端演练（已成功）：`41027890897`，候选提交 `c397fd1b0d4e58735976ef78e766f9d82b4feffc`，分支 `codex/release-0.0.2`。手动演练仅构建/验签，不上传 COS，不创建 Release。
+
+GitHub Actions 多平台构建与最终产物校验已通过；真实 COS SDK 契约已在本机临时环境补测通过。
 
 ## 待完成
-
-- GitHub Actions 多平台签名构建、真实 COS SDK 契约及最终产物校验。
 - x64/ARM64 Windows 的 MSI→NSIS 安装、更新、重启、卸载实机回归；macOS 0.0.1→0.0.2 实际升级。
 - 正式 tag、COS 不可变产物、稳定清单、GitHub Release 与公网下载验收。
 
@@ -63,3 +63,13 @@ Windows 跨安装器升级尚未验收，不能将构建成功描述为升级验
 发现正式发布与恢复工作流的 COS SDK 契约测试仍指向迁移前的 `scripts`，本次实测原命令执行 0 个测试。两个入口改为 `scripts/zhishu`，复用原有两项 SDK 测试；L1 固定工作流接入修复，补丁登记 ZS-003 已补充。该改动不影响正在构建的候选安装包代码。
 
 修正后验证：临时虚拟环境安装 `cos-python-sdk-v5==1.9.44`，相同发现命令执行 2 项契约测试全部通过；完整 COS 套件 23 项全部通过、无跳过、无真实上传。工作流使用项目已有 Prettier YAML 解析器通过语法/格式稳定性检查；初始直接导入未安装的 `yaml` 包失败，未因此增加项目依赖。
+
+## 云端候选构建结果（2026-10-30 17:00，Asia/Shanghai）
+
+[构建演练 41027890897](https://github.com/zws-code/zhishu-ccs/actions/runs/41027890897) 的预检、macOS 两架构编译、universal 打包、Windows x64/ARM64 EXE 构建及发布产物校验全部成功。正式上传步骤未执行，GitHub Release 作业按手动演练条件跳过；线上仍为 0.0.1。
+
+已保存 `cos-payload-v0.0.2`（artifact `12965377474`，162613662 字节）以及各平台原产物。签名/哈希校验后的 dry-run 输出：`Validated v0.0.2; no network requests or uploads`。macOS 日志确认 `MACOS_SIGNING_MODE: adhoc`，`.app` 和 DMG 的 codesign 检查通过，未执行 Apple 公证。
+
+后续提交 `b0c781fb` 只修正正式发布/恢复流程的 COS SDK 测试发现目录并更新文档，未改变这批候选安装包的应用代码。该修复已执行真实 SDK 两项契约与全部 23 项 COS 测试，工作流 YAML 检查通过。
+
+仍未创建或推送 `v0.0.2`，尚未上传 COS 或切换稳定清单。正式发布须完成 ADR-0003 所要求的 Windows 跨安装器安装/升级验证；如果用户明确批准本次延期实机验收，应先登记批准范围与待补验收项，再推正式 tag。候选演练产物不能伪装成正式 tag 构建来源供恢复流程发布。
