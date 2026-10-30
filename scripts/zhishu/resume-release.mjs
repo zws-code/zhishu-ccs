@@ -17,13 +17,33 @@ export async function resolveReleaseSource(github, repo, runId) {
     workflow.path !== ".github/workflows/release.yml" ||
     run.event !== "push" ||
     run.status !== "completed" ||
-    !["failure", "success"].includes(run.conclusion) ||
+    !["failure", "success", "cancelled"].includes(run.conclusion) ||
     run.head_repository?.full_name !== `${repo.owner}/${repo.repo}` ||
     !/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(tag || "")
   )
     throw new Error(
       "Recovery requires a completed formal tag release from this repository",
     );
+  if (run.conclusion === "cancelled") {
+    const jobs = await github.paginate(
+      github.rest.actions.listJobsForWorkflowRun,
+      { ...repo, run_id: id, filter: "latest", per_page: 100 },
+    );
+    const publishers = jobs.filter(
+      (job) => job.name === "Validate artifacts and publish to COS",
+    );
+    if (
+      publishers.length !== 1 ||
+      !publishers[0].steps?.some(
+        (step) =>
+          step.name === "Save verified payload for retries" &&
+          step.conclusion === "success",
+      )
+    )
+      throw new Error(
+        "Cancelled release has no completed verified payload save",
+      );
+  }
   const { data: ref } = await github.rest.git.getRef({
     ...repo,
     ref: `tags/${tag}`,

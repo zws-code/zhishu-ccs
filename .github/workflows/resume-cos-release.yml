@@ -98,7 +98,7 @@ jobs:
       - name: Install COS SDK
         run: python -m pip install -r scripts/zhishu/cos-requirements.txt
       - name: Check actual COS SDK upload contract
-        run: python -B -m unittest discover -s scripts -p 'test_publish_cos.py' -k CosSdkContractTests
+        run: python -B -m unittest discover -s scripts/zhishu -p 'test_publish_cos.py' -k CosSdkContractTests
       - name: Resume COS publication without rebuilding
         env:
           COS_UPLOAD_ACCELERATE: ${{ steps.source.outputs.accelerate }}

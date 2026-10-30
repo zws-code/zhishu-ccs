@@ -4,9 +4,9 @@
 
 仓库：<https://github.com/zws-code/zhishu-ccs>。旧本地打包后 SSH 上传的二开脚本和配置示例已删除；本仓库在 COS 发布成功后自动创建智枢 GitHub Release，不运行上游 R2 镜像。上游相关实现保留，仅允许在上游仓库执行。
 
-本次作为首次正式发布，不兼容旧测试包的更新入口；旧测试用户直接安装正式包。后续正式版本必须沿用本次的应用身份及更新公钥；Windows 安装格式切换按 ADR-0003 验证。
+0.0.1 为首次正式发布，不兼容旧测试包的更新入口；旧测试用户直接安装正式包。后续正式版本沿用既有应用身份及更新公钥；Windows 安装格式切换按 ADR-0003 验证。
 
-## 当前打包策略（后续版本生效）
+## 当前打包策略（自 0.0.2 生效）
 
 Windows 仅构建 x64（Intel/AMD 64 位）和 ARM64 的 NSIS `.exe` 安装包及 `.exe.sig` 更新签名，不生成 MSI 或便携 ZIP。macOS universal 产物沿用原流程；Linux 暂停打包，普通 CI 中的 Linux 检查仍保留。
 
@@ -14,12 +14,21 @@ Windows 仅构建 x64（Intel/AMD 64 位）和 ARM64 的 NSIS `.exe` 安装包�
 
 **上线顺序**：先部署 zhishu-proxy 的 Windows `kind=exe` 解析兼容，再发布客户端新版本。x64/ARM64 必须完成 MSI → EXE 的安装、更新、重启、卸载验证。Linux 暂停仅允许移除明确的六个旧 Linux 更新键，不放宽 Windows/macOS 缺包、同版本不可变或禁止降级规则。详见 [ADR-0003](adr/ADR-0003-windows-exe-release.md)。
 
-下节是已发布的 v0.0.1 历史记录，链接及文件不因新策略而改名或覆盖。
+0.0.1 的历史链接及文件不因新策略而改名或覆盖。
+
+## 0.0.2 正式发布结果（2026-10-30）
+
+- 已于北京时间 **18:41:15** 发布，当前 GitHub Latest 为 [v0.0.2](https://github.com/zws-code/zhishu-ccs/releases/tag/v0.0.2)。原正式源码为 `1aba22d89c9afd10ef8959af5aa2d9259d385e58`，tag 未移动。
+- [原构建 41032256949](https://github.com/zws-code/zhishu-ccs/actions/runs/41032256949) 的全部平台构建成功，普通上传过慢后经用户明确授权取消；[国际加速恢复 41042420751](https://github.com/zws-code/zhishu-ccs/actions/runs/41042420751) 复用原 payload 完成 COS 和 GitHub 发布，没有重新编译。
+- 两个稳定清单已切到 0.0.2，4 个更新平台条目、4 个网页下载项。10 个 COS 文件实际下载并核对哈希，3 个独立更新包验证生产签名；GitHub 11 个附件大小与哈希全部匹配。
+- macOS 为 Intel/Apple Silicon universal DMG/ZIP，Windows 为 x64/ARM64 EXE；Linux 本版暂停。macOS 仍使用 adhoc、未公证；旧版本升级实机验收按本次用户批准延期。
+- IP 下载页清单已更新；`api.hnzhishu.cn` 的下载页及清单路径返回备案提示 HTML，域名入口需另行处理。COS 国内直连及 GitHub 下载正常。
+- 本次恢复明确开启 `accelerate`，保留 3 GB 上传读取上限；没有修改后续发布的默认仓库变量。完整记录、批准范围与文件哈希见 [0.0.2 发布记录](RELEASE-0.0.2.md)。
 
 ## 0.0.1 正式发布结果（2026-10-29）
 
 - `v0.0.1` 已正式发布，GitHub 发布时间为北京时间 **2026-10-29 15:21**。源码 tag 固定在 `b7619e916f3d7d1feb2d001c4ca279a99d8e6889`；[原正式构建](https://github.com/zws-code/zhishu-ccs/actions/runs/40825474319)完成全部平台编译与签名，上传参数不兼容的问题修复后，[复用原包的恢复发布](https://github.com/zws-code/zhishu-ccs/actions/runs/40834709561)中 COS 与 GitHub Release 两个作业均成功。没有重新编译或替换同版本安装包。
-- [GitHub Release v0.0.1](https://github.com/zws-code/zhishu-ccs/releases/tag/v0.0.1) 已标记为 Latest；25 个附件的大小和 SHA-256 全部与原发布记录匹配。
+- [GitHub Release v0.0.1](https://github.com/zws-code/zhishu-ccs/releases/tag/v0.0.1) 当时标记为 Latest；25 个附件的大小和 SHA-256 全部与原发布记录匹配。
 - COS 桶为广州 `zhishu-ccs-release-1252121424`，版本目录为 `ccs/stable/v0.0.1/`。24 个发布文件和独立 `release.json` 已上传；24 个文件均通过公网 HEAD 大小检查。
 - 根目录 `latest.json` 与 `client-release.json` 均已切到 `0.0.1`，并与版本目录对应清单逐字节一致；更新清单含 10 个平台/格式条目，网页清单含 12 个下载条目。
 - 已实际下载 45,320,138 字节的 macOS 更新包，SHA-256 为 `db4f238b4196a4552699b3c05e36f06bc637a605b171add32f7c3a2580d277f3`，用生产公钥验证 Tauri 更新签名成功。包内版本为 `0.0.1`，identifier 为 `com.zhishu.ccswitch.desktop`，包含 Intel 与 Apple Silicon 架构；已在实际二进制中核对 COS 更新地址和生产公钥。
@@ -45,10 +54,10 @@ Linux、便携包及全部签名见上述 Release 的 **Assets**。
 
 ### 第一步：准备下一个版本
 
-当前首次正式版本为 `0.0.1`。下一次可以使用 `0.0.2`，以下以它为例；**已经正式发布的版本号不能重复使用**。
+当前正式版本为 `0.0.2`。下一次可以使用 `0.0.3`，以下以它为例；**已经正式发布的版本号不能重复使用**。
 
 1. 在本机仓库完成本次要发布的代码，先用 `git status --short` 核对改动。
-2. 将以下文件中的应用版本统一改为 `0.0.2`：
+2. 将以下文件中的应用版本统一改为 `0.0.3`：
    - `package.json` 的顶层 `version`。
    - `src-tauri/tauri.conf.json` 的顶层 `version`。
    - `src-tauri/Cargo.toml` 的 `[package] version`。
@@ -58,11 +67,11 @@ Linux、便携包及全部签名见上述 Release 的 **Assets**。
 cargo update --workspace --manifest-path src-tauri/Cargo.toml
 ```
 
-4. 新增 `src/whats-new/0.0.2.json`。如无应用内公告，可使用下面的内容；要展示公告时遵循同目录 README 的多语言格式。
+4. 新增 `src/whats-new/0.0.3.json`。如无应用内公告，可使用下面的内容；要展示公告时遵循同目录 README 的多语言格式。
 
 ```json
 {
-  "version": "0.0.2",
+  "version": "0.0.3",
   "items": []
 }
 ```
@@ -86,24 +95,24 @@ git remote -v
 先用 `git add <具体源码文件>` 加入本次需要发布的代码，再加入版本文件和新公告。执行 `git diff --cached` 审查本次暂存内容后，再继续提交和推送：
 
 ```sh
-git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock src/whats-new/0.0.2.json
+git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock src/whats-new/0.0.3.json
 git diff --cached
-git commit -m "chore(release): prepare 0.0.2"
-git push zhishu-git HEAD:refs/heads/ccw-dev
+git commit -m "chore(release): prepare 0.0.3"
+git push zhishu-git HEAD:refs/heads/codex/release-0.0.3
 ```
 
-如需先演练，可到 [Actions 发布工作流](https://github.com/zws-code/zhishu-ccs/actions/workflows/release.yml) 点击 **Run workflow**，选择 `ccw-dev`。**Run workflow 只演练，不会正式上传 COS，也不会创建 GitHub Release。**
+如需先演练，可到 [Actions 发布工作流](https://github.com/zws-code/zhishu-ccs/actions/workflows/release.yml) 点击 **Run workflow**，选择 `codex/release-0.0.3`。**Run workflow 只演练，不会正式上传 COS，也不会创建 GitHub Release。**
 
 ### 第三步：推送正式 tag
 
 确认代码已提交、版本一致，而且不存在同名正式 tag，再执行：
 
 ```sh
-git tag v0.0.2
-git push zhishu-git v0.0.2
+git tag v0.0.3
+git push zhishu-git v0.0.3
 ```
 
-推送 tag 才是正式发布开关。之后在 [Actions](https://github.com/zws-code/zhishu-ccs/actions) 打开 `v0.0.2` 对应运行，等待构建、COS 发布和 **Publish GitHub Release after COS** 全部成功。如环境显示 **Review deployments**，由已配置的审核者批准本次部署。
+推送 tag 才是正式发布开关。之后在 [Actions](https://github.com/zws-code/zhishu-ccs/actions) 打开 `v0.0.3` 对应运行，等待构建、COS 发布和 **Publish GitHub Release after COS** 全部成功。如环境显示 **Review deployments**，由已配置的审核者批准本次部署。
 
 不要在工作流运行时取消任务、移动 tag 或重新上传同版本文件。首个 `v0.0.1` 曾有未成功的测试 tag，首次上线前做过一次修正；这不适用于以后已正式发布的 tag。
 
@@ -111,13 +120,13 @@ git push zhishu-git v0.0.2
 
 | 验收位置 | 应该看到什么 |
 | --- | --- |
-| [GitHub Releases](https://github.com/zws-code/zhishu-ccs/releases) | `智枢 CCS v0.0.2`，标记 Latest；下方 Assets 可直接下载 macOS `.dmg`、Windows 两种架构的 `.exe` 和签名 |
-| 腾讯云 COS 控制台 | 打开 `zhishu-ccs-release-1252121424`，进入 `ccs/stable/v0.0.2/`，看到安装包和清单；`ccs/stable/` 下有 `latest.json`、`client-release.json` |
+| [GitHub Releases](https://github.com/zws-code/zhishu-ccs/releases) | `智枢 CCS v0.0.3`，标记 Latest；下方 Assets 可直接下载 macOS `.dmg`、Windows 两种架构的 `.exe` 和签名 |
+| 腾讯云 COS 控制台 | 打开 `zhishu-ccs-release-1252121424`，进入 `ccs/stable/v0.0.3/`，看到安装包和清单；`ccs/stable/` 下有 `latest.json`、`client-release.json` |
 | 客户端 | 用正式安装版启动，启动时会检查更新；也可进入“设置 → 关于”检查更新，有新版时按提示安装并重启 |
 
 公网更新清单为 [latest.json](https://zhishu-ccs-release-1252121424.cos.ap-guangzhou.myqcloud.com/ccs/stable/latest.json)，网页下载清单为 [client-release.json](https://zhishu-ccs-release-1252121424.cos.ap-guangzhou.myqcloud.com/ccs/stable/client-release.json)。清单中的版本应等于本次发布版本，下载链接应指向该版本目录。
 
-后续版本首次安装选择 macOS `.dmg` 或 Windows 对应架构的 `.exe`。Windows 原 MSI 安装用户必须覆盖跨安装器升级回归；旧便携版手动安装，Linux 暂无新版本包。`0.0.1` 是首次正式版本，同版本检查应显示已是最新；完整升级验收需要后续 `0.0.2` 从正式 `0.0.1` 实际完成下载、验签、安装与重启。
+后续版本首次安装选择 macOS `.dmg` 或 Windows 对应架构的 `.exe`。Windows 原 MSI 安装用户必须覆盖跨安装器升级回归；旧便携版手动安装，Linux 暂无新版本包。`0.0.1` 是首次正式版本；0.0.1→0.0.2 的实际下载、验签、安装与重启验收仍按本次批准待补，后续版本也需完成对应升级验证。
 
 当前 macOS 使用 `adhoc`，没有 Apple 公证；Tauri 更新签名仍启用。当前分发使用 COS 默认域名，CDN 尚未接入。
 
@@ -137,9 +146,11 @@ GitHub 的海外构建机直传广州桶可能很慢；本次普通上传遇到�
 
 ### 上传脚本修复后：用原包恢复发布
 
-如果正式 tag 的安装包已构建成功并保存，但需要修复上传脚本，重跑旧的正式工作流仍使用旧脚本。此时到 [Resume verified COS release](https://github.com/zws-code/zhishu-ccs/actions/workflows/resume-cos-release.yml)，点击 **Run workflow**，选择已修复脚本所在的 `ccw-dev` 分支，填写原正式构建的 **run_id**。桶全球加速已开启且愿意承担本次流量费用时，可勾选 `accelerate`；默认不勾选。
+如果正式 tag 的安装包已构建成功并保存，但需要修复上传脚本，重跑旧的正式工作流仍使用旧脚本。此时到 [Resume verified COS release](https://github.com/zws-code/zhishu-ccs/actions/workflows/resume-cos-release.yml)，点击 **Run workflow**，选择已修复脚本所在的分支（本次为 `codex/release-0.0.2`），填写原正式构建的 **run_id**。桶全球加速已开启且愿意承担本次流量费用时，可勾选 `accelerate`；默认不勾选。
 
-run_id 是原 Actions 页面地址末尾的数字。例如本次原正式运行是 `40825474319`，网址为 `https://github.com/zws-code/zhishu-ccs/actions/runs/40825474319`。恢复入口会核对原工作流、正式 tag、原提交和未过期的 `cos-payload-v<版本>`，再次验证签名与哈希后实际上传 COS，再创建 GitHub Release。它不编译、不移动 tag、不生成另一套同版本包；原产物已过期时不能使用，应发新版本。
+run_id 是原 Actions 页面地址末尾的数字。例如 0.0.2 原正式运行是 `41032256949`，网址为 `https://github.com/zws-code/zhishu-ccs/actions/runs/41032256949`。恢复入口会核对原工作流、正式 tag、原提交和未过期的 `cos-payload-v<版本>`，再次验证签名与哈希后实际上传 COS，再创建 GitHub Release。它不编译、不移动 tag、不生成另一套同版本包；原产物已过期时不能使用，应发新版本。
+
+取消的正式运行仅在 `Save verified payload for retries` 已成功、原 tag 未移动且存在唯一未过期 payload 时可恢复，仍重新验证全部签名与哈希。不能用取消来跳过构建或产物检查；0.0.2 因普通上传过慢，维护者在发布会话中明确批准停止并改用国际加速，记录见 [0.0.2 发布记录](RELEASE-0.0.2.md)。
 
 注意：**这个恢复工作流会实际发布**，与 `Release to Tencent COS` 的手动演练不同。后台也可推送专用分支 `codex/cos-resume` 触发恢复，但提交说明必须带单独一行 `Resume-Release-Run: <原正式run_id>`；本次需要加速时再加单独一行 `Resume-Release-Accelerate: true`。日常优先使用上述页面输入方式。
 

@@ -22,6 +22,7 @@ function fixture(change = {}) {
           data: { path: change.path || ".github/workflows/release.yml" },
         }),
         listWorkflowRunArtifacts: () => {},
+        listJobsForWorkflowRun: () => {},
       },
       git: {
         getRef: async () => ({
@@ -32,8 +33,10 @@ function fixture(change = {}) {
         }),
       },
     },
-    paginate: async () =>
-      change.artifacts || [{ name: "cos-payload-v0.0.1", expired: false }],
+    paginate: async (method) =>
+      method.name === "listJobsForWorkflowRun"
+        ? change.jobs || []
+        : change.artifacts || [{ name: "cos-payload-v0.0.1", expired: false }],
   };
 }
 
@@ -70,4 +73,46 @@ test("validation runs, other repositories/workflows and moved tags cannot publis
     await assert.rejects(resolveReleaseSource(fixture(change), repo, "123"));
   for (const runId of ["", "123; command", "-1", "9007199254740992"])
     await assert.rejects(resolveReleaseSource(fixture(), repo, runId));
+});
+
+test("cancelled formal releases require a completed verified payload save", async () => {
+  const publisher = {
+    name: "Validate artifacts and publish to COS",
+    steps: [
+      { name: "Save verified payload for retries", conclusion: "success" },
+    ],
+  };
+  const cancelled = { run: { conclusion: "cancelled" }, jobs: [publisher] };
+  const result = await resolveReleaseSource(fixture(cancelled), repo, "123");
+  assert.equal(result.sha, "original-signed-build");
+  for (const jobs of [
+    [],
+    [publisher, publisher],
+    [{ ...publisher, steps: [] }],
+    [
+      {
+        ...publisher,
+        steps: [{ ...publisher.steps[0], conclusion: "cancelled" }],
+      },
+    ],
+    [
+      {
+        ...publisher,
+        steps: [{ ...publisher.steps[0], conclusion: "failure" }],
+      },
+    ],
+  ])
+    await assert.rejects(
+      resolveReleaseSource(fixture({ ...cancelled, jobs }), repo, "123"),
+      /completed verified payload save/,
+    );
+  for (const change of [
+    { run: { conclusion: "cancelled", status: "in_progress" } },
+    { ref: { type: "commit", sha: "moved-tag" } },
+    { artifacts: [] },
+    { artifacts: [{ name: "cos-payload-v0.0.1", expired: true }] },
+  ])
+    await assert.rejects(
+      resolveReleaseSource(fixture({ ...cancelled, ...change }), repo, "123"),
+    );
 });

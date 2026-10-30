@@ -830,7 +830,7 @@ jobs:
 
       - name: Check actual COS SDK upload contract
         if: github.event_name == 'push' && github.ref_type == 'tag'
-        run: python -B -m unittest discover -s scripts -p 'test_publish_cos.py' -k CosSdkContractTests
+        run: python -B -m unittest discover -s scripts/zhishu -p 'test_publish_cos.py' -k CosSdkContractTests
 
       - name: Publish immutable artifacts and stable manifests
         if: github.event_name == 'push' && github.ref_type == 'tag'
