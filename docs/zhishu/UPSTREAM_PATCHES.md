@@ -319,3 +319,5 @@ L3 的统一依据见 [ADR-0002](adr/ADR-0002-structure-and-history.md)，数据
 ## 0.0.2 发布准备复核（2026-10-30）
 
 复核 ZS-044、ZS-046、ZS-047、ZS-148：应用版本统一为 0.0.2，侵入等级 L1。版本字段由 npm/Cargo/Tauri 固定入口读取，不能由新增 Adapter 替代；复用既有打包、签名、COS 发布与更新实现，应用身份和更新协议不变。新增 `src/whats-new/0.0.2.json`；验证及发布状态见 [0.0.2 发布记录](RELEASE-0.0.2.md)。
+
+发布准备补充复核 ZS-003（L1）：`.github/workflows/release.yml` 的 COS SDK 契约测试发现目录由 `scripts` 改为实际的 `scripts/zhishu`；自有恢复工作流同步修正。原命令实测执行 0 项测试，固定工作流入口必须直接修正，新增模块不能改变 unittest 的发现目录。未改变构建、签名、上传策略及权限。
