@@ -113,12 +113,20 @@ def load_payload(directory):
     return receipt, latest
 
 
+# ADR-0003: Linux packaging is paused. Keep all other platform-loss protection.
+PAUSED_UPDATER_PLATFORMS = frozenset({
+    "linux-x86_64", "linux-aarch64",
+    "linux-x86_64-deb", "linux-aarch64-deb",
+    "linux-x86_64-rpm", "linux-aarch64-rpm",
+})
+
+
 def check_promotion(current, incoming):
     if current is None:
         return
     if version(current["version"]) > version(incoming["version"]):
         raise ReleaseError("Refusing to downgrade the stable release")
-    if not set(current["platforms"]) <= set(incoming["platforms"]):
+    if set(current["platforms"]) - set(incoming["platforms"]) - PAUSED_UPDATER_PLATFORMS:
         raise ReleaseError("Previously released platforms are missing")
     if current["version"] == incoming["version"] and current != incoming:
         raise ReleaseError("A published version is immutable; use a new version")

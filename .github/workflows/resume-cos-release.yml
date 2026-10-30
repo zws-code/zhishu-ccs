@@ -81,11 +81,11 @@ jobs:
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs';
           import assert from 'node:assert/strict';
-          import { collectUpdaterPlatforms, targets } from './scripts/zhishu/release-artifacts.mjs';
+          import { collectReceiptUpdaterPlatforms } from './scripts/zhishu/release-artifacts.mjs';
           const receipt = JSON.parse(readFileSync('cos-payload/release.json'));
           assert.equal(receipt.tag, process.env.SOURCE_TAG);
           assert.equal(receipt.downloadBaseUrl, process.env.COS_PUBLIC_BASE_URL.replace(/\/+$/, ''));
-          const platforms = collectUpdaterPlatforms('cos-payload', Object.keys(targets), receipt.version,
+          const platforms = collectReceiptUpdaterPlatforms('cos-payload', receipt,
             { updatePublicKey: process.env.ZHISHU_UPDATE_PUBLIC_KEY }, { downloadBaseUrl: receipt.downloadBaseUrl });
           assert.deepEqual(JSON.parse(readFileSync('cos-payload/latest.json')).platforms, platforms);
           console.log('Original payload signatures verified');
@@ -138,7 +138,7 @@ jobs:
 
             此版本复用原正式构建的安装包、签名和清单，COS 发布完成后提供 GitHub 下载。
 
-            在下方 Assets 选择 macOS `.dmg`（Intel / Apple Silicon 通用）、Windows `.msi`，或对应架构的 Linux 安装包。
+            在下方 Assets 选择对应系统和架构的原始安装包。新版本 Windows 使用 `.exe`；历史版本可能包含 `.msi` 和 Linux 包。
             `.tar.gz` 和 `.sig` 用于客户端更新与验签。客户端自动更新使用 COS 更新源。
 
             [COS 下载清单](${{ env.COS_PUBLIC_BASE_URL }}/${{ needs.resume-cos.outputs.tag }}/client-release.json)

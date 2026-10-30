@@ -12,7 +12,13 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { artifactNames, hashFile, targets } from "./release-artifacts.mjs";
+import {
+  artifactNames,
+  collectReceiptUpdaterPlatforms,
+  hashFile,
+  legacyTargets,
+  targets,
+} from "./release-artifacts.mjs";
 import { checkVersion, cosConfig, prepareCosPayload } from "./cos-release.mjs";
 
 function fixture(fn) {
@@ -59,12 +65,14 @@ const environment = (key) => ({
   ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP: "false",
   ZHISHU_UPDATE_ALLOW_INSECURE_HTTP: "false",
 });
-function payload(dir, mutate = () => {}) {
+function payload(dir, mutate = () => {}, definitions = targets) {
   const key = identity();
   const assets = join(dir, "assets");
   mkdirSync(assets);
-  for (const id of Object.keys(targets)) {
-    for (const [ext, name] of Object.entries(artifactNames(id, "1.0.0"))) {
+  for (const id of Object.keys(definitions)) {
+    for (const [ext, name] of Object.entries(
+      artifactNames(id, "1.0.0", definitions),
+    )) {
       const data = Buffer.from(`fixture ${name}`);
       writeFileSync(join(assets, name), data);
       if (!["dmg", "zip"].includes(ext))
@@ -125,18 +133,38 @@ test("tag must match all three committed versions and an existing summary", () =
 
 test("all platforms get verified signatures and CDN manifests with accurate sizes and hashes", () =>
   fixture((dir) => {
-    const { assets, out, env } = payload(dir, (assets) =>
-      writeFileSync(
-        join(assets, "Zhishu-Ccs-v1.0.0-Windows-Portable.zip"),
-        "portable",
-      ),
-    );
+    const { assets, out, env } = payload(dir);
     const receipt = prepareCosPayload(assets, "v1.0.0", out, env);
-    assert.equal(receipt.targets.length, 5);
+    assert.equal(receipt.targets.length, 3);
     const latest = JSON.parse(readFileSync(join(out, "latest.json")));
     const website = JSON.parse(readFileSync(join(out, "client-release.json")));
-    assert.equal(Object.keys(latest.platforms).length, 10);
-    assert.equal(website.files.length, 11);
+    assert.equal(Object.keys(latest.platforms).length, 4);
+    assert.equal(website.files.length, 4);
+    assert.equal(receipt.packaging, "nsis-v1");
+    assert.deepEqual(Object.keys(latest.platforms).sort(), [
+      "darwin-aarch64",
+      "darwin-x86_64",
+      "windows-aarch64",
+      "windows-x86_64",
+    ]);
+    assert.deepEqual(
+      website.files
+        .filter((file) => file.platform === "windows")
+        .map(({ arch, kind }) => ({ arch, kind })),
+      [
+        { arch: "arm64", kind: "exe" },
+        { arch: "x64", kind: "exe" },
+      ],
+    );
+    assert.deepEqual(
+      collectReceiptUpdaterPlatforms(
+        out,
+        receipt,
+        { updatePublicKey: env.ZHISHU_UPDATE_PUBLIC_KEY },
+        { downloadBaseUrl: env.COS_PUBLIC_BASE_URL },
+      ),
+      latest.platforms,
+    );
     assert.equal(latest.pub_date, "2026-10-29T03:00:00Z");
     for (const item of receipt.files)
       assert.equal(item.sha256, hashFile(join(out, item.name)));
@@ -160,8 +188,8 @@ test("all platforms get verified signatures and CDN manifests with accurate size
 test("tampered installers, missing platforms and wrong keys fail before preparing upload files", () => {
   for (const mutate of [
     (assets) =>
-      writeFileSync(join(assets, "Zhishu-Ccs-v1.0.0-Windows.msi"), "tampered"),
-    (assets) => rmSync(join(assets, "Zhishu-Ccs-v1.0.0-Linux-arm64.AppImage")),
+      writeFileSync(join(assets, "Zhishu-Ccs-v1.0.0-Windows.exe"), "tampered"),
+    (assets) => rmSync(join(assets, "Zhishu-Ccs-v1.0.0-Windows-arm64.exe")),
     (assets) => rmSync(join(assets, "Zhishu-Ccs-v1.0.0-macOS.tar.gz.sig")),
   ])
     fixture((dir) => {
@@ -192,4 +220,57 @@ test("unexpected files cannot leak into the public payload", () =>
       /非预期/,
     );
     assert.equal(existsSync(out), false);
+  }));
+
+test("new releases reject legacy MSI, portable ZIP and paused Linux assets", () => {
+  for (const name of [
+    "Zhishu-Ccs-v1.0.0-Windows.msi",
+    "Zhishu-Ccs-v1.0.0-Windows-Portable.zip",
+    "Zhishu-Ccs-v1.0.0-Linux-arm64.deb",
+  ])
+    fixture((dir) => {
+      const { assets, out, env } = payload(dir, (assets) =>
+        writeFileSync(join(assets, name), "legacy"),
+      );
+      assert.throws(
+        () => prepareCosPayload(assets, "v1.0.0", out, env),
+        /非预期/,
+      );
+      assert.equal(existsSync(out), false);
+    });
+});
+
+test("recovery verifies the original MSI/Linux payload using its historical receipt", () =>
+  fixture((dir) => {
+    const { assets, env } = payload(dir, () => {}, legacyTargets);
+    const receipt = { version: "1.0.0", targets: Object.keys(legacyTargets) };
+    const config = { updatePublicKey: env.ZHISHU_UPDATE_PUBLIC_KEY };
+    const publish = { downloadBaseUrl: env.COS_PUBLIC_BASE_URL };
+    const platforms = collectReceiptUpdaterPlatforms(
+      assets,
+      receipt,
+      config,
+      publish,
+    );
+    assert.equal(Object.keys(platforms).length, 10);
+    assert.ok(platforms["windows-x86_64"].url.endsWith("-Windows.msi"));
+    assert.ok(platforms["windows-aarch64"].url.endsWith("-Windows-arm64.msi"));
+    assert.ok(platforms["linux-aarch64-deb"].url.endsWith("-Linux-arm64.deb"));
+    for (const changed of [
+      { ...receipt, packaging: "unknown" },
+      { ...receipt, targets: receipt.targets.slice(1) },
+      { ...receipt, packaging: "nsis-v1" },
+    ])
+      assert.throws(
+        () => collectReceiptUpdaterPlatforms(assets, changed, config, publish),
+        /打包策略/,
+      );
+    writeFileSync(
+      join(assets, "Zhishu-Ccs-v1.0.0-Windows-arm64.msi"),
+      "corrupted",
+    );
+    assert.throws(
+      () => collectReceiptUpdaterPlatforms(assets, receipt, config, publish),
+      /签名/,
+    );
   }));

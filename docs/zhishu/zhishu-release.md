@@ -4,7 +4,17 @@
 
 仓库：<https://github.com/zws-code/zhishu-ccs>。旧本地打包后 SSH 上传的二开脚本和配置示例已删除；本仓库在 COS 发布成功后自动创建智枢 GitHub Release，不运行上游 R2 镜像。上游相关实现保留，仅允许在上游仓库执行。
 
-本次作为首次正式发布，不兼容旧测试包的更新入口；旧测试用户直接安装正式包。后续正式版本必须沿用本次的应用身份、Windows 安装身份及更新公钥。
+本次作为首次正式发布，不兼容旧测试包的更新入口；旧测试用户直接安装正式包。后续正式版本必须沿用本次的应用身份及更新公钥；Windows 安装格式切换按 ADR-0003 验证。
+
+## 当前打包策略（后续版本生效）
+
+Windows 仅构建 x64（Intel/AMD 64 位）和 ARM64 的 NSIS `.exe` 安装包及 `.exe.sig` 更新签名，不生成 MSI 或便携 ZIP。macOS universal 产物沿用原流程；Linux 暂停打包，普通 CI 中的 Linux 检查仍保留。
+
+新版本 `latest.json` 只含 `darwin-aarch64`、`darwin-x86_64`、`windows-aarch64`、`windows-x86_64` 四个条目；官网清单为 macOS DMG/ZIP 和两种 Windows EXE，共四个下载项。`release.json` 用 `packaging: nsis-v1` 标识新策略，恢复流程仍能验证未带该字段的历史 MSI/Linux 包。
+
+**上线顺序**：先部署 zhishu-proxy 的 Windows `kind=exe` 解析兼容，再发布客户端新版本。x64/ARM64 必须完成 MSI → EXE 的安装、更新、重启、卸载验证。Linux 暂停仅允许移除明确的六个旧 Linux 更新键，不放宽 Windows/macOS 缺包、同版本不可变或禁止降级规则。详见 [ADR-0003](adr/ADR-0003-windows-exe-release.md)。
+
+下节是已发布的 v0.0.1 历史记录，链接及文件不因新策略而改名或覆盖。
 
 ## 0.0.1 正式发布结果（2026-10-29）
 
@@ -101,13 +111,13 @@ git push zhishu-git v0.0.2
 
 | 验收位置 | 应该看到什么 |
 | --- | --- |
-| [GitHub Releases](https://github.com/zws-code/zhishu-ccs/releases) | `智枢 CCS v0.0.2`，标记 Latest；下方 Assets 可直接下载 `.dmg`、`.msi`、Linux 包和签名 |
+| [GitHub Releases](https://github.com/zws-code/zhishu-ccs/releases) | `智枢 CCS v0.0.2`，标记 Latest；下方 Assets 可直接下载 macOS `.dmg`、Windows 两种架构的 `.exe` 和签名 |
 | 腾讯云 COS 控制台 | 打开 `zhishu-ccs-release-1252121424`，进入 `ccs/stable/v0.0.2/`，看到安装包和清单；`ccs/stable/` 下有 `latest.json`、`client-release.json` |
 | 客户端 | 用正式安装版启动，启动时会检查更新；也可进入“设置 → 关于”检查更新，有新版时按提示安装并重启 |
 
 公网更新清单为 [latest.json](https://zhishu-ccs-release-1252121424.cos.ap-guangzhou.myqcloud.com/ccs/stable/latest.json)，网页下载清单为 [client-release.json](https://zhishu-ccs-release-1252121424.cos.ap-guangzhou.myqcloud.com/ccs/stable/client-release.json)。清单中的版本应等于本次发布版本，下载链接应指向该版本目录。
 
-第一次安装选择 macOS `.dmg` 或 Windows `.msi`。Windows 便携版使用手动下载方式，不将其当作安装版自动更新验收；Linux 使用相应包格式的更新行为。`0.0.1` 是首次正式版本，同版本检查应显示已是最新；完整升级验收需要后续 `0.0.2` 从正式 `0.0.1` 实际完成下载、验签、安装与重启。
+后续版本首次安装选择 macOS `.dmg` 或 Windows 对应架构的 `.exe`。Windows 原 MSI 安装用户必须覆盖跨安装器升级回归；旧便携版手动安装，Linux 暂无新版本包。`0.0.1` 是首次正式版本，同版本检查应显示已是最新；完整升级验收需要后续 `0.0.2` 从正式 `0.0.1` 实际完成下载、验签、安装与重启。
 
 当前 macOS 使用 `adhoc`，没有 Apple 公证；Tauri 更新签名仍启用。当前分发使用 COS 默认域名，CDN 尚未接入。
 
@@ -275,8 +285,8 @@ git push zhishu-git HEAD:refs/heads/codex/cos-validation
 | 构建机 | 产物 |
 | --- | --- |
 | macOS | Intel/Apple Silicon universal DMG、ZIP、签名 tar.gz 更新包 |
-| Windows x64 / ARM64 | MSI、签名及继承的便携包 |
-| Linux x64 / ARM64 | AppImage、DEB、RPM 和各自签名 |
+| Windows x64 / ARM64 | NSIS EXE 安装包及 `.exe.sig` 更新签名 |
+| Linux x64 / ARM64 | 暂停构建和发布新包 |
 
 工作流使用 `package.json` 指定的 pnpm 和 `rust-toolchain.toml` 指定的 Rust，不在本机模拟其他系统已完成构建。
 
@@ -294,10 +304,10 @@ git push zhishu-git v<新版本号>
 工作流会：
 
 1. 检查 tag、三个源码版本、应用内公告及发布配置。
-2. 构建全部平台，并按选择完成 Apple 签名/公证。
+2. 构建 macOS universal 和 Windows x64/ARM64 EXE，并按选择完成 Apple 签名/公证。
 3. 验证安装包与每个更新包的 minisign 签名；生成 CDN URL、真实文件大小、SHA-256 和两份不同用途的清单。
 4. 保存已验证的 `cos-payload-v<版本>` artifact，供失败后使用原产物重试。
-5. 检查 COS 旧版清单，拒绝降版本、漏已发布平台和同版本不同内容。
+5. 检查 COS 旧版清单，仅允许 ADR-0003 列明的 Linux 平台暂停；继续拒绝降版本、其他平台缺失和同版本不同内容。
 6. 先预留不可变版本输入，再上传版本目录，检查 COS 对象和 CDN 公网文件。
 7. 公网检查通过后，依次发布根目录 `client-release.json`、`latest.json`，读回校验并等待 CDN 清单与本地一致。
 8. COS 作业成功后，独立作业下载同一份 `cos-payload-v<版本>` artifact，创建正式、非预发布的 GitHub Release，设为 Latest，并附上全部已验证安装包、签名及清单。在仓库右侧 **Releases** 或工作流摘要中的下载链接进入，在版本页面展开 **Assets** 选择安装包。macOS 发布说明按实际签名模式生成，不把 `adhoc` 称为 Apple 公证。
@@ -341,7 +351,7 @@ python3 -B scripts/zhishu/publish-cos.py <已验证的cos-payload目录> --dry-r
 | `pnpm build` | 开启，需私钥 | 本机正式配置验证，不上传产物 |
 | `pnpm release:prepare` | 仅生成配置 | 校验配置，不编译 |
 
-底层参数由包装脚本传给 Tauri，例如 `pnpm build -- --target universal-apple-darwin --bundles app,dmg --ci`。不得额外传 `--config` 覆盖发布策略。默认目标为本机架构，默认 bundle 来自 `tauri.conf.json`；Windows/Linux 安装包需对应系统构建。产物在 `src-tauri/target/[<target>/]release/bundle/`，设置 `CARGO_TARGET_DIR` 时以该目录为准。
+底层参数由包装脚本传给 Tauri，例如 `pnpm build -- --target universal-apple-darwin --bundles app,dmg --ci`。不得额外传 `--config` 覆盖发布策略。默认目标为本机架构；Windows 的 `tauri.windows.conf.json` 将默认 bundle 限定为 NSIS，可在 Windows 上运行 `pnpm build -- --target aarch64-pc-windows-msvc --bundles nsis --ci` 构建 ARM64。Linux 不纳入本轮发行矩阵，底层 Tauri/Linux 开发能力保留。产物在 `src-tauri/target/[<target>/]release/bundle/`，设置 `CARGO_TARGET_DIR` 时以该目录为准。
 
 配置环境变量沿用 `VITE_PLATFORM_API_URL`、`VITE_PLATFORM_WEB_URL`、`ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP`、`ZHISHU_UPDATE_URL`、`ZHISHU_UPDATE_PUBLIC_KEY`、`ZHISHU_UPDATE_ALLOW_INSECURE_HTTP`。私钥只通过 `TAURI_SIGNING_PRIVATE_KEY` 和可选的 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 注入，不写入应用配置。
 

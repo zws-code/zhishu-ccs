@@ -302,3 +302,16 @@ L3 的统一依据见 [ADR-0002](adr/ADR-0002-structure-and-history.md)，数据
 | SYNC-20261029-40 | `src-tauri/tests/golden/claude_key_fields.rs` | 将显式档位替换与缺失档位派生分开验证，覆盖原始数据库配置不变 | 原 golden 契约未覆盖分支既有派生行为；不修改生产实现 | L0 | golden 集成测试 | 既有 with_derived_model_slots 语义 |
 | SYNC-20261029-41 | `src-tauri/tests/provider_service.rs` | 集成夹具使用智枢既有 .zhishu-ccs 数据目录，验证账号镜像和 Skills 备份恢复 | 测试硬编码旧上游目录导致夹具未进入实际服务目录；不修改生产路径 | L0 | provider_service / skill_sync | 旧路径在合并测试中遗漏适配 |
 | SYNC-20261029-42 | `src-tauri/tests/skill_sync.rs` | 集成夹具使用智枢既有 .zhishu-ccs 数据目录，验证账号镜像和 Skills 备份恢复 | 测试硬编码旧上游目录导致夹具未进入实际服务目录；不修改生产路径 | L0 | provider_service / skill_sync | 旧路径在合并测试中遗漏适配 |
+
+
+## 2026-10-29 Windows EXE / Linux 暂停打包补丁
+
+依据：[ADR-0003](adr/ADR-0003-windows-exe-release.md)。功能分支：`feat/windows-exe-release`。
+
+| ID | 上游文件 | 原因 | 为什么不能仅新增/包装 | 级别 | 对应测试 | 最后复核 |
+|---|---|---|---|---|---|---|
+| BUILD-20261029-01 | `.github/workflows/release.yml` | Windows 仅打包 x64/ARM64 NSIS EXE，移除 Linux 打包及便携 ZIP，复用自有脚本生成更新清单 | GitHub 的固定工作流入口必须调整现有矩阵、命令与产物收集，新增 Adapter 无法取消已有构建 | L1 | 发布脚本、工作流语法；Windows 实机待验证 | 2026-10-29 / ADR-0003 |
+| BUILD-20261029-02 | `src-tauri/tauri.windows.conf.json` | Windows 默认使用 NSIS/currentUser，与 CI 和原 MSI perUser 范围一致 | Tauri 按固定平台配置合并默认打包目标，业务包装无法改变该默认值 | L1 | 配置 Schema；Windows 安装/升级待验证 | 2026-10-29 / ADR-0003 |
+| BUILD-20261029-03 | `scripts/generate-download-manifest.mjs` | 官网清单识别 x64/ARM64 EXE，保留历史包格式读取 | 所有发布入口复用该生成器，需要扩展同一格式规则而非新增平行清单 | L1 | 产物及官网解析/下载展示回归 | 2026-10-29 / ADR-0003 |
+
+自有文件同步调整：`scripts/zhishu/release-artifacts.mjs`、`cos-release.mjs`、`publish-cos.py` 及对应测试，`.github/workflows/resume-cos-release.yml`、发布说明和 ADR。COS 仅对六个明确的旧 Linux updater 键允许暂停；仍拒绝其他平台丢失、降级、同版本改包。历史恢复依原收据识别旧 MSI/Linux 产物。

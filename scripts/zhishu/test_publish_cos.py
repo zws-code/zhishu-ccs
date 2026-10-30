@@ -44,10 +44,10 @@ class MemoryStore:
 
 
 def payload(directory, number="1.0.0", platforms=None):
-    platforms = platforms or ["darwin-aarch64", "darwin-x86_64", "windows-x86_64"]
-    installer = directory / "test.msi"
+    platforms = platforms or ["darwin-aarch64", "darwin-x86_64", "windows-x86_64", "windows-aarch64"]
+    installer = directory / "test.exe"
     installer.write_bytes(b"signed-fixture-installer")
-    url = BASE + "/v" + number + "/test.msi"
+    url = BASE + "/v" + number + "/test.exe"
     latest = {"version": number, "platforms": {name: {"url": url, "signature": "fixture"} for name in platforms}}
     (directory / "latest.json").write_text(json.dumps(latest))
     (directory / "client-release.json").write_text(json.dumps({"version": number, "files": [{"url": url}]}))
@@ -84,7 +84,7 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(self.store.objects, before)
 
     def test_upload_failure_leaves_both_stable_manifests_untouched(self):
-        self.store.fail_at = PREFIX + "/v1.0.0/test.msi"
+        self.store.fail_at = PREFIX + "/v1.0.0/test.exe"
         with self.assertRaises(module.ReleaseError):
             self.publish()
         self.assertNotIn(PREFIX + "/latest.json", self.store.objects)
@@ -103,13 +103,36 @@ class PublisherTests(unittest.TestCase):
     def test_newer_stable_or_missing_platforms_refused_before_upload(self):
         for current in [
             {**self.latest, "version": "2.0.0"},
-            {"version": "0.9.0", "platforms": {"linux-aarch64": {}}},
+            {"version": "0.9.0", "platforms": {"windows-i686": {}}},
             {**self.latest, "notes": "different release"},
         ]:
             self.store.objects[PREFIX + "/latest.json"] = json.dumps(current).encode()
             with self.assertRaises(module.ReleaseError):
                 self.publish()
             self.assertEqual(self.store.events, [])
+
+    def test_linux_pause_promotes_without_deleting_historical_artifacts(self):
+        current = {**self.latest, "version": "0.9.0", "platforms": {
+            **self.latest["platforms"],
+            **{key: {} for key in module.PAUSED_UPDATER_PLATFORMS},
+        }}
+        self.store.objects[PREFIX + "/latest.json"] = json.dumps(current).encode()
+        old_key = PREFIX + "/v0.9.0/Linux.AppImage"
+        self.store.objects[old_key] = b"old installer"
+        self.publish()
+        self.assertEqual(json.loads(self.store.objects[PREFIX + "/latest.json"]), self.latest)
+        self.assertEqual(self.store.objects[old_key], b"old installer")
+
+    def test_pause_exception_does_not_allow_other_platform_loss_or_same_version_changes(self):
+        current = {**self.latest, "version": "0.9.0"}
+        for key in [*self.latest["platforms"], "linux-riscv64"]:
+            old = {**current, "platforms": {**current["platforms"], key: {}}}
+            incoming = {**self.latest, "platforms": {k: v for k, v in self.latest["platforms"].items() if k != key}}
+            with self.subTest(platform=key), self.assertRaisesRegex(module.ReleaseError, "platforms are missing"):
+                module.check_promotion(old, incoming)
+        old = {**self.latest, "platforms": {**self.latest["platforms"], "linux-aarch64": {}}}
+        with self.assertRaisesRegex(module.ReleaseError, "immutable"):
+            module.check_promotion(old, self.latest)
 
     def test_recheck_rejects_newer_release_appearing_during_upload(self):
         def promote_during_check(*args):
@@ -123,7 +146,7 @@ class PublisherTests(unittest.TestCase):
         self.store.objects[PREFIX + "/v1.0.0/release.json"] = b"other build"
         with self.assertRaises(module.ReleaseError):
             self.publish()
-        self.assertNotIn(PREFIX + "/v1.0.0/test.msi", self.store.objects)
+        self.assertNotIn(PREFIX + "/v1.0.0/test.exe", self.store.objects)
 
     def test_failure_between_manifest_writes_can_resume(self):
         self.store.fail_at = PREFIX + "/latest.json"
@@ -140,7 +163,7 @@ class PublisherTests(unittest.TestCase):
             self.publish()
         self.assertEqual(self.store.events, [])
         (self.directory / "unlisted.key").unlink()
-        (self.directory / "test.msi").write_bytes(b"corrupt")
+        (self.directory / "test.exe").write_bytes(b"corrupt")
         with self.assertRaises(module.ReleaseError):
             self.publish()
 
@@ -225,9 +248,9 @@ class CosAdapterTests(unittest.TestCase):
         store.client = types.SimpleNamespace(put_object=lambda **kwargs: captured.append(kwargs))
         store.upload_client = store.client
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "test.msi"
+            path = Path(directory) / "test.exe"
             path.write_bytes(b"installer")
-            store.put("ccs/stable/v1.0.0/test.msi", path, True)
+            store.put("ccs/stable/v1.0.0/test.exe", path, True)
             self.assertEqual(captured[-1]["Metadata"], {"x-cos-meta-sha256": module.digest(path), "x-cos-forbid-overwrite": "true"})
             self.assertNotIn("ForbidOverwrite", captured[-1])
             self.assertFalse(captured[-1]["EnableMD5"])
@@ -278,13 +301,13 @@ class UploadProgressTests(unittest.TestCase):
     def test_progress_wrap_preserves_bytes_and_sdk_retry_seek(self):
         data = b"installer" * 300000
         stream = io.BytesIO(data)
-        body = module.UploadBody(stream, "test.msi", len(data))
+        body = module.UploadBody(stream, "test.exe", len(data))
         output = io.StringIO()
         with redirect_stdout(output):
             self.assertEqual(body.read(1024 * 1024), data[:1024 * 1024])
             body.seek(0)
             self.assertEqual(body.read(), data)
-        self.assertIn("Upload stream test.msi", output.getvalue())
+        self.assertIn("Upload stream test.exe", output.getvalue())
         self.assertEqual(body.tell(), len(data))
 
     def test_concurrent_uploads_finish_before_any_stable_pointer(self):
@@ -340,10 +363,10 @@ class CosSdkContractTests(unittest.TestCase):
             return types.SimpleNamespace(headers={"ETag": "test"})
         store.client.send_request = capture
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "test.msi"
+            path = Path(directory) / "test.exe"
             path.write_bytes(b"actual SDK contract")
             for immutable in (True, False):
-                store.put("ccs/stable/v1.0.0/test.msi", path, immutable)
+                store.put("ccs/stable/v1.0.0/test.exe", path, immutable)
                 headers = requests[-1]["headers"]
                 self.assertEqual(headers["x-cos-forbid-overwrite"], str(immutable).lower())
                 self.assertEqual(headers["x-cos-meta-sha256"], module.digest(path))

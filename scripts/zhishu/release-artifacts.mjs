@@ -25,17 +25,23 @@ export const targets = {
   "windows-x64": {
     os: "win32",
     triple: "x86_64-pc-windows-msvc",
-    bundles: "msi",
+    bundles: "nsis",
     platform: "windows",
     arch: "x64",
   },
   "windows-arm64": {
     os: "win32",
     triple: "aarch64-pc-windows-msvc",
-    bundles: "msi",
+    bundles: "nsis",
     platform: "windows",
     arch: "arm64",
   },
+};
+// Only for validating immutable payloads created before the EXE-only policy.
+export const legacyTargets = {
+  ...targets,
+  "windows-x64": { ...targets["windows-x64"], bundles: "msi" },
+  "windows-arm64": { ...targets["windows-arm64"], bundles: "msi" },
   "linux-x64": {
     os: "linux",
     triple: "x86_64-unknown-linux-gnu",
@@ -51,14 +57,15 @@ export const targets = {
     arch: "arm64",
   },
 };
+
 export function versionNumber(value) {
   const v = String(value).replace(/^v/, "");
   if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(v))
     throw new Error("正式版本必须是 x.y.z，例如 4.0.20");
   return v;
 }
-export function artifactNames(id, version) {
-  const target = targets[id];
+export function artifactNames(id, version, definitions = targets) {
+  const target = definitions[id];
   if (!target) throw new Error(`未知目标：${id}`);
   const prefix = `Zhishu-Ccs-v${versionNumber(version)}`;
   const suffix =
@@ -71,17 +78,26 @@ export function artifactNames(id, version) {
     id === "macos"
       ? ["dmg", "zip", "tar.gz"]
       : target.platform === "windows"
-        ? ["msi"]
+        ? [target.bundles === "nsis" ? "exe" : "msi"]
         : ["AppImage", "deb", "rpm"];
   return Object.fromEntries(
     extensions.map((ext) => [ext, `${prefix}-${suffix}.${ext}`]),
   );
 }
-export function collectUpdaterPlatforms(dir, ids, version, config, publish) {
+export function collectUpdaterPlatforms(
+  dir,
+  ids,
+  version,
+  config,
+  publish,
+  definitions = targets,
+) {
   const platforms = {};
   for (const id of ids) {
-    const target = targets[id];
-    for (const [ext, name] of Object.entries(artifactNames(id, version))) {
+    const target = definitions[id];
+    for (const [ext, name] of Object.entries(
+      artifactNames(id, version, definitions),
+    )) {
       const path = join(dir, name);
       if (!lstatSync(path).isFile() || statSync(path).size <= 0)
         throw new Error(`安装包无效：${path}`);
@@ -104,6 +120,31 @@ export function collectUpdaterPlatforms(dir, ids, version, config, publish) {
   }
   return platforms;
 }
+// Recovery uses the original receipt's packaging policy, never today's build matrix.
+export function collectReceiptUpdaterPlatforms(dir, receipt, config, publish) {
+  const definitions =
+    receipt.packaging === "nsis-v1"
+      ? targets
+      : receipt.packaging === undefined
+        ? legacyTargets
+        : null;
+  if (
+    !definitions ||
+    !Array.isArray(receipt.targets) ||
+    JSON.stringify([...receipt.targets].sort()) !==
+      JSON.stringify(Object.keys(definitions).sort())
+  )
+    throw new Error("发布收据的打包策略或目标不一致");
+  return collectUpdaterPlatforms(
+    dir,
+    receipt.targets,
+    receipt.version,
+    config,
+    publish,
+    definitions,
+  );
+}
+
 export function hashFile(path) {
   // Files are bounded by the installer size; Tauri's verifier also reads the payload.
   return createHash("sha256").update(readFileSync(path)).digest("hex");
@@ -292,7 +333,13 @@ export function assembleRelease(
       size: statSync(join(out, name)).size,
       sha256: hashFile(join(out, name)),
     }));
-  const metadata = { version, tag, targets: [...ids].sort(), files };
+  const metadata = {
+    version,
+    tag,
+    packaging: "nsis-v1",
+    targets: [...ids].sort(),
+    files,
+  };
   writeFileSync(
     join(out, "release.json"),
     JSON.stringify(metadata, null, 2) + "\n",

@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
+  artifactNames,
   assembleRelease,
   collectUpdaterPlatforms,
   hashFile,
@@ -82,14 +83,9 @@ function buildFixture(dir, id, version, config, key) {
           `Zhishu-Ccs-v${version}-macOS.zip`,
           `Zhishu-Ccs-v${version}-macOS.tar.gz`,
         ]
-      : target.os === "win32"
-        ? [
-            `Zhishu-Ccs-v${version}-Windows${target.arch === "arm64" ? "-arm64" : ""}.msi`,
-          ]
-        : ["AppImage", "deb", "rpm"].map(
-            (ext) =>
-              `Zhishu-Ccs-v${version}-Linux-${target.arch === "x64" ? "x86_64" : "arm64"}.${ext}`,
-          );
+      : [
+          `Zhishu-Ccs-v${version}-Windows${target.arch === "arm64" ? "-arm64" : ""}.exe`,
+        ];
   for (const name of names) {
     const bytes = Buffer.from(`fixture ${name}`);
     writeFileSync(join(out, name), bytes);
@@ -121,9 +117,19 @@ test("validates stable versions and all supported build targets", () => {
     "macos",
     "windows-x64",
     "windows-arm64",
-    "linux-x64",
-    "linux-arm64",
   ]);
+});
+test("Windows releases use only NSIS EXE installers and Linux is not an active target", () => {
+  assert.deepEqual(artifactNames("windows-x64", "1.0.0"), {
+    exe: "Zhishu-Ccs-v1.0.0-Windows.exe",
+  });
+  assert.deepEqual(artifactNames("windows-arm64", "1.0.0"), {
+    exe: "Zhishu-Ccs-v1.0.0-Windows-arm64.exe",
+  });
+  assert.equal(targets["windows-x64"].bundles, "nsis");
+  assert.equal(targets["windows-arm64"].bundles, "nsis");
+  for (const id of ["linux-x64", "linux-arm64"])
+    assert.throws(() => artifactNames(id, "1.0.0"), /未知目标/);
 });
 test("HTTP updater needs an explicit independent opt-in", () => {
   const config = configFor(identity().key);
@@ -165,14 +171,14 @@ test("build receipts reject changed files and a different production endpoint", 
     writeFileSync(join(inputs[0], "Zhishu-Ccs-v4.0.20-macOS.dmg"), "changed");
     assert.throws(() => validateReceipt(inputs[0], "4.0.20", config), /损坏/);
   }));
-test("assembles macOS, both Windows and both Linux architectures with real checksums and verified signatures", () =>
+test("assembles macOS and both Windows EXE architectures without Linux with real checksums and verified signatures", () =>
   fixture((dir) => {
     const { out } = assembled(dir, "4.0.20", Object.keys(targets));
     const website = JSON.parse(readFileSync(join(out, "client-release.json")));
     const latest = JSON.parse(readFileSync(join(out, "latest.json")));
     assert.equal(website.allowInsecureHttp, true);
-    assert.equal(website.files.length, 10);
-    assert.equal(Object.keys(latest.platforms).length, 10);
+    assert.equal(website.files.length, 4);
+    assert.equal(Object.keys(latest.platforms).length, 4);
     assert.equal(
       latest.platforms["darwin-aarch64"].url,
       latest.platforms["darwin-x86_64"].url,
@@ -195,10 +201,7 @@ test("build validation verifies every target in place without creating completio
         config,
         publish,
       );
-      assert.equal(
-        Object.keys(platforms).length,
-        id === "macos" ? 2 : id.startsWith("linux") ? 3 : 1,
-      );
+      assert.equal(Object.keys(platforms).length, id === "macos" ? 2 : 1);
       assert.deepEqual(readdirSync(input).sort(), before);
       for (const entry of Object.values(platforms))
         assert.ok(entry.url.startsWith(`${publish.downloadBaseUrl}/v4.0.20/`));
@@ -216,7 +219,7 @@ test("build validation rejects missing installers and bad signatures before comp
     const key = identity();
     const config = configFor(key.key);
     const input = buildFixture(dir, "windows-x64", "4.0.20", config, key);
-    const installer = join(input, "Zhishu-Ccs-v4.0.20-Windows.msi");
+    const installer = join(input, "Zhishu-Ccs-v4.0.20-Windows.exe");
     writeFileSync(
       installer + ".sig",
       identity().signature(readFileSync(installer)),
@@ -250,7 +253,7 @@ test("a missing signature cannot become a published updater", () =>
     const key = identity();
     const config = configFor(key.key);
     const input = buildFixture(dir, "windows-x64", "4.0.20", config, key);
-    rmSync(join(input, "Zhishu-Ccs-v4.0.20-Windows.msi.sig"));
+    rmSync(join(input, "Zhishu-Ccs-v4.0.20-Windows.exe.sig"));
     saveReceipt(input, "windows-x64", "4.0.20", config);
     assert.throws(
       () =>

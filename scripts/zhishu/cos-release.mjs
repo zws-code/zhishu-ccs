@@ -97,11 +97,6 @@ export function prepareCosPayload(assets, tag, out, env = process.env) {
       if (!["dmg", "zip"].includes(ext)) names.add(`${name}.sig`);
     }
   }
-  // Preserve the existing upstream Windows portable downloads when present.
-  for (const arch of ["", "-arm64"]) {
-    const name = `Zhishu-Ccs-${tag}-Windows${arch}-Portable.zip`;
-    if (existsSync(join(assets, name))) names.add(name);
-  }
   const allowed = new Set([...names, "latest.json", "client-release.json"]);
   for (const name of readdirSync(assets)) {
     if (!allowed.has(name) || !lstatSync(join(assets, name)).isFile())
@@ -144,6 +139,7 @@ export function prepareCosPayload(assets, tag, out, env = process.env) {
     version,
     tag,
     downloadBaseUrl: publish.downloadBaseUrl,
+    packaging: "nsis-v1",
     targets: ids,
     files,
   };
@@ -164,7 +160,10 @@ if (
       cosConfig();
       readReleaseConfig(new URL("../../", import.meta.url));
       if (args[0])
-        checkVersion(fileURLToPath(new URL("../../", import.meta.url)), args[0]);
+        checkVersion(
+          fileURLToPath(new URL("../../", import.meta.url)),
+          args[0],
+        );
       console.log("COS 发布配置检查通过；未连接腾讯云。");
     } else if (command === "prepare" && args.length === 3) {
       const receipt = prepareCosPayload(...args);

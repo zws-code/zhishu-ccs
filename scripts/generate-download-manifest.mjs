@@ -52,6 +52,13 @@ const RULES = [
   },
   { suffix: "-Windows.msi", platform: "windows", kind: "msi", arch: "x64" },
   {
+    suffix: "-Windows-arm64.exe",
+    platform: "windows",
+    kind: "exe",
+    arch: "arm64",
+  },
+  { suffix: "-Windows.exe", platform: "windows", kind: "exe", arch: "x64" },
+  {
     suffix: "-Linux-arm64.AppImage",
     platform: "linux",
     kind: "appimage",
