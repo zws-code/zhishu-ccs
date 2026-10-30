@@ -315,3 +315,7 @@ L3 的统一依据见 [ADR-0002](adr/ADR-0002-structure-and-history.md)，数据
 | BUILD-20261029-03 | `scripts/generate-download-manifest.mjs` | 官网清单识别 x64/ARM64 EXE，保留历史包格式读取 | 所有发布入口复用该生成器，需要扩展同一格式规则而非新增平行清单 | L1 | 产物及官网解析/下载展示回归 | 2026-10-29 / ADR-0003 |
 
 自有文件同步调整：`scripts/zhishu/release-artifacts.mjs`、`cos-release.mjs`、`publish-cos.py` 及对应测试，`.github/workflows/resume-cos-release.yml`、发布说明和 ADR。COS 仅对六个明确的旧 Linux updater 键允许暂停；仍拒绝其他平台丢失、降级、同版本改包。历史恢复依原收据识别旧 MSI/Linux 产物。
+
+## 0.0.2 发布准备复核（2026-10-30）
+
+复核 ZS-044、ZS-046、ZS-047、ZS-148：应用版本统一为 0.0.2，侵入等级 L1。版本字段由 npm/Cargo/Tauri 固定入口读取，不能由新增 Adapter 替代；复用既有打包、签名、COS 发布与更新实现，应用身份和更新协议不变。新增 `src/whats-new/0.0.2.json`；验证及发布状态见 [0.0.2 发布记录](RELEASE-0.0.2.md)。
