@@ -152,6 +152,12 @@ GitHub 的海外构建机直传广州桶可能很慢；0.0.2 的普通上传曾�
 - 只有 GitHub Release 失败：使用 **Re-run failed jobs**，只补发 Release，COS 已上线的文件保持原样。
 - 代码需修复、同版本已预留或上传：发布更高版本，不能移动已发布 tag 或覆盖桶内版本文件。
 
+### macOS 14 runner brownout / 退役
+
+若 macOS 作业在执行编译步骤前报 `scheduled macOS 14 runner image brownout`，这是 GitHub 托管镜像停用演练。官方宣布 macOS 14 runner 于 **2026-11-02** 退役，见 [runner-images #13518](https://github.com/actions/runner-images/issues/13518)。发布工作流的 `macos-binary`、`macos-release` 已统一使用固定的 `macos-15`，沿用两个 Rust 目标与 universal 合包；客户端最低系统版本仍为 macOS 12.0。
+
+`v0.0.4` 指向的提交仍使用旧 runner，重跑该运行不会读取分支上的修复。保留原 tag，提交 runner 修复后发布下一个稳定版本（例如 `v0.0.5`）；先手动演练可验证新镜像的双架构构建和签名。只有完整且已验证的 payload 才能使用下方恢复工作流，缺少 macOS 构建产物时无法用上传恢复补齐。
+
 ### 上传脚本修复后：用原包恢复发布
 
 如果正式 tag 的安装包已构建成功并保存，但需要修复上传脚本，重跑旧的正式工作流仍使用旧脚本。此时到 [Resume verified COS release](https://github.com/zws-code/zhishu-ccs/actions/workflows/resume-cos-release.yml)，点击 **Run workflow**，选择包含已审查脚本修复的分支，填写原正式构建的 **run_id**。桶全球加速已开启且愿意承担本次流量费用时，可勾选 `accelerate`；默认不勾选。

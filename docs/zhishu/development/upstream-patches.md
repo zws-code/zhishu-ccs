@@ -2,6 +2,14 @@
 
 > 这是按基线/事件累积的补丁台账。222 项清单针对 2026-10-29 的 4.0.21 快照，后续变更按事件追加；旧路径、版本和分支描述仅适用于该段，不是当前 4.0.22 的完整重新统计。当前现状见 [代码基线](baseline.md)。
 
+## 2026-11-01：macOS 发布 runner 迁移
+
+复核 ZS-003（L1）：`.github/workflows/release.yml` 的 `macos-binary` 和 `macos-release` 从 `macos-14` 固定迁移到 `macos-15`。GitHub 在退役前安排 macOS 14 brownout，2026-11-02 起停用该镜像，已导致 `v0.0.4` 的 macOS 作业无法启动；官方说明见 [runner-images #13518](https://github.com/actions/runner-images/issues/13518)。`runs-on` 是 Actions 调度入口，新增脚本或 Adapter 无法在作业启动前替换镜像，故必须修改既有工作流。
+
+复用原有 ARM64 runner、Rust 双目标编译、universal 合包、签名/公证与 COS → GitHub Release 链路；客户端最低 macOS 版本仍为 `12.0`。本次仅替换两处 runner 标签，不变更应用身份、签名凭据、业务数据、版本或已发布 tag。镜像更新涉及 Xcode/SDK 环境差异，实际跨架构构建、签名与安装升级须由后续演练和实机验收确认；回退需选择仍受支持的 runner，不能恢复即将退役的标签。
+
+本轮验证（2026-11-01）：YAML 解析及改动前后结构比对通过，语义差异仅为两个 runner；双目标矩阵、发布依赖/门禁、签名步骤和最低系统版本保持一致。`pnpm test:release` 58 项全部通过，`git diff --check` 通过。未执行真实 Actions/macOS 构建、Apple 签名/公证及实机安装升级；未运行与本次工作流标签无关的前端/Rust 全量检查。本次不触发正式发布。
+
 ## 2026-11-01：版本递增与 tag 发布脚本
 
 复核 ZS-044（L1）：`package.json` 仅增加 `release:tag`、`test:release-tag` 命令，并把新回归接入 `test:release`。pnpm 的命令发现依赖该固定入口，不能仅新增自有脚本替代；实现与测试均新增在 `scripts/zhishu/tag-release{,.test}.mjs`（L0），操作说明更新于[发布文档](../releases/README.md)。
