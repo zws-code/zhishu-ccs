@@ -224,3 +224,17 @@ CC_SWITCH_TEST_HOME="$(mktemp -d /tmp/zhishu-client-api.XXXXXX)" cargo test --of
 已执行：`./node_modules/.bin/tsc --noEmit` 通过；本次修改的现存前端/测试文件 Prettier 检查通过；`cargo fmt --check --manifest-path src-tauri/Cargo.toml` 通过；9 个相关前端测试文件共 202 项通过；`CC_SWITCH_TEST_HOME` 指向独立临时目录的 `cargo test --offline --manifest-path src-tauri/Cargo.toml --lib zhishu:: --quiet` 共 149 项通过。运行时代码与测试中的 Harness/DSH 标识扫描无匹配。另已编译 Rust 测试目标；未执行全仓测试、Clippy、桌面实机或原生 CLI 验收。
 
 本次不迁移或删除用户机器上的旧 Harness 配置及数据库行。新分支不再识别该应用 ID，旧数据需要在原发布版本管理或迁出。提交重组与最终文件树核对见 [整理记录](HISTORY_REWRITE_2026-10-31.md) 和 [ADR-0006](adr/ADR-0006-zws-history-without-harness.md)。
+
+## DSH 平台供应商适配（2026-10-31）
+
+用户场景：已登录平台并取得本机基础数据后，可在 DSH 页面同步托管供应商；全应用同步、按账号删除和清理退出也覆盖 DSH。验收范围为兼容模型映射、稳定分组 ID、完整模型目录、重复同步、Key 轮换、原生 profile 写入和账号归属删除。复用上游 4.0.22 的 DSH ProviderService、`dsh_config` 路径/锁/凭据引用及平台两阶段同步；没有新 IPC、schema、凭据存储或上游核心补丁。改动均在智枢模块和自有测试/文档，侵入等级 L0；`UPSTREAM_PATCHES.md` 无新增条目。
+
+后续按用户反馈复核真实本机配置：手动 `shoudongtianjia` 已在 DSH profile，平台托管项的数据库行却标记为未写入原生配置；两者的协议、网关地址及 Key 相同。因此将 DSH 同步改为新建时原子写入原生 profile，已有数据库项在原生节点缺失时补写。隔离回归覆盖与手动项共存、首次可见、移除后再次同步恢复、重复同步不改写、Key 轮换和按账号删除；未改动真实 DSH profile 或凭据。
+
+已执行：`pnpm typecheck` 通过；DSH 入口与白名单前端测试 16 项通过，本次 TS 文件 Prettier 检查通过；隔离 `CC_SWITCH_TEST_HOME` 的 `cargo test --locked --offline --lib zhishu:: -- --test-threads=1` 151 项通过；隔离目录的 `dsh_commands` 集成测试 3 项通过；`cargo fmt --check`、`cargo clippy --locked --offline -- -D warnings`、`git diff --check` 通过。Rust 测试为 DSH 设置临时 `DSH_HOME`，验证 profile 不含明文 Key、凭据引用文件存储 Key、重复同步不改写文件、轮换和删除；不访问真实用户配置。
+
+仓库级 `pnpm format:check` 未通过，仅报告未修改的 `src/App.tsx`；本次改动的 TS 文件单独检查通过。未执行全仓前端/全部 Rust 测试、真实 DSH CLI 调用、真实平台账号、Windows/Linux 运行、安装升级或发布验收。回退可撤销本次智枢适配与白名单，已产生的 DSH 托管项需按账号使用现有删除入口处理；不自动迁移或清理用户配置。
+
+后续现场复核（2026-10-31）：开发数据库中的手动项和平台项均标记已写入原生配置，`web`、`desktop`、`headless` profile 也均含两项；先前“仅数据库保存”的诊断已不能解释当时的不可见。平台项有 177 个模型，其中 6 个曾含 DSH schema 不接受的 `reasoningEfforts.ultra`，手动项只有 5 个模型。已在智枢 DSH 模型适配中限制思考档位，并在重复同步时清理已有托管模型的非法档位；本轮未直接修改真实 `~/.dsh`。期间用户侧配置发生更新，复核时数据库与原生 profile 已无 `ultra`。当前打开的 DSH 模型选择器已实际显示「智枢平台 · 智枢router-ccs-标准」及其 GPT-6-Luna 等模型，手动项同时可见；不能仅凭这次观察断定是谁触发了重同步。
+
+本轮验证：隔离 `CC_SWITCH_TEST_HOME` 与 `DSH_HOME` 的 `cargo test --locked --offline --lib zhishu:: -- --test-threads=1` 共 152 项通过；最终代码的 `cargo test --locked --offline --lib dsh -- --test-threads=1` 共 66 项通过，包含 DSH 原生 YAML 不含 `ultra`、重复同步不改写、已有非法档位清理；`cargo fmt --check`、`cargo clippy --locked --offline -- -D warnings` 和 `git diff --check` 通过。已只读查看本机 DSH 模型选择器，确认平台分组可见；未执行平台模型实际请求、完整仓库测试或发布。REA 对已安装 DSH 应用包的外部分析被自动审批阻止，因此以本机 `dsh 0.2.1-rc.5` 版本、官方同版本 schema、隔离回归和当前界面观察为依据，不宣称安装包内部已核验。

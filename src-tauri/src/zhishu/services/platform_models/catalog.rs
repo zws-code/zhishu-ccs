@@ -293,8 +293,8 @@ mod tests {
             "openai",
             vec![json!({"id":"custom-model"}), json!({"id":"custom-model"})],
         );
-        assert_eq!(models.len(), 11);
-        for agent in ["claude", "claude-desktop", "codex", "kimi"] {
+        assert_eq!(models.len(), adapter::AGENTS.len() - 1);
+        for agent in ["claude", "claude-desktop", "codex", "kimi", "dsh"] {
             assert!(models
                 .iter()
                 .any(|m| m.agent == agent && m.id == "custom-model" && m.protocol == "responses"));

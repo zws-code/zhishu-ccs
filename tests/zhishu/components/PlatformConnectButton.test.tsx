@@ -118,6 +118,15 @@ describe("sync current platform service providers", () => {
     expect(platformModelsApi.sync).toHaveBeenCalledWith("kimi");
   });
 
+  it("syncs DeepSeek Harness from its provider page", async () => {
+    const { invalidate } = renderButton("dsh");
+    fireEvent.click(screen.getByRole("button", { name: "同步平台供应商" }));
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    expect(platformModelsApi.sync).toHaveBeenCalledWith("dsh");
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["providers", "dsh"] });
+  });
+
   it("blocks repeated clicks while synchronization is running", async () => {
     let finish!: (
       value: Awaited<ReturnType<typeof platformModelsApi.sync>>,

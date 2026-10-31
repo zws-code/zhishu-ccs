@@ -441,7 +441,12 @@ fn sync_agent_providers(
             continue;
         }
         attempted_adds.insert(id.clone());
-        match ProviderService::add_without_switching(state, app.clone(), desired.provider.clone()) {
+        let add = if *app == crate::app_config::AppType::Dsh {
+            ProviderService::add_to_live(state, app.clone(), desired.provider.clone())
+        } else {
+            ProviderService::add_without_switching(state, app.clone(), desired.provider.clone())
+        };
+        match add {
             Ok(_) => {
                 added += 1;
                 existing.insert(id.clone(), desired.provider.clone());
@@ -550,6 +555,12 @@ fn sync_agent_providers(
                     next_base,
                 );
                 if refreshed.name != desired.provider.name {
+                    if app == &crate::app_config::AppType::Dsh
+                        && refreshed.settings_config["name"] == provider.name
+                    {
+                        refreshed.settings_config["name"] =
+                            Value::String(desired.provider.name.clone());
+                    }
                     refreshed.name = desired.provider.name.clone();
                     changed = true;
                 }
@@ -600,9 +611,22 @@ fn sync_agent_providers(
                     managed.group_name = desired.group_name.clone();
                     managed.subscription_type = desired.subscription_type.clone();
                 }
+                let mut refresh_succeeded = true;
                 if changed {
                     if let Err(err) = ProviderService::update(state, app.clone(), None, refreshed) {
                         warnings.push(format!("无法刷新服务供应商 {id} 的配置：{err}"));
+                        refresh_succeeded = false;
+                    }
+                }
+                if refresh_succeeded && *app == crate::app_config::AppType::Dsh {
+                    match ProviderService::dsh_native_exists(id) {
+                        Ok(false) => {
+                            if let Err(err) = ProviderService::switch(state, app.clone(), id) {
+                                warnings.push(format!("无法将服务供应商 {id} 写入 DSH：{err}"));
+                            }
+                        }
+                        Ok(true) => {}
+                        Err(err) => warnings.push(format!("无法检查 DSH 供应商 {id}：{err}")),
                     }
                 }
             }
@@ -692,6 +716,7 @@ mod tests {
                 ("MINIMAX_DATA_DIR", temp.path().join("mcode")),
                 ("WORKBUDDY_CONFIG_DIR", temp.path().join("workbuddy")),
                 ("KIMI_CODE_HOME", temp.path().join("kimi")),
+                ("DSH_HOME", temp.path().join("dsh")),
             ] {
                 env.push((key, std::env::var_os(key)));
                 std::env::set_var(key, dir);
@@ -2403,6 +2428,122 @@ mod tests {
             let managed = refreshed.meta.unwrap().platform_managed.unwrap();
             assert_eq!(managed.group_name.as_deref(), Some(name));
         }
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn dsh_sync_writes_native_profiles_and_deletes_only_managed_provider() {
+        use crate::{app_config::AppType, database::Database};
+        use std::sync::Arc;
+
+        let _home = SyncTestHome::new();
+        let state = AppState::new(Arc::new(Database::memory().unwrap()));
+        let app = AppType::Dsh;
+        let manual = Provider::with_id(
+            "shoudongtianjia".into(),
+            "shoudongtianjia".into(),
+            json!({"api":"openai-responses","options":{"baseURL":"https://manual.test/v1","apiKey":"manual-key"},
+                "models":{"model-one":{"name":"model-one"}}}),
+            None,
+        );
+        crate::services::ProviderService::add(&state, app.clone(), manual, true).unwrap();
+        let manual_before = crate::dsh_config::get_providers().unwrap()["shoudongtianjia"].clone();
+        let group = crate::zhishu::services::platform_auth::AvailableGroup {
+            id: 42,
+            name: "DSH models".into(),
+            platform: "composite".into(),
+            status: "active".into(),
+            subscription_type: "standard".into(),
+        };
+        let mut discovery = test_discovery(vec![group]);
+        discovery.catalogs[0].models = vec![
+            json!({"id":"model-one","supported_endpoint_types":["responses"],"context_window":64000,
+                "supported_reasoning_levels":["high","ultra"]}),
+            json!({"id":"model-two","supported_endpoint_types":["responses"],"max_output_tokens":4096}),
+        ];
+        let id = adapter::service_provider_id("dsh", 42, "composite", "https://platform.test", 1);
+        let result = sync_agent_providers(&state, &app, &discovery).unwrap();
+        assert_eq!((result.0, result.1, result.2), (1, 0, 0));
+        assert!(result.3.is_empty(), "{:?}", result.3);
+        let provider = state.db.get_provider_by_id(&id, "dsh").unwrap().unwrap();
+        assert_eq!(
+            provider.settings_config["models"]
+                .as_object()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(
+            crate::dsh_config::get_providers().unwrap()["shoudongtianjia"],
+            manual_before
+        );
+        let profile = crate::dsh_config::profile_path("web");
+        let credentials = crate::dsh_config::credentials_path();
+        let native: serde_yaml::Value =
+            serde_yaml::from_slice(&std::fs::read(&profile).unwrap()).unwrap();
+        let models = native[0]["config"]["providers"][&id]["models"]
+            .as_sequence()
+            .unwrap();
+        assert_eq!(models.len(), 2);
+        assert!(models.iter().any(|model| model["id"] == "model-one"));
+        let first = models
+            .iter()
+            .find(|model| model["id"] == "model-one")
+            .unwrap();
+        assert_eq!(first["reasoningEfforts"]["high"], "high");
+        assert!(first["reasoningEfforts"].get("ultra").is_none());
+        assert!(!std::fs::read_to_string(&profile)
+            .unwrap()
+            .contains("key-42"));
+        assert!(std::fs::read_to_string(&credentials)
+            .unwrap()
+            .contains("key-42"));
+        let files_before = (
+            std::fs::read(&profile).unwrap(),
+            std::fs::read(&credentials).unwrap(),
+        );
+        let result = sync_agent_providers(&state, &app, &discovery).unwrap();
+        assert_eq!((result.0, result.1, result.2), (0, 0, 1));
+        assert!(result.3.is_empty(), "{:?}", result.3);
+        assert_eq!(std::fs::read(&profile).unwrap(), files_before.0);
+        assert_eq!(std::fs::read(&credentials).unwrap(), files_before.1);
+
+        crate::services::ProviderService::remove_from_live_config(&state, app.clone(), &id)
+            .unwrap();
+        assert!(!crate::dsh_config::get_providers()
+            .unwrap()
+            .contains_key(&id));
+        let result = sync_agent_providers(&state, &app, &discovery).unwrap();
+        assert_eq!((result.0, result.1, result.2), (0, 0, 1));
+        assert!(result.3.is_empty(), "{:?}", result.3);
+        assert!(crate::dsh_config::get_providers()
+            .unwrap()
+            .contains_key(&id));
+
+        discovery.catalogs[0].credential.key = "rotated-key".into();
+        discovery.groups[0].name = "Renamed DSH group".into();
+        discovery.catalogs[0].group.name = "Renamed DSH group".into();
+        discovery.catalogs[0].models.remove(1);
+        let result = sync_agent_providers(&state, &app, &discovery).unwrap();
+        assert_eq!((result.0, result.1, result.2), (0, 0, 1));
+        assert!(result.3.is_empty(), "{:?}", result.3);
+        let refreshed = crate::dsh_config::get_providers().unwrap();
+        assert_eq!(refreshed[&id]["name"], "智枢平台 · Renamed DSH group");
+        assert_eq!(refreshed[&id]["options"]["apiKey"], "rotated-key");
+        assert_eq!(refreshed[&id]["models"].as_object().unwrap().len(), 1);
+
+        let result =
+            delete::delete_account_providers(&state, &app, "https://platform.test", 1).unwrap();
+        assert_eq!((result.removed, result.skipped), (1, 0));
+        assert!(result.warnings.is_empty(), "{:?}", result.warnings);
+        assert!(!crate::dsh_config::get_providers()
+            .unwrap()
+            .contains_key(&id));
+        assert!(state.db.get_provider_by_id(&id, "dsh").unwrap().is_none());
+        assert_eq!(
+            crate::dsh_config::get_providers().unwrap()["shoudongtianjia"],
+            manual_before
+        );
     }
 
     #[test]

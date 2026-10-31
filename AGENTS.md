@@ -27,7 +27,7 @@
 - 技术栈：Tauri 2、React 18、TypeScript、Vite 7、Tailwind CSS、TanStack Query 5；后端使用 Rust、Tokio、Serde、SQLite/rusqlite。
 - 上游继承能力包括供应商管理、CLI 配置适配、MCP、Skills、提示词、会话及本地代理；这些主干在本分支也有修改，不能直接用上游文件覆盖。
 - 本项目新增的平台登录、会话恢复、登录历史、平台基础数据、供应商同步和订阅额度，主要位于前后端的 `platform*` 模块；它们与授权中心的 Codex/Copilot/xAI OAuth 是不同链路。
-- WorkBuddy 已默认显示，已有原生配置适配、平台供应商同步和回归用例；代码支持不等于目标工具的真实运行验收。本整理分支不包含二开新增的 DeepSeek Harness 接入。
+- WorkBuddy 已默认显示，已有原生配置适配、平台供应商同步和回归用例。上游 4.0.22 的 DeepSeek Harness 原生适配已接入平台供应商同步；代码支持不等于目标工具的真实运行验收。
 - 登录或会话恢复成功后自动尝试同步一次「平台基础数据」，成功后自动同步全部已支持工具；失败可手动重试。各应用也可手动同步供应商列表；本地同步不检测外部修改，也不做覆盖确认。
 - 应用可见性、MCP、Skills、增量供应商、路由和 Stack 模式使用不同白名单，见 `src/config/appConfig.tsx` 及后端对应能力判断；不要以出现在应用列表中推断所有功能均支持。
 - README、CONTRIBUTING 和部分功能文档可能滞后；登录后先同步平台基础数据，再自动同步全部已支持工具。当前切换式应用采用关键字段投影，不应照旧说明恢复整份配置回填。
@@ -161,7 +161,7 @@
 - 平台层只调用客户端专用 API。共享 Key 唯一来源为 `/access`，客户端不做分组前缀授权推断、Key 命名查找/创建/替换/删除，也不请求独立模型目录或旧 credentials 回退。登录 JWT 与模型 Key 分离。
 - 专用 Key 的授权、共享与生命周期由服务端管理；客户端删除 Provider 或退出不能删除 Key。额度与 `keyAvailable` 独立展示；服务端仍返回的过期/暂停订阅和目录失败组保留本地项，成功快照中消失的分组按撤销授权协调。
 - 协调和清理保留 `meta.platformManaged` 的来源、用户、分组与订阅类型判断；不修改本地自建项和其他账号项。一般不主动切换当前供应商；删除当前项需要先找到安全备用项，否则保留并提示。刷新模型目录时保留未知字段、未报告参数和用户选择，目录失败不能当作空列表删除。
-- 当前前后端平台白名单为 `claude`、`claude-desktop`、`codex`、`gemini`、`grokbuild`、`opencode`、`openclaw`、`hermes`、`pi`、`workbuddy`、`mcode`、`kimi`；`agy` 尚不在其中。新增应用必须同时核对 `zhishu/integrations/ccswitch/platform_models.rs::AGENTS` 和 `src/zhishu/models/platformConfig.ts::PLATFORM_SYNC_APPS`，一致性回归见 `tests/zhishu/config/platformConfig.test.ts`。
+- 当前前后端平台白名单为 `claude`、`claude-desktop`、`codex`、`gemini`、`grokbuild`、`opencode`、`openclaw`、`hermes`、`pi`、`workbuddy`、`mcode`、`kimi`、`dsh`；`agy` 尚不在其中。新增应用必须同时核对 `zhishu/integrations/ccswitch/platform_models.rs::AGENTS` 和 `src/zhishu/models/platformConfig.ts::PLATFORM_SYNC_APPS`，一致性回归见 `tests/zhishu/config/platformConfig.test.ts`。
 - 订阅额度通过 `platform_get_subscription_usage` 在 Rust 中只读 `/api/zhishu/v1/client/usage/summary`，返回账户隔离的 `{ baseUrl, userId, syncedAt, balance, groups }`，按分组保留全部订阅；前端按账户缓存、五分钟刷新。过期、暂停、进度缺失及查询失败不能显示为不限量或退回钱包余额。
 - 要改先做什么：核对 `APPLY_LOCK`、本地身份校验、目录解析与存储、`sync_report`、局部恢复及前端缓存失效；用模拟响应和临时目录验证两阶段互不越界。
 

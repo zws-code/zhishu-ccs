@@ -21,6 +21,7 @@ pub(crate) fn read_settings(state: &AppState, app: &AppType) -> Result<Value, Ap
                 .map_err(|_| AppError::Config("Invalid MCode config".into()));
         }
         AppType::Kimi => return crate::kimi_config::platform_selection(),
+        AppType::Dsh => return Ok(json!({})),
         AppType::Claude => crate::config::get_claude_settings_path(),
         AppType::ClaudeDesktop => {
             let current = ProviderService::current(state, AppType::ClaudeDesktop)?;
@@ -234,7 +235,7 @@ pub(crate) fn populate_catalog(
                 &single.settings_config["modelCatalog"]["models"],
                 "model",
             ),
-            "opencode" | "mcode" => {
+            "opencode" | "mcode" | "dsh" => {
                 if let (Some(target), Some(source)) = (
                     settings["models"].as_object_mut(),
                     single.settings_config["models"].as_object(),
@@ -286,6 +287,7 @@ pub(crate) fn refresh_catalog(provider: &mut Provider, desired: &Provider, app: 
         AppType::Codex => &["modelCatalog"],
         AppType::OpenCode
         | AppType::Mcode
+        | AppType::Dsh
         | AppType::Kimi
         | AppType::Pi
         | AppType::OpenClaw
@@ -311,6 +313,22 @@ pub(crate) fn refresh_catalog(provider: &mut Provider, desired: &Provider, app: 
                 }
             } else {
                 refresh_model_membership(&mut provider.settings_config[field], source, "id");
+            }
+        }
+    }
+    if app == &AppType::Dsh {
+        if let Some(models) = provider.settings_config["models"].as_object_mut() {
+            for model in models.values_mut() {
+                if let Some(efforts) = model
+                    .get_mut("reasoningEfforts")
+                    .and_then(Value::as_object_mut)
+                {
+                    efforts.retain(|level, _| adapter::dsh_reasoning_effort_supported(level));
+                    if !efforts.keys().any(|level| level != "off") {
+                        model["reasoningEfforts"] = json!(false);
+                        model["reasoning"] = json!(false);
+                    }
+                }
             }
         }
     }
@@ -473,6 +491,49 @@ fn merge_array(target: &mut Value, source: &Value, id: &str) {
 mod tests {
     use super::*;
 
+    #[test]
+    fn dsh_refresh_removes_unsupported_reasoning_effort_from_existing_provider() {
+        let mut model = models("dsh").remove(0);
+        model.reasoning_levels = vec!["high".into(), "ultra".into()];
+        model.reasoning = Some(true);
+        let desired =
+            adapter::provider(&model, "https://platform.test", 1, "key", 7, None).unwrap();
+        let mut provider = desired.clone();
+        provider.settings_config["models"][&model.model]["reasoningEfforts"] =
+            json!({"high":"high","ultra":"ultra"});
+
+        assert!(refresh_catalog(&mut provider, &desired, &AppType::Dsh));
+        assert_eq!(
+            provider.settings_config["models"][&model.model]["reasoningEfforts"],
+            json!({"high":"high"})
+        );
+        assert!(!refresh_catalog(&mut provider, &desired, &AppType::Dsh));
+
+        let mut only_unsupported_model = model.clone();
+        only_unsupported_model.reasoning_levels = vec!["ultra".into()];
+        let desired_only = adapter::provider(
+            &only_unsupported_model,
+            "https://platform.test",
+            1,
+            "key",
+            7,
+            None,
+        )
+        .unwrap();
+        let mut only_unsupported = desired_only.clone();
+        only_unsupported.settings_config["models"][&model.model]["reasoningEfforts"] =
+            json!({"ultra":"ultra"});
+        assert!(refresh_catalog(
+            &mut only_unsupported,
+            &desired_only,
+            &AppType::Dsh
+        ));
+        assert_eq!(
+            only_unsupported.settings_config["models"][&model.model]["reasoningEfforts"],
+            false
+        );
+    }
+
     fn models(agent: &str) -> Vec<AgentModel> {
         ["first-model", "kept-model"].into_iter().map(|id| serde_json::from_value(json!({
             "id": id, "agent":agent, "model":id, "name":id,
@@ -528,10 +589,14 @@ mod tests {
             AppType::OpenClaw,
             AppType::Hermes,
             AppType::Mcode,
+            AppType::Dsh,
             AppType::Kimi,
             AppType::WorkBuddy,
         ] {
-            let object_models = matches!(app, AppType::OpenCode | AppType::Mcode | AppType::Kimi);
+            let object_models = matches!(
+                app,
+                AppType::OpenCode | AppType::Mcode | AppType::Dsh | AppType::Kimi
+            );
             let field = if app == AppType::Codex { "model" } else { "id" };
             let previous = if object_models {
                 json!({"removed":{"name":"Removed"}, "kept":{"custom":"keep", "context":100}})

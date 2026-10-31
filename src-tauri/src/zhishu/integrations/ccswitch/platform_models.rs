@@ -11,7 +11,7 @@ use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
-// 与前端 src/config/platformConfig.ts 的 PLATFORM_SYNC_APPS 保持一致。
+// 与前端 src/zhishu/models/platformConfig.ts 的 PLATFORM_SYNC_APPS 保持一致。
 pub(crate) const AGENTS: &[&str] = &[
     "claude",
     "claude-desktop",
@@ -25,7 +25,15 @@ pub(crate) const AGENTS: &[&str] = &[
     "workbuddy",
     "mcode",
     "kimi",
+    "dsh",
 ];
+
+pub(crate) fn dsh_reasoning_effort_supported(level: &str) -> bool {
+    matches!(
+        level,
+        "none" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max"
+    )
+}
 
 pub(crate) fn app(agent: &str) -> Result<AppType, PlatformAuthError> {
     if !AGENTS.contains(&agent) {
@@ -269,6 +277,12 @@ fn build_provider(
             "WorkBuddy 仅支持 OpenAI Chat Completions 模型",
         ));
     }
+    if m.agent == "dsh" && m.protocol == "gemini" {
+        return Err(fail(
+            "INCOMPATIBLE",
+            "DeepSeek Harness 不支持 Gemini 原生协议",
+        ));
+    }
     let root = connection_root.unwrap_or(origin).trim_end_matches('/');
     let base = format!("{root}/v1");
     // Native Anthropic clients append /v1/messages. OpenCode's AI SDK
@@ -368,6 +382,8 @@ fn build_provider(
         }),
         "mcode" => json!({"name":"智枢平台", "kind":"custom", "enabled":true,"api":protocol_api,
             "options":{"baseURL":native_base,"apiKey":key}, "models":{(model):{"name":m.name}}}),
+        "dsh" => json!({"name":name, "api":protocol_api,
+            "options":{"baseURL":native_base,"apiKey":key}, "models":{(model):{"name":m.name}}}),
         "kimi" => {
             let provider_type = match m.protocol.as_str() {
                 "anthropic" => "anthropic",
@@ -417,7 +433,7 @@ fn build_provider(
         }
         _ => return Err(fail("UNSUPPORTED_AGENT", "暂不支持这个工具")),
     };
-    if matches!(m.agent.as_str(), "opencode" | "mcode") {
+    if matches!(m.agent.as_str(), "opencode" | "mcode" | "dsh") {
         let entry = &mut settings["models"][model];
         if m.context_window > 0 {
             entry["limit"] = json!({"context":m.context_window});
@@ -434,7 +450,30 @@ fn build_provider(
         if !m.input_modalities.is_empty() {
             entry["modalities"] = json!({"input":m.input_modalities});
         }
-        if !m.reasoning_levels.is_empty() && m.protocol != "gemini" {
+        if m.agent == "dsh" {
+            if !m.reasoning_levels.is_empty() {
+                let efforts: serde_json::Map<String, Value> = m
+                    .reasoning_levels
+                    .iter()
+                    .filter(|level| dsh_reasoning_effort_supported(level))
+                    .map(|level| {
+                        if level == "none" || level == "off" {
+                            ("off".into(), Value::Null)
+                        } else {
+                            (level.clone(), json!(level))
+                        }
+                    })
+                    .collect();
+                if m.reasoning != Some(false) && efforts.keys().any(|level| level != "off") {
+                    entry["reasoning"] = json!(true);
+                    entry["reasoningEfforts"] = json!(efforts);
+                } else {
+                    entry["reasoning"] = json!(false);
+                }
+            } else if m.reasoning == Some(true) {
+                entry.as_object_mut().unwrap().remove("reasoning");
+            }
+        } else if !m.reasoning_levels.is_empty() && m.protocol != "gemini" {
             let effort_field = if m.protocol == "anthropic" {
                 "effort"
             } else {
@@ -622,7 +661,7 @@ fn settings_protocol(app: &AppType, settings: &Value) -> Option<&'static str> {
         };
     }
     let (path, anthropic, responses, chat) = match app {
-        AppType::Pi | AppType::OpenClaw | AppType::Mcode => (
+        AppType::Pi | AppType::OpenClaw | AppType::Mcode | AppType::Dsh => (
             "/api",
             "anthropic-messages",
             "openai-responses",
@@ -669,7 +708,7 @@ fn generated_base_url(
             "/base_url",
             if protocol == "anthropic" { root } else { &base },
         ),
-        AppType::Mcode => (
+        AppType::Mcode | AppType::Dsh => (
             "/options/baseURL",
             if protocol == "anthropic" { root } else { &base },
         ),
@@ -911,6 +950,7 @@ pub(crate) fn select_default(
             crate::hermes_config::set_model_config(&config).map(|_| ())
         }
         AppType::WorkBuddy => Ok(()),
+        AppType::Dsh => Ok(()),
         _ => Ok(()),
     }
 }
@@ -946,6 +986,7 @@ pub(crate) fn is_selected(
                 crate::workbuddy_config::provider_is_live(&provider.settings_config).ok()
             })
             .unwrap_or(false),
+        AppType::Dsh => crate::dsh_config::get_providers()?.contains_key(id),
         _ => crate::services::ProviderService::current(state, app.clone())? == id,
     })
 }
@@ -981,6 +1022,57 @@ mod tests {
             assert_eq!(row["capabilities"]["input"], json!(["text", "image"]));
             assert_eq!(row["limit"], json!({"context":32000,"output":4096}));
         }
+    }
+
+    #[test]
+    fn dsh_platform_provider_uses_native_protocol_and_model_fields() {
+        for (protocol, api, base) in [
+            ("anthropic", "anthropic-messages", "https://example.test"),
+            ("responses", "openai-responses", "https://example.test/v1"),
+            ("chat", "openai-completions", "https://example.test/v1"),
+        ] {
+            let mut m = model("dsh", protocol);
+            m.input_modalities = vec!["text".into(), "image".into()];
+            m.reasoning_levels = vec!["none".into(), "high".into(), "ultra".into()];
+            let p = provider(&m, "https://example.test", 1, "test-key", 2, None).unwrap();
+            crate::dsh_config::validate_provider(&p.id, &p.settings_config).unwrap();
+            assert_eq!(p.settings_config["api"], api);
+            assert_eq!(p.settings_config["options"]["baseURL"], base);
+            assert_eq!(p.resolve_usage_credentials(&AppType::Dsh).1, "test-key");
+            let row = &p.settings_config["models"][&m.model];
+            assert_eq!(row["limit"], json!({"context":32000,"output":4096}));
+            assert_eq!(row["modalities"]["input"], json!(["text", "image"]));
+            assert_eq!(row["reasoningEfforts"], json!({"off":null,"high":"high"}));
+            assert!(row.get("variants").is_none());
+        }
+        for levels in [vec!["none"], vec!["ultra"]] {
+            let mut m = model("dsh", "responses");
+            m.reasoning = Some(true);
+            m.reasoning_levels = levels.into_iter().map(str::to_owned).collect();
+            let p = provider(&m, "https://example.test", 1, "test-key", 2, None).unwrap();
+            let row = &p.settings_config["models"][&m.model];
+            assert_eq!(row["reasoning"], false);
+            assert!(row.get("reasoningEfforts").is_none());
+        }
+        let mut unreported = model("dsh", "responses");
+        unreported.reasoning = Some(true);
+        let p = provider(&unreported, "https://example.test", 1, "test-key", 2, None).unwrap();
+        assert!(p.settings_config["models"][&unreported.model]
+            .get("reasoning")
+            .is_none());
+        assert_eq!(
+            provider(
+                &model("dsh", "gemini"),
+                "https://example.test",
+                1,
+                "key",
+                2,
+                None
+            )
+            .unwrap_err()
+            .code,
+            "INCOMPATIBLE"
+        );
     }
 
     #[test]
@@ -1112,6 +1204,7 @@ mod tests {
             ("openclaw", "/baseUrl"),
             ("hermes", "/base_url"),
             ("mcode", "/options/baseURL"),
+            ("dsh", "/options/baseURL"),
         ] {
             for origin in [
                 "https://example.test/gateway",

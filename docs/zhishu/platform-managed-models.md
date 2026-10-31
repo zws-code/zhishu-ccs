@@ -67,6 +67,8 @@ CC Switch 使用服务端成功下发的授权分组生成工具供应商，不�
 
 模型能力直接使用 `/access` 的明确返回值。Codex 写入已报告的窗口、思考档位和模态，OpenCode/MCode 写入已报告的 limit、reasoning、variants 等；未报告参数沿用已有记录，不进行另一套网络发现。目录失败只保留现有供应商，不新建使用未知授权模型的供应商。
 
+DeepSeek Harness (`dsh`) 复用上游的增量 Provider 和原生 profile 适配。平台目录只映射 Anthropic Messages、OpenAI Responses 与 Chat Completions；Gemini 原生协议不生成 DSH 模型。同步新建托管项时通过 ProviderService 同时写入 DSH profile 和凭据引用；已有托管项若原生 profile 缺失，重复同步会补写。DSH 模型的思考档位只写入原生 schema 支持的值；再次同步会清理旧托管项中不支持的档位。原生写入失败时返回警告，不把未发布项误报为成功添加。未变化的原生文件不改写；Key 或模型目录变化时只更新该账号托管项，删除仍按账号归属执行。DSH 的 `DSH_HOME`、profile 锁、私密凭据文件和失败恢复沿用上游实现。当前 macOS 本机的 DSH 模型选择器已确认显示平台分组；跨平台及模型请求仍需验收。
+
 ## 余额与订阅额度
 
 平台账户刷新仅调用 `GET /api/zhishu/v1/client/account`；额度刷新仅调用 `GET /api/zhishu/v1/client/usage/summary`，不整理 Key 或更新 `/access` 快照。

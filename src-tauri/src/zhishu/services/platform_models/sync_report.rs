@@ -40,6 +40,9 @@ pub(crate) fn paths(app: &AppType) -> Result<Vec<PathBuf>, AppError> {
         ],
         AppType::Mcode => vec![crate::mcode_config::config_path()],
         AppType::Kimi => vec![crate::kimi_config::config_path()],
+        AppType::Dsh => std::iter::once(crate::dsh_config::credentials_path())
+            .chain(crate::dsh_config::target_paths())
+            .collect(),
         AppType::ClaudeDesktop => crate::claude_desktop_config::live_file_paths()?,
         AppType::WorkBuddy => vec![crate::workbuddy_config::get_workbuddy_models_path()],
         _ => return Err(AppError::InvalidInput("Unsupported platform Agent".into())),

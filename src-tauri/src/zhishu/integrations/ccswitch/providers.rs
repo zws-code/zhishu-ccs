@@ -19,6 +19,18 @@ impl Providers {
         ProviderService::add_without_switching(state, app, provider)
     }
 
+    pub(crate) fn add_to_live(
+        state: &AppState,
+        app: AppType,
+        provider: Provider,
+    ) -> Result<bool, AppError> {
+        ProviderService::add(state, app, provider, true)
+    }
+
+    pub(crate) fn dsh_native_exists(id: &str) -> Result<bool, AppError> {
+        crate::dsh_config::provider_key_exists(id)
+    }
+
     pub(crate) fn update(
         state: &AppState,
         app: AppType,
