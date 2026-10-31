@@ -1,7 +1,7 @@
 //! ② Claude Code 关键字段的切换结果。
 //!
 //! 关键字段回答「请求发到哪、凭什么鉴权、哪个模型名、哪种协议」，由供应商完全拥有：
-//! 显式配置的关键字段按目标供应商替换；缺失模型档位按智枢既有规则写盘补齐，上一家的一个都不能留。
+//! 显式配置的关键字段按目标供应商替换；缺失字段保持缺失，上一家的一个都不能留。
 //! 旧代码靠整份覆盖做到这一点，重构版改成「清空关键字段再写入」，结果必须一样。
 //!
 //! 关键字段的定义直接引用 `live::floor`，和切换用的是同一份。
@@ -301,9 +301,9 @@ fn common_config_opt_in_does_not_carry_key_fields_to_the_next_provider() {
     switch_and_check(&state, "claude-official");
 }
 
-/// 智枢分支的写盘补齐不能携带上一家模型，也不能改写持久化的原始配置。
+/// 手动配置不派生模型档位，也不能携带上一家的模型或改写原始配置。
 #[test]
-fn missing_model_slots_are_derived_only_in_live_settings() {
+fn manual_model_slots_are_not_derived_in_live_settings() {
     let _guard = test_mutex().lock().unwrap_or_else(|e| e.into_inner());
     reset_test_fs();
     let target = provider(
@@ -327,9 +327,7 @@ fn missing_model_slots_are_derived_only_in_live_settings() {
             "ANTHROPIC_AUTH_TOKEN": "fixture-key",
             "ANTHROPIC_MODEL": "main-model",
             "ANTHROPIC_SMALL_FAST_MODEL": "fast-model",
-            "ANTHROPIC_DEFAULT_HAIKU_MODEL": "fast-model",
-            "ANTHROPIC_DEFAULT_SONNET_MODEL": "explicit-sonnet",
-            "ANTHROPIC_DEFAULT_OPUS_MODEL": "main-model"
+            "ANTHROPIC_DEFAULT_SONNET_MODEL": "explicit-sonnet"
         })
     );
     let saved = state

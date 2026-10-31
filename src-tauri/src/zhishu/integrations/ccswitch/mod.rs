@@ -3,3 +3,6 @@ pub(crate) mod platform_models;
 pub(crate) mod providers;
 pub(crate) mod workbuddy;
 pub(crate) mod workbuddy_config;
+
+#[cfg(test)]
+mod test_support;

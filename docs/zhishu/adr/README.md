@@ -11,5 +11,6 @@
 | [ADR-0005：账号目录与清理退出](ADR-0005-account-local-cleanup.md) | 当前账号存储、旧 v2 迁移及清理边界 |
 | [ADR-0006：独立历史整理分支](ADR-0006-zws-history-without-harness.md) | 当时剔除二开 Harness；不代表当前分支不支持上游 DSH |
 | [ADR-0007：合并上游 4.0.22](ADR-0007-merge-4.0.22.md) | 当前上游 DSH 与 v24 迁移；状态仍按原决策保留，不等于发布批准 |
+| [ADR-0008：平台与上游边界收敛](ADR-0008-upstream-patch-convergence.md) | Claude 平台档位、平台适配/夹具迁出、通用元数据更新和无效补丁撤回 |
 
 ADR 保留做出决策时的事实；当前代码能力见 [基线](../development/baseline.md)，实际执行结果见 [验证记录](../history/validation.md)。

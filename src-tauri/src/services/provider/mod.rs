@@ -1290,11 +1290,10 @@ mod tests {
         );
     }
 
-    /// 切换时自动补齐模型档位：行里只写了主模型时，`/model` 的三个别名档位按回落链
-    /// 补进 `settings.json`；行里已有的档位以行为准，供应商行本身不改写。
+    /// 手动供应商只发布显式字段，平台模型档位由上层组装。
     #[tokio::test]
     #[serial]
-    async fn switching_claude_provider_fills_missing_model_slots_in_live() {
+    async fn switching_manual_claude_provider_keeps_missing_model_slots_absent() {
         let _home = TempHome::new();
         crate::settings::reload_settings().expect("reload settings");
 
@@ -1315,11 +1314,20 @@ mod tests {
 
         let live: Value = read_json_file(&get_claude_settings_path()).expect("read live");
         let env = |key: &str| live["env"][key].as_str();
-        assert_eq!(env("ANTHROPIC_DEFAULT_HAIKU_MODEL"), Some("glm-5.2"));
-        assert_eq!(env("ANTHROPIC_DEFAULT_SONNET_MODEL"), Some("glm-5.2"));
-        assert_eq!(env("ANTHROPIC_DEFAULT_OPUS_MODEL"), Some("glm-5.2"));
+        assert_eq!(env("ANTHROPIC_DEFAULT_HAIKU_MODEL"), None);
+        assert_eq!(env("ANTHROPIC_DEFAULT_SONNET_MODEL"), None);
+        assert_eq!(env("ANTHROPIC_DEFAULT_OPUS_MODEL"), None);
 
-        // 行里已有的档位以行为准；行本身保持只有主模型，下次编辑看到的还是原样。
+        let preview = claude_editor::view(&state, &bare.settings_config).expect("editor preview");
+        for key in [
+            "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+            "ANTHROPIC_DEFAULT_SONNET_MODEL",
+            "ANTHROPIC_DEFAULT_OPUS_MODEL",
+        ] {
+            assert!(preview.settings["env"].get(key).is_none(), "{key}");
+        }
+
+        // 持久化配置保持用户原样。
         let row = db
             .get_all_providers("claude")
             .expect("providers")
@@ -6309,6 +6317,25 @@ impl ProviderService {
             claude_editor::write_live(state.db.as_ref(), &plan, editor.on_conflict, key_fields)
                 .and_then(|()| Self::resync_proxy_for_saved_row(state, &app_type, &provider));
         Self::keep_row_if_written(state, &app_type, &provider.id, existing.as_ref(), written)
+    }
+
+    /// Update metadata without publishing native configuration or replacing the provider row.
+    pub(crate) fn update_metadata(
+        state: &AppState,
+        app_type: AppType,
+        id: &str,
+        update: impl FnOnce(&mut Value) -> Result<(), AppError>,
+    ) -> Result<bool, AppError> {
+        let _guard = if app_type.has_route_mode() {
+            crate::mode::controller::lock_settled_blocking(state, &app_type)?
+        } else {
+            Some(futures::executor::block_on(
+                state.proxy_service.lock_switch_for_app(app_type.as_str()),
+            ))
+        };
+        state
+            .db
+            .update_provider_metadata(app_type.as_str(), id, update)
     }
 
     /// Update a provider

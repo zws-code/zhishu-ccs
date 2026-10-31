@@ -17,6 +17,41 @@ type OmoProviderRow = (
 );
 
 impl Database {
+    /// Modify only metadata on an existing row, preserving unknown JSON fields and all other columns.
+    /// The callback sees the latest value under the connection lock; it must not call the database.
+    pub(crate) fn update_provider_metadata(
+        &self,
+        app_type: &str,
+        id: &str,
+        update: impl FnOnce(&mut serde_json::Value) -> Result<(), AppError>,
+    ) -> Result<bool, AppError> {
+        let conn = lock_conn!(self.conn);
+        let text: Option<String> = conn
+            .query_row(
+                "SELECT meta FROM providers WHERE app_type = ?1 AND id = ?2",
+                params![app_type, id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|e| AppError::Database(e.to_string()))?;
+        let Some(text) = text else {
+            return Ok(false);
+        };
+        let mut meta: serde_json::Value = serde_json::from_str(&text)
+            .map_err(|e| AppError::Database(format!("Invalid provider metadata: {e}")))?;
+        let before = meta.clone();
+        update(&mut meta)?;
+        if meta == before {
+            return Ok(false);
+        }
+        conn.execute(
+            "UPDATE providers SET meta = ?1 WHERE app_type = ?2 AND id = ?3",
+            params![meta.to_string(), app_type, id],
+        )
+        .map_err(|e| AppError::Database(e.to_string()))?;
+        Ok(true)
+    }
+
     /// Detach Codex providers bound to these deleted local accounts, atomically.
     /// Only this device's account IDs are passed in: provider rows sync across
     /// devices, and a row bound to another device's account must stay bound.

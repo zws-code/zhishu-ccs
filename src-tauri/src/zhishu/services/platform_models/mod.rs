@@ -300,27 +300,32 @@ fn sync_agent_providers(
 ) -> Result<(usize, usize, usize, Vec<String>), PlatformAuthError> {
     let agent = app.as_str();
     let live = local_error(connection::read_settings(state, app))?;
-    let mut existing = local_error(state.db.get_all_providers(agent))?;
-    // 过期订阅可能没有模型目录，仍需迁移旧行的订阅标记；这里只更新数据库元数据。
-    for provider in existing.values_mut() {
-        let Some(managed) = provider
+    // Expired subscriptions may have no catalog. Update only their marker through the adapter.
+    let ids = local_error(state.db.get_all_providers(agent))?;
+    for provider in ids.values().filter(|provider| {
+        provider
             .meta
-            .as_mut()
-            .and_then(|meta| meta.platform_managed.as_mut())
-        else {
-            continue;
-        };
-        if managed.origin == discovery.account.base_url
-            && managed.user_id == discovery.account.user.id
-            && managed
-                .group_id
-                .is_some_and(|id| discovery.subscription_group_ids.contains(&id))
-            && managed.subscription_type.as_deref() != Some("subscription")
-        {
-            managed.subscription_type = Some("subscription".into());
-            local_error(state.db.save_provider(agent, provider))?;
-        }
+            .as_ref()
+            .and_then(|meta| meta.platform_managed.as_ref())
+            .is_some_and(|managed| {
+                managed.origin == discovery.account.base_url
+                    && managed.user_id == discovery.account.user.id
+                    && managed
+                        .group_id
+                        .is_some_and(|id| discovery.subscription_group_ids.contains(&id))
+                    && managed.subscription_type.as_deref() != Some("subscription")
+            })
+    }) {
+        local_error(ProviderService::mark_subscription(
+            state,
+            app.clone(),
+            &provider.id,
+            &discovery.account.base_url,
+            discovery.account.user.id,
+            &discovery.subscription_group_ids,
+        ))?;
     }
+    let mut existing = local_error(state.db.get_all_providers(agent))?;
     let mut failed_group_ids = discovery.failed_group_ids.clone();
     let mut warnings = Vec::new();
     // 无凭证不等于目录失败，更不能将未知 Key 写入工具配置。
@@ -736,6 +741,239 @@ mod tests {
             }
             crate::settings::reload_settings().unwrap();
         }
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn platform_claude_slots_are_assembled_before_native_switch() {
+        let _home = SyncTestHome::new();
+        let state = AppState::new(std::sync::Arc::new(
+            crate::database::Database::memory().unwrap(),
+        ));
+        let model: AgentModel = serde_json::from_value(json!({
+            "id":"model", "agent":"claude", "model":"platform-model", "name":"Platform",
+            "protocol":"anthropic", "category":"recommended", "available":true
+        }))
+        .unwrap();
+        let provider =
+            adapter::provider(&model, "https://platform.test", 1, "fixture-key", 7, None).unwrap();
+        let id = provider.id.clone();
+        ProviderService::add_without_switching(
+            &state,
+            crate::app_config::AppType::Claude,
+            provider.clone(),
+        )
+        .unwrap();
+        ProviderService::switch(&state, crate::app_config::AppType::Claude, &id).unwrap();
+        let live =
+            crate::config::read_json_file::<Value>(&crate::config::get_claude_settings_path())
+                .unwrap();
+        for key in [
+            "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+            "ANTHROPIC_DEFAULT_SONNET_MODEL",
+            "ANTHROPIC_DEFAULT_OPUS_MODEL",
+        ] {
+            assert_eq!(provider.settings_config["env"][key], "platform-model");
+            assert_eq!(live["env"][key], "platform-model");
+        }
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn subscription_marker_updates_latest_metadata_without_native_writes_or_resurrection() {
+        use crate::app_config::AppType;
+        use crate::database::Database;
+        use crate::services::ProviderService as UpstreamProviders;
+        let _home = SyncTestHome::new();
+        let state = AppState::new(std::sync::Arc::new(Database::memory().unwrap()));
+        let provider = deletion_provider("workbuddy", "subscription", "https://platform.test", 1);
+        state.db.save_provider("workbuddy", &provider).unwrap();
+        // Unknown future fields must survive; a fresh edit made after discovery must survive too.
+        let mut raw = serde_json::to_value(provider.meta.as_ref().unwrap()).unwrap();
+        raw["future"] = json!({"keep":true});
+        raw["platformManaged"]["groupId"] = json!(42);
+        raw["platformManaged"]["future"] = json!("keep");
+        raw["platformManaged"]
+            .as_object_mut()
+            .unwrap()
+            .remove("subscriptionType");
+        state.db.conn.lock().unwrap().execute(
+            "UPDATE providers SET meta = ?1, name = 'edited', notes = 'latest', settings_config = ?2 WHERE id = ?3 AND app_type = 'workbuddy'",
+            rusqlite::params![raw.to_string(), json!({"userSetting":"keep"}).to_string(), provider.id],
+        ).unwrap();
+        let path = crate::workbuddy_config::get_workbuddy_home().join("models.json");
+        crate::config::atomic_write_private(&path, b"{\"models\":[],\"userSetting\":true}")
+            .unwrap();
+        let before = std::fs::read(&path).unwrap();
+        let groups = HashSet::from([42]);
+        for (origin, user, group) in [
+            ("https://other.test", 1, 42),
+            ("https://platform.test", 2, 42),
+            ("https://platform.test", 1, 43),
+        ] {
+            assert!(!ProviderService::mark_subscription(
+                &state,
+                AppType::WorkBuddy,
+                &provider.id,
+                origin,
+                user,
+                &HashSet::from([group])
+            )
+            .unwrap());
+        }
+        assert!(ProviderService::mark_subscription(
+            &state,
+            AppType::WorkBuddy,
+            &provider.id,
+            "https://platform.test",
+            1,
+            &groups
+        )
+        .unwrap());
+        assert!(!ProviderService::mark_subscription(
+            &state,
+            AppType::WorkBuddy,
+            &provider.id,
+            "https://platform.test",
+            1,
+            &groups
+        )
+        .unwrap());
+        let saved = state
+            .db
+            .get_provider_by_id(&provider.id, "workbuddy")
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.name, "edited");
+        assert_eq!(saved.notes.as_deref(), Some("latest"));
+        assert_eq!(saved.settings_config, json!({"userSetting":"keep"}));
+        let saved_raw: String = state
+            .db
+            .conn
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT meta FROM providers WHERE app_type = 'workbuddy' AND id = ?1",
+                [&provider.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let mut expected = raw;
+        expected["platformManaged"]["subscriptionType"] = json!("subscription");
+        assert_eq!(serde_json::from_str::<Value>(&saved_raw).unwrap(), expected);
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+        assert!(UpstreamProviders::update_metadata(
+            &state,
+            AppType::WorkBuddy,
+            &provider.id,
+            |meta| {
+                meta["future"] = json!("discard");
+                Err(crate::error::AppError::Config("abort".into()))
+            }
+        )
+        .is_err());
+        let after_failure: String = state
+            .db
+            .conn
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT meta FROM providers WHERE app_type = 'workbuddy' AND id = ?1",
+                [&provider.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(after_failure, saved_raw);
+        state.db.delete_provider("workbuddy", &provider.id).unwrap();
+        assert!(!ProviderService::mark_subscription(
+            &state,
+            AppType::WorkBuddy,
+            &provider.id,
+            "https://platform.test",
+            1,
+            &groups
+        )
+        .unwrap());
+        assert!(state
+            .db
+            .get_provider_by_id(&provider.id, "workbuddy")
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn metadata_updates_wait_for_application_lock_and_preserve_concurrent_fields() {
+        use crate::{
+            app_config::AppType, database::Database, services::ProviderService as UpstreamProviders,
+        };
+        let _home = SyncTestHome::new();
+        let state = std::sync::Arc::new(AppState::new(std::sync::Arc::new(
+            Database::memory().unwrap(),
+        )));
+        state
+            .db
+            .save_provider(
+                "workbuddy",
+                &Provider::with_id("concurrent".into(), "Original".into(), json!({}), None),
+            )
+            .unwrap();
+        let guard =
+            futures::executor::block_on(state.proxy_service.lock_switch_for_app("workbuddy"));
+        let worker_state = state.clone();
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            started_tx.send(()).unwrap();
+            let result = UpstreamProviders::update_metadata(
+                &worker_state,
+                AppType::WorkBuddy,
+                "concurrent",
+                |meta| {
+                    meta["counter"] = json!(
+                        meta.get("counter")
+                            .and_then(Value::as_u64)
+                            .unwrap_or_default()
+                            + 1
+                    );
+                    Ok(())
+                },
+            );
+            done_tx.send(result).unwrap();
+        });
+        started_rx.recv().unwrap();
+        assert!(matches!(
+            done_rx.recv_timeout(std::time::Duration::from_millis(50)),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+        ));
+        state
+            .db
+            .update_provider_metadata("workbuddy", "concurrent", |meta| {
+                meta["counter"] = json!(40);
+                meta["unknown"] = json!({"keep":true});
+                Ok(())
+            })
+            .unwrap();
+        drop(guard);
+        assert!(done_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap()
+            .unwrap());
+        worker.join().unwrap();
+        let raw: String = state
+            .db
+            .conn
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT meta FROM providers WHERE id = 'concurrent' AND app_type = 'workbuddy'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let meta: Value = serde_json::from_str(&raw).unwrap();
+        assert_eq!(meta["counter"], 41);
+        assert_eq!(meta["unknown"], json!({"keep":true}));
     }
 
     #[test]

@@ -2,6 +2,23 @@
 
 > 这是按基线/事件累积的补丁台账。222 项清单针对 2026-10-29 的 4.0.21 快照，后续变更按事件追加；旧路径、版本和分支描述仅适用于该段，不是当前 4.0.22 的完整重新统计。当前现状见 [代码基线](baseline.md)。
 
+## 2026-10-31：平台与上游边界收敛
+
+决策见 [ADR-0008](../adr/ADR-0008-upstream-patch-convergence.md)。本段覆盖下方历史条目对应能力的当前状态；历史表不改写。
+
+| 文件/既有补丁 | 当前处理及必要性 | 等级 | 回归入口 |
+|---|---|---|---|
+| `src-tauri/src/live/project/claude.rs`（ZS-123）、`services/provider/claude_direct.rs`（ZS-138）、`services/provider/claude_editor.rs`（ZS-139） | 完整恢复 4.0.22 上游；平台已在自有 Adapter 组装 Haiku/Sonnet/Opus，无需通用派生 | L3 补丁撤回 | 手动 Provider 切换/编辑预览、平台 Claude 原生切换、Claude 金标 |
+| `src-tauri/src/mode/controller.rs`（ZS-125）、`services/provider/mod.rs`（ZS-142） | 撤回直连写入的全局档位派生；保留历史审计、WorkBuddy 与身份隔离；服务新增通用元数据入口 | L3 | Provider、mode 与历史还原 |
+| `src-tauri/src/{opencode_config,kimi_config,mcode_config}.rs`、`pi_config/mod.rs` | 完整恢复 4.0.22 上游；平台专用测试夹具移到 `zhishu/integrations/ccswitch/test_support.rs`；Kimi 选择解析通过 Adapter 复用原生 `read/config_path` | L3 补丁撤回 | 平台全应用同步、删除、退出、Kimi 别名 |
+| `src/components/settings/sections/GeneralSection.tsx`（ZS-175）、`src/components/providers/presentation.ts`（ZS-170）、`src/lib/api/index.ts` | 完整恢复 4.0.22 上游；撤下无调用者的 simplified、无赋值的 deleteReason 及自有 API 重导出；配置历史继续使用自有模块入口 | L2 补丁撤回 | Settings、卡片呈现、配置历史、类型检查 |
+| `src/lib/query/mutations.ts`（ZS-201） | 保留 WorkBuddy 分派；成功沿用上游刷新，失败补刷一次，避免成功时顺序双刷 | L2 | `tests/zhishu/hooks/useWorkBuddyMutationRefresh.test.tsx` 八项成功/失败路径 |
+| `src-tauri/src/services/provider/mod.rs::update_metadata`、`database/dao/providers.rs::update_provider_metadata` | 唯一新增的通用核心能力：复用应用锁，连接锁内读取最新原始 JSON，仅更新 meta，不插入、不写 CLI；上游现有 update 会发布配置，故不能直接用于元数据迁移。平台归属和订阅判断留在 Adapter | L3 | 元数据新鲜读取、未知字段保留、缺失项、错误不落盘、应用锁等待、原生文件不变 |
+
+完整配置历史和还原、完整 WorkBuddy 原生支持继续保留。Tauri 事件监听清理竞态、macOS Dock 图标恢复、OpenCode V2 用量凭据读取按独立修复补丁保留，本次不将其归入平台同步。此前 DSH 修复已单独提交为 `2fea90d7`，继续复用上游原生服务。
+
+本次不改 schema、IPC、凭据和数据目录，不覆盖正在整理的文档或开发签名改动；配置写入仍走已有锁、备份、原子发布/pending 和 WorkBuddy 局部恢复。已执行结果和未验收范围见 [验证记录](../history/validation.md)。
+
 ## 2026-10-31：4.0.22 冲突复核
 
 以 `4.0.22` (`b7642674`) 为新上游基线；逐项决议及验证见 [同步报告](../upstream-sync/2026-10-31.md) 与 [ADR-0007](../adr/ADR-0007-merge-4.0.22.md)。本轮没有新增平行 Provider 核心。

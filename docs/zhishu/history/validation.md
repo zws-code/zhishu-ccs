@@ -2,6 +2,30 @@
 
 > 本页保留各次任务的执行结果和未验证项；测试数量、代码路径、分支状态及临时资料均属于当时快照。本次文档整理没有重跑这些历史测试。当前行为以 [代码基线](../development/baseline.md)、功能说明和源码为准。
 
+## 平台与上游边界收敛（2026-10-31）
+
+范围：[ADR-0008](../adr/ADR-0008-upstream-patch-convergence.md)。基于 `2fea90d7` 工作区实施，保留任务开始前已有的文档整理、开发签名及 Vite 配置修改。文档整理已独立提交为 `5f70b01a`；本次收敛仅作本地提交，不推送或发布。
+
+| 本次执行 | 结果 |
+|---|---|
+| `./node_modules/.bin/tsc --noEmit` | 通过；直接执行仓库 TypeScript，避开只读沙箱下 pnpm 版本管理锁 |
+| 受影响前端文件及新增测试 Prettier | 通过 |
+| `vitest run tests/zhishu` 加 Add/Update mutation、GeneralSection 和两套 SettingsDialog | 22 文件、240 项通过；含 WorkBuddy 四类操作成功/失败仅刷新一次的 8 项新增回归 |
+| 隔离 Rust `--lib zhishu::` | 156 项通过；含历史还原、平台会话、全应用同步、WorkBuddy、DSH 和新增元数据/Claude 回归 |
+| 隔离 Rust `--lib services::provider::` | 212 项通过；含手动 Claude 不补齐及编辑预览 |
+| 隔离 Rust `--lib mode::` | 184 项通过；含退出代理/聚合恢复、pending、并发与历史摘要 |
+| 隔离 Rust `--test golden` | 44 项通过；未更新金标快照 |
+| `cargo fmt --check --manifest-path src-tauri/Cargo.toml` | 通过 |
+| `cargo clippy --locked --offline --manifest-path src-tauri/Cargo.toml -- -D warnings` | 通过（项目规定的常规严格检查） |
+| `cargo clippy --locked --offline --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | 未通过：原有上游 `src-tauri/src/dsh_config.rs:2018` 的 `&[web.clone()]` 命中 `cloned_ref_to_slice_refs`；已核对该文件与 4.0.22 无差异，本次不增加无关核心修复 |
+| `vite build --mode development --outDir /tmp/zhishu-convergence-renderer-build` | 通过，独立构建输出；存在既有浏览器数据、Tailwind 歧义、静态/动态导入和大 chunk 提示。没有执行正式发行构建或验签 |
+| 上游差异与文档链接 | 10 个撤回文件逐字节等同 `b7642674`；相对该基线的已有源码文件修改数 Rust 45→39、前端 46→43（净减少包含新增通用 DAO 补丁，不含新增自有文件）；收敛文档相对链接均有效 |
+| `git diff --check` | 通过 |
+
+Rust 使用独立 `CC_SWITCH_TEST_HOME`/`DSH_HOME`，智枢测试夹具进一步隔离 Pi、Hermes、MCode、WorkBuddy、Kimi 等目录；未修改智能体 `HOME`/`CODEX_HOME`，未用真实 CLI 配置试验。新增元数据用例验证账号/平台/分组归属、最新元数据、未知字段、删除后不重建、回调失败不落盘、等待应用锁与原生文件不变。
+
+未执行：全量前后端测试、真实平台请求、真实 CLI 启动、macOS/Windows/Linux keyring 和重启恢复实测、安装升级与发布验证。保留历史功能的模拟回归不替代这些验收。
+
 ## 目录与功能提交整理（2026-10-29）
 
 日期：2026-10-29；环境：本机 macOS，使用仓库现有 node_modules 与 Rust 缓存。

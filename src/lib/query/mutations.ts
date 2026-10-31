@@ -167,11 +167,11 @@ export const useAddProviderMutation = (appId: AppId) => {
         }),
       );
     },
-    onSettled: async () => {
+    onSettled: async (_data, error) => {
       if (isPiFamilyApp(appId)) {
         await invalidatePiProviderCaches(queryClient, appId);
       }
-      if (appId === "workbuddy") {
+      if (error && appId === "workbuddy") {
         await queryClient.invalidateQueries({
           queryKey: ["providers", "workbuddy"],
         });
@@ -242,7 +242,7 @@ export const useUpdateProviderMutation = (appId: AppId) => {
         }),
       );
     },
-    onSettled: async () => {
+    onSettled: async (_data, error) => {
       if (isPiFamilyApp(appId)) {
         await invalidatePiProviderCaches(queryClient, appId);
       } else if (appId === "kimi") {
@@ -251,7 +251,7 @@ export const useUpdateProviderMutation = (appId: AppId) => {
           queryKey: ["providers", "kimi"],
         });
       }
-      if (appId === "workbuddy") {
+      if (error && appId === "workbuddy") {
         await queryClient.invalidateQueries({
           queryKey: ["providers", "workbuddy"],
         });
@@ -330,7 +330,7 @@ export const useDeleteProviderMutation = (appId: AppId) => {
         }),
       );
     },
-    onSettled: async () => {
+    onSettled: async (_data, error) => {
       if (isPiFamilyApp(appId)) {
         await invalidatePiProviderCaches(queryClient, appId);
       } else if (appId === "kimi") {
@@ -339,7 +339,7 @@ export const useDeleteProviderMutation = (appId: AppId) => {
           queryKey: ["providers", "kimi"],
         });
       }
-      if (appId === "workbuddy") {
+      if (error && appId === "workbuddy") {
         await queryClient.invalidateQueries({
           queryKey: ["providers", "workbuddy"],
         });
@@ -429,11 +429,11 @@ export const useSwitchProviderMutation = (appId: AppId) => {
         },
       );
     },
-    onSettled: async () => {
+    onSettled: async (_data, error) => {
       if (isPiFamilyApp(appId)) {
         await invalidatePiProviderCaches(queryClient, appId);
       }
-      if (appId === "workbuddy") {
+      if (error && appId === "workbuddy") {
         await queryClient.invalidateQueries({
           queryKey: ["providers", "workbuddy"],
         });

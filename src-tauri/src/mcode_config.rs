@@ -60,45 +60,6 @@ pub(crate) fn config_path() -> PathBuf {
     data_dir().join("config.yaml")
 }
 
-/// Seed native model selection for provider-sync and logout regression tests.
-#[cfg(test)]
-pub(crate) fn set_platform_default(provider: &str, model: &str) -> Result<(), AppError> {
-    let path = config_path();
-    let lock_path = PathBuf::from(format!("{}.lock", path.display()));
-    fs::create_dir(&lock_path)
-        .map_err(|_| AppError::Conflict("MCode is saving configuration; retry shortly".into()))?;
-    let _lock = ConfigLock(lock_path);
-    let mut document = read(&path)?;
-    if document
-        .get("custom_provider")
-        .and_then(|v| v.get(provider))
-        .and_then(|v| v.get("models"))
-        .and_then(|v| v.get(model))
-        .is_none()
-    {
-        return Err(AppError::Config(
-            "The selected MCode model has not been configured".into(),
-        ));
-    }
-    document["defaultModel"] = format!("custom_provider:{provider}/{model}").into();
-    document["defaultLightModel"] = format!("custom_provider:{provider}/{model}").into();
-    atomic_write_private(
-        &path,
-        serde_yaml::to_string(&document)
-            .map_err(|e| AppError::Config(e.to_string()))?
-            .as_bytes(),
-    )
-}
-
-#[cfg(test)]
-pub(crate) fn platform_default_matches(provider: &str, model: &str) -> Result<bool, AppError> {
-    let document = read(&config_path())?;
-    Ok(document
-        .get("defaultModel")
-        .and_then(serde_yaml::Value::as_str)
-        == Some(format!("custom_provider:{provider}/{model}").as_str()))
-}
-
 fn read(path: &Path) -> Result<serde_yaml::Value, AppError> {
     let text = match fs::read_to_string(path) {
         Ok(text) => text,

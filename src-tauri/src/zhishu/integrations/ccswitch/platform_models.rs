@@ -908,6 +908,34 @@ pub(crate) fn publish_workbuddy_models<'a>(
     Ok(())
 }
 
+/// Read the selected Kimi model from one native snapshot (aliases need not equal model IDs).
+pub(crate) fn kimi_selection() -> Result<Value, crate::error::AppError> {
+    let document = crate::kimi_config::read(&crate::kimi_config::config_path())?;
+    Ok(kimi_selection_from(&document))
+}
+
+fn kimi_selection_from(document: &Value) -> Value {
+    let selected = document
+        .get("default_model")
+        .and_then(Value::as_str)
+        .and_then(|key| document.get("models").and_then(|models| models.get(key)));
+    let provider = selected
+        .and_then(|entry| entry.get("provider"))
+        .and_then(Value::as_str)
+        .filter(|id| {
+            document
+                .get("providers")
+                .and_then(|providers| providers.get(*id))
+                .is_some()
+        })
+        .unwrap_or_default();
+    let model = selected
+        .and_then(|entry| entry.get("model"))
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    json!({"defaultProvider":provider, "defaultModel":model})
+}
+
 // Helpers for exercising native selection in provider-sync and logout tests.
 #[cfg(test)]
 pub(crate) fn select_default(
@@ -916,7 +944,7 @@ pub(crate) fn select_default(
     model: &str,
 ) -> Result<(), crate::error::AppError> {
     match app {
-        AppType::OpenCode => crate::opencode_config::set_platform_default(id, model),
+        AppType::OpenCode => super::test_support::select_opencode(id, model),
         AppType::OpenClaw => {
             let reference = format!("{id}/{model}");
             let mut catalog = crate::openclaw_config::get_model_catalog()?.unwrap_or_default();
@@ -936,9 +964,9 @@ pub(crate) fn select_default(
             )
             .map(|_| ())
         }
-        AppType::Pi => crate::pi_config::set_platform_default(id, model),
-        AppType::Mcode => crate::mcode_config::set_platform_default(id, model),
-        AppType::Kimi => crate::kimi_config::set_platform_default(id, model),
+        AppType::Pi => super::test_support::select_pi(id, model),
+        AppType::Mcode => super::test_support::select_mcode(id, model),
+        AppType::Kimi => super::test_support::select_kimi(id, model),
         AppType::Hermes => {
             let mut config = crate::hermes_config::get_model_config()?.unwrap_or_default();
             config.default = Some(model.into());
@@ -977,8 +1005,8 @@ pub(crate) fn is_selected(
         AppType::Hermes => crate::hermes_config::get_model_config()?.is_some_and(|m| {
             m.default.as_deref() == Some(model) && m.provider.as_deref() == Some(id)
         }),
-        AppType::Mcode => crate::mcode_config::platform_default_matches(id, model)?,
-        AppType::Kimi => crate::kimi_config::platform_default_matches(id, model)?,
+        AppType::Mcode => super::test_support::mcode_selected(id, model)?,
+        AppType::Kimi => super::test_support::kimi_selected(id, model)?,
         AppType::WorkBuddy => state
             .db
             .get_provider_by_id(id, app.as_str())?
@@ -994,6 +1022,29 @@ pub(crate) fn is_selected(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn kimi_selection_resolves_native_aliases_and_rejects_missing_providers() {
+        let document = json!({
+            "default_model":"alias/with.dots", "unknown":{"keep":true},
+            "providers":{"platform":{"type":"openai"}},
+            "models":{"alias/with.dots":{"provider":"platform", "model":"real/model"}}
+        });
+        assert_eq!(
+            kimi_selection_from(&document),
+            json!({"defaultProvider":"platform", "defaultModel":"real/model"})
+        );
+        let mut dangling = document;
+        dangling["providers"] = json!({});
+        assert_eq!(
+            kimi_selection_from(&dangling),
+            json!({"defaultProvider":"", "defaultModel":"real/model"})
+        );
+        assert_eq!(
+            kimi_selection_from(&json!({})),
+            json!({"defaultProvider":"", "defaultModel":""})
+        );
+    }
+
     fn model(agent: &str, protocol: &str) -> AgentModel {
         serde_json::from_value(json!({"id":"entry", "agent":agent,"model":"model/with-\"quotes", "name":"Example", "protocol":protocol,"available":true,"category":"recommended","supportsTools":true,"supportsStreaming":true,"contextWindow":32000,"maxOutputTokens":4096})).unwrap()
     }

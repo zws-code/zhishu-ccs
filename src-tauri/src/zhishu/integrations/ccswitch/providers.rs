@@ -40,6 +40,37 @@ impl Providers {
         ProviderService::update(state, app, original_id, provider)
     }
 
+    pub(crate) fn mark_subscription(
+        state: &AppState,
+        app: AppType,
+        id: &str,
+        origin: &str,
+        user_id: i64,
+        groups: &std::collections::HashSet<i64>,
+    ) -> Result<bool, AppError> {
+        ProviderService::update_metadata(state, app, id, |meta| {
+            let Some(managed) = meta
+                .get_mut("platformManaged")
+                .and_then(Value::as_object_mut)
+            else {
+                return Ok(());
+            };
+            if managed.get("origin").and_then(Value::as_str) == Some(origin)
+                && managed.get("userId").and_then(Value::as_i64) == Some(user_id)
+                && managed
+                    .get("groupId")
+                    .and_then(Value::as_i64)
+                    .is_some_and(|id| groups.contains(&id))
+            {
+                managed.insert(
+                    "subscriptionType".into(),
+                    Value::String("subscription".into()),
+                );
+            }
+            Ok(())
+        })
+    }
+
     pub(crate) fn switch(
         state: &AppState,
         app: AppType,

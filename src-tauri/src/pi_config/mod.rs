@@ -80,27 +80,6 @@ pub(crate) fn get_pi_settings_path() -> Result<PathBuf, AppError> {
     Ok(get_pi_agent_dir()?.join("settings.json"))
 }
 
-/// Seed native model selection for provider-sync and logout regression tests.
-#[cfg(test)]
-pub(crate) fn set_platform_default(provider: &str, model: &str) -> Result<(), AppError> {
-    let _guard = lock_models_file()?;
-    let path = get_pi_settings_path()?;
-    let mut document = if path.exists() {
-        read_json5_value(&path, "Pi settings")?
-    } else {
-        serde_json::json!({})
-    };
-    let object = document
-        .as_object_mut()
-        .ok_or_else(|| AppError::Config("Pi settings must be an object".into()))?;
-    object.insert("defaultProvider".into(), Value::String(provider.into()));
-    object.insert("defaultModel".into(), Value::String(model.into()));
-    atomic_write_private(
-        &path,
-        &serde_json::to_vec_pretty(&document).map_err(|e| AppError::Config(e.to_string()))?,
-    )
-}
-
 pub(crate) fn read_pi_native_defaults() -> Result<PiNativeDefaults, AppError> {
     let path = get_pi_settings_path()?;
     if !path.exists() {

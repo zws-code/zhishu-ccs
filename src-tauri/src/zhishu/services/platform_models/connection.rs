@@ -20,7 +20,7 @@ pub(crate) fn read_settings(state: &AppState, app: &AppType) -> Result<Value, Ap
             return serde_yaml::from_str(&text)
                 .map_err(|_| AppError::Config("Invalid MCode config".into()));
         }
-        AppType::Kimi => return crate::kimi_config::platform_selection(),
+        AppType::Kimi => return adapter::kimi_selection(),
         AppType::Dsh => return Ok(json!({})),
         AppType::Claude => crate::config::get_claude_settings_path(),
         AppType::ClaudeDesktop => {
