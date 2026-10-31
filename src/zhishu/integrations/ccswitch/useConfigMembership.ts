@@ -66,6 +66,7 @@ export function useConfigMembership(appId: AppId, enabled = true) {
     (provider: Provider): boolean => {
       switch (appId) {
         case "kimi":
+        case "dsh":
         case "mcode":
         case "workbuddy":
           return provider.meta?.liveConfigManaged === true;

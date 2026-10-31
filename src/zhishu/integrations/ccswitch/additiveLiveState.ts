@@ -35,7 +35,7 @@ export async function refreshAdditiveLiveState(
       queryClient.invalidateQueries({ queryKey: hermesKeys.liveProviderIds }),
       queryClient.invalidateQueries({ queryKey: hermesKeys.modelConfig }),
     ]);
-  } else if (app === "mcode" || app === "kimi") {
+  } else if (app === "mcode" || app === "dsh" || app === "kimi") {
     await queryClient.invalidateQueries({ queryKey: ["providers", app] });
   } else if (app === "workbuddy") {
     await queryClient.invalidateQueries({

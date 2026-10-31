@@ -6,3 +6,4 @@
 
 - [ADR-0005：按账号保存基础数据与清理退出](ADR-0005-account-local-cleanup.md)
 - [ADR-0006：整理 zws 二开历史并移除 Harness 接入](ADR-0006-zws-history-without-harness.md)
+- [ADR-0007：合并上游 4.0.22 并保留智枢边界](ADR-0007-merge-4.0.22.md)

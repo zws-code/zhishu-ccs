@@ -28,7 +28,6 @@ import {
   useProvidersQuery,
   useSettingsQuery,
 } from "@/lib/query";
-import { refreshAdditiveLiveState } from "@/zhishu/integrations/ccswitch/additiveLiveState";
 import {
   piApi,
   providersApi,
@@ -765,6 +764,7 @@ function App() {
       try {
         if (
           activeApp === "mcode" ||
+          activeApp === "dsh" ||
           activeApp === "kimi" ||
           activeApp === "agy"
         )
@@ -972,7 +972,35 @@ function App() {
   };
 
   // 累加式应用的「已添加」和「默认」都现读客户端文件，移除前后重读一遍
-  // 共用 src/lib/query/additiveLiveState.ts 的原生状态刷新。
+  const refreshAdditiveLiveState = async (app: AppId) => {
+    if (isPiFamilyApp(app)) {
+      await invalidatePiProviderCaches(queryClient, app);
+    } else if (app === "opencode") {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["opencodeLiveProviderIds"],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["opencodeDefaultModel"] }),
+      ]);
+    } else if (app === "openclaw") {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: openclawKeys.liveProviderIds,
+        }),
+        queryClient.invalidateQueries({ queryKey: openclawKeys.defaultModel }),
+        queryClient.invalidateQueries({ queryKey: openclawKeys.health }),
+      ]);
+    } else if (app === "hermes") {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: hermesKeys.liveProviderIds }),
+        queryClient.invalidateQueries({ queryKey: hermesKeys.modelConfig }),
+      ]);
+    } else if (app === "mcode" || app === "dsh" || app === "kimi") {
+      await queryClient.invalidateQueries({ queryKey: ["providers", app] });
+    } else if (app === "workbuddy") {
+      await queryClient.invalidateQueries({ queryKey: ["providers", "workbuddy"] });
+    }
+  };
 
   const handleConfirmAction = async () => {
     if (!confirmAction) return;
@@ -992,7 +1020,7 @@ function App() {
               ? translateKimiProviderMutationError(detail, t)
               : "") || detail;
         // 默认模型可能在客户端里改过、页面还是旧的：失败了也重读，让「默认」和移除按钮跟上
-        void refreshAdditiveLiveState(queryClient, activeApp).catch(
+        void refreshAdditiveLiveState(activeApp).catch(
           () => undefined,
         );
         toast.error(t("notifications.removeFromConfigFailed"), {
@@ -1001,7 +1029,7 @@ function App() {
         });
         return;
       }
-      await refreshAdditiveLiveState(queryClient, activeApp);
+      await refreshAdditiveLiveState(activeApp);
       toast.success(
         isPiFamilyApp(activeApp)
           ? t(`${activeApp}.provider.removed`, {
@@ -1140,7 +1168,11 @@ function App() {
         existingKeys,
       );
       duplicatedProvider.addToLive = false;
-    } else if (activeApp === "mcode" || activeApp === "kimi") {
+    } else if (
+      activeApp === "mcode" ||
+      activeApp === "dsh" ||
+      activeApp === "kimi"
+    ) {
       // The MCode list already includes its live custom nodes; the backend
       // rejects a key that MCode itself owns.
       duplicatedProvider.providerKey = generateUniqueProviderCopyKey(
@@ -1256,7 +1288,7 @@ function App() {
 
   // 应用页 ⋯ →「查看此应用的用量」：带上这个应用的筛选（Claude Desktop 的流量并在 Claude 里）
   const usageAppOf = (app: AppId): AppTypeFilter | null => {
-    const type = app === "claude-desktop" ? "claude" : app;
+    const type = sharedFeatureAppOf(app);
     return (KNOWN_APP_TYPES as ReadonlyArray<string>).includes(type)
       ? (type as AppTypeFilter)
       : null;
@@ -1360,6 +1392,7 @@ function App() {
           <AppConfigHistoryButton key={activeApp} app={activeApp} />
           {currentView === "providers" &&
             activeApp !== "mcode" &&
+            activeApp !== "dsh" &&
             activeApp !== "kimi" &&
             (settingsData?.showProfileSwitcher ?? false) && (
               <ProfileSwitcher activeApp={activeApp} />
@@ -1473,7 +1506,7 @@ function App() {
     onConfigureUsage: setUsageProvider,
     onOpenWebsite: handleOpenWebsite,
     onOpenTerminal:
-      activeApp === "claude" || activeApp === "agy"
+      activeApp === "claude" || activeApp === "codex" || activeApp === "agy"
         ? setTerminalProvider
         : undefined,
     onCreate: () => openAddProvider(currentModeView),
@@ -1541,6 +1574,7 @@ function App() {
               activeApp === "workbuddy" ||
               activeApp === "mcode" ||
               activeApp === "kimi" ||
+              activeApp === "dsh" ||
               activeApp === "omp"
                 ? (provider) => setConfirmAction({ provider, action: "remove" })
                 : undefined

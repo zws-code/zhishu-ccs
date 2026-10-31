@@ -72,6 +72,7 @@ export function AddProviderDialog({
     appId !== "omp" &&
     appId !== "workbuddy" &&
     appId !== "mcode" &&
+    appId !== "dsh" &&
     appId !== "kimi" &&
     appId !== "grokbuild" &&
     appId !== "claude-desktop";
@@ -297,6 +298,7 @@ export function AddProviderDialog({
           appId === "workbuddy" ||
           appId === "mcode" ||
           appId === "kimi" ||
+          appId === "dsh" ||
           appId === "omp") &&
         values.providerKey
       ) {

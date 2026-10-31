@@ -74,6 +74,7 @@ export const useAddProviderMutation = (appId: AppId) => {
         appId === "workbuddy" ||
         appId === "mcode" ||
         appId === "kimi" ||
+        appId === "dsh" ||
         appId === "omp"
       ) {
         if (

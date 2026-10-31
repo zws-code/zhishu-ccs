@@ -11,6 +11,7 @@ export type AppId =
   | "pi"
   | "workbuddy"
   | "kimi"
+  | "dsh"
   | "mcode"
   | "agy"
   | "omp";
