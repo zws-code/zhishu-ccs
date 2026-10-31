@@ -1,13 +1,15 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "CC Switch",
-  "version": "4.0.21",
-  "identifier": "com.ccswitch.desktop",
+  "productName": "Zhishu CC Switch",
+  "mainBinaryName": "zhishu-ccs",
+  "version": "0.0.3",
+  "identifier": "com.zhishu.ccswitch.desktop",
   "build": {
     "frontendDist": "../dist",
-    "devUrl": "http://localhost:3000",
+    "devUrl": "http://localhost:1420",
     "beforeDevCommand": "pnpm run dev:renderer",
-    "beforeBuildCommand": "pnpm run build:renderer"
+    "beforeBuildCommand": "pnpm run build:renderer",
+    "additionalWatchFolders": ["icons"]
   },
   "app": {
     "macOSPrivateApi": true,
@@ -58,15 +60,12 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["ccswitch"]
+        "schemes": ["zhishu-ccswitch"]
       }
     },
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM4MDI4QzlBNTczOTI4RTMKUldUaktEbFhtb3dDeUM5US9kT0FmdGR5Ti9vQzcwa2dTMlpibDVDUmQ2M0VGTzVOWnd0SGpFVlEK",
-      "endpoints": [
-        "https://dl.ccswitch.io/latest.json",
-        "https://github.com/farion1231/cc-switch/releases/latest/download/latest.json"
-      ]
+      "pubkey": "",
+      "endpoints": []
     }
   }
 }

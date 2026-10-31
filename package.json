@@ -1,11 +1,13 @@
 {
-  "name": "cc-switch",
-  "version": "4.0.21",
+  "name": "zhishu-ccs",
+  "version": "0.0.3",
   "description": "All-in-One Assistant for Claude Code, Codex & Gemini CLI",
   "type": "module",
   "scripts": {
-    "dev": "pnpm tauri dev",
-    "build": "pnpm tauri build",
+    "dev": "node scripts/zhishu/dev-isolated.mjs",
+    "test:dev-isolation": "node --test scripts/zhishu/dev-isolated.test.mjs",
+    "test:dev-signing": "node --test scripts/zhishu/macos-dev-sign.test.mjs",
+    "build": "node scripts/zhishu/build-release.mjs",
     "tauri": "tauri",
     "dev:renderer": "vite",
     "build:renderer": "vite build",
@@ -13,7 +15,12 @@
     "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,css,json}\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,css,json}\"",
     "test:unit": "vitest run",
-    "test:unit:watch": "vitest watch"
+    "test:unit:watch": "vitest watch",
+    "release:prepare": "node scripts/zhishu/prepare-release.mjs",
+    "test:release-config": "node --test scripts/zhishu/release-config.test.mjs",
+    "test:release": "node --test scripts/zhishu/release-config.test.mjs scripts/zhishu/release-artifacts.test.mjs scripts/zhishu/cos-release.test.mjs scripts/zhishu/resume-release.test.mjs",
+    "release:check": "node scripts/zhishu/cos-release.mjs check",
+    "test:release-cos": "python3 -B -m unittest discover -s scripts/zhishu -p 'test_publish_cos.py'"
   },
   "keywords": [],
   "author": "Jason Young",

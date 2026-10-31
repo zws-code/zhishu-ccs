@@ -1,6 +1,6 @@
 [package]
-name = "cc-switch"
-version = "4.0.21"
+name = "zhishu-ccs"
+version = "0.0.3"
 description = "All-in-One Assistant for Claude Code, Codex & Gemini CLI"
 authors = ["Jason Young"]
 license = "MIT"
@@ -81,6 +81,7 @@ indexmap = { version = "2", features = ["serde"] }
 rust_decimal = "1.33"
 uuid = { version = "1.11", features = ["v4"] }
 sha2 = "0.10"
+keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust", "vendored"] }
 hmac = "0.12"
 json5 = "0.4"
 json-five = "0.3.1"
@@ -117,8 +118,8 @@ objc2 = "0.5"
 objc2-app-kit = { version = "0.2", features = ["NSColor"] }
 # 托盘面板的原生玻璃：NSGlassEffectView（macOS 26）/ NSVisualEffectView；0.2 那套没有前者
 objc2-06 = { package = "objc2", version = "0.6" }
-objc2-foundation-03 = { package = "objc2-foundation", version = "0.3", default-features = false, features = ["std", "NSArray", "NSGeometry", "NSString"] }
-objc2-app-kit-03 = { package = "objc2-app-kit", version = "0.3", default-features = false, features = ["std", "NSAppearance", "NSGlassEffectView", "NSGraphics", "NSResponder", "NSScreen", "NSView", "NSVisualEffectView", "NSWindow"] }
+objc2-foundation-03 = { package = "objc2-foundation", version = "0.3", default-features = false, features = ["std", "NSArray", "NSData", "NSGeometry", "NSString"] }
+objc2-app-kit-03 = { package = "objc2-app-kit", version = "0.3", default-features = false, features = ["std", "NSAppearance", "NSApplication", "NSGlassEffectView", "NSGraphics", "NSImage", "NSResponder", "NSScreen", "NSView", "NSVisualEffectView", "NSWindow"] }
 
 # Optimize release binary size to help reduce AppImage footprint
 [profile.release]
@@ -129,7 +130,10 @@ lto = "thin"
 opt-level = "s"
 # 使用 unwind 以便 panic hook 能捕获 backtrace（abort 会直接终止无法捕获）
 panic = "unwind"
-strip = "symbols"
+# Cargo applies this to proc-macro crates too. Stripping them breaks older
+# Tauri transitive dependencies with Rust 1.95, so keep the release profile
+# unstripped and strip only a finished application binary if needed.
+strip = false
 
 [dev-dependencies]
 serial_test = "3"

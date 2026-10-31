@@ -1,19 +1,37 @@
-name: Release
+name: Release to Tencent COS
 
 on:
   push:
+    # Dedicated validation ref: branch pushes compile only; uploads still require a tag.
+    branches:
+      - 'codex/cos-validation'
+      - 'codex/release-0.0.3'
     tags:
       - 'v*'
   # 手动触发即干跑：完整编译、签名、公证，产物只留在 workflow 里，不建 GitHub Release
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  # 带上事件名：手动干跑也能选 tag，和正式发布同组会把正在跑的发布取消掉
+  # 演练与正式发布分别排队；不取消正在执行的发布。
   group: release-${{ github.event_name }}-${{ github.ref_name }}
-  cancel-in-progress: true
+  cancel-in-progress: false
+
+env:
+  VITE_PLATFORM_API_URL: ${{ vars.ZHISHU_PLATFORM_API_URL }}
+  VITE_PLATFORM_WEB_URL: ${{ vars.ZHISHU_PLATFORM_WEB_URL }}
+  ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP: ${{ vars.ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP }}
+  ZHISHU_UPDATE_URL: ${{ vars.ZHISHU_UPDATE_URL }}
+  ZHISHU_UPDATE_PUBLIC_KEY: ${{ vars.ZHISHU_UPDATE_PUBLIC_KEY }}
+  COS_BUCKET: ${{ vars.COS_BUCKET }}
+  COS_REGION: ${{ vars.COS_REGION }}
+  # Enable global upload acceleration for the explicitly authorized 0.0.3 release.
+  COS_UPLOAD_ACCELERATE: ${{ github.ref == 'refs/tags/v0.0.3' && 'true' || vars.COS_UPLOAD_ACCELERATE || 'false' }}
+  COS_PREFIX: ${{ vars.COS_PREFIX || 'ccs/stable' }}
+  COS_PUBLIC_BASE_URL: ${{ vars.COS_PUBLIC_BASE_URL }}
+  MACOS_SIGNING_MODE: ${{ vars.ZHISHU_MACOS_SIGNING_MODE || 'developer-id' }}
 
 jobs:
   # 应用内更新摘要（src/whats-new/<版本>.json，见同目录 README）随安装包发出。漏写的话
@@ -23,11 +41,14 @@ jobs:
   whats-new-check:
     name: Check in-app what's new summaries
     runs-on: ubuntu-22.04
+    if: github.repository == 'zws-code/zhishu-ccs'
+    outputs:
+      tag: ${{ steps.config.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      # 手动干跑可以在任意分支上跑，那时这一版的摘要可能还没写，只在推 tag 时要求存在
+      # 推 tag 时先快速检查摘要；后续配置预检也会核对源码版本与摘要
       - name: Require this version's summary
         if: github.event_name == 'push' && github.ref_type == 'tag'
         env:
@@ -44,6 +65,34 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '20'
+
+      - name: Validate release configuration and version
+        id: config
+        env:
+          SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          TAG="$(node -p "'v' + require('./package.json').version")"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$TAG" ]; then
+            echo "::error::Tag differs from the committed application version"; exit 1
+          fi
+          node scripts/zhishu/cos-release.mjs check "$TAG"
+          test -n "$SIGNING_KEY" || { echo "::error::Missing TAURI_SIGNING_PRIVATE_KEY"; exit 1; }
+          case "$MACOS_SIGNING_MODE" in
+            developer-id)
+              for variable in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD KEYCHAIN_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+                test -n "${!variable}" || { echo "::error::Missing $variable for Developer ID signing"; exit 1; }
+              done ;;
+            adhoc) echo "::warning::Ad-hoc macOS build: no Apple notarization; first installation may be blocked by Gatekeeper" ;;
+            *) echo "::error::ZHISHU_MACOS_SIGNING_MODE must be developer-id or adhoc"; exit 1 ;;
+          esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Setup pnpm
         env:
@@ -67,6 +116,15 @@ jobs:
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
 
+      - name: Test release scripts
+        run: pnpm test:release
+
+      - name: Test COS publisher
+        run: pnpm test:release-cos
+
+      - name: TypeScript check
+        run: pnpm typecheck
+
       - name: Validate all summaries
         run: pnpm vitest run tests/config/whatsNewEntries.test.ts
 
@@ -80,9 +138,6 @@ jobs:
         include:
           - os: windows-2022
           - os: windows-11-arm
-            arch: arm64
-          - os: ubuntu-22.04
-          - os: ubuntu-22.04-arm
             arch: arm64
 
     steps:
@@ -112,38 +167,6 @@ jobs:
         if: runner.os == 'Windows' && matrix.arch == 'arm64'
         shell: pwsh
         run: rustup target add aarch64-pc-windows-msvc
-
-      - name: Install Linux system deps
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          set -euxo pipefail
-          sudo apt-get update
-          # Core build tools and pkg-config
-          sudo apt-get install -y --no-install-recommends \
-            build-essential \
-            pkg-config \
-            curl \
-            wget \
-            file \
-            patchelf \
-            libssl-dev \
-            rpm \
-            flatpak \
-            flatpak-builder \
-            elfutils \
-            xdg-utils
-          # GTK/GLib stack for gdk-3.0, glib-2.0, gio-2.0
-          sudo apt-get install -y --no-install-recommends \
-            libgtk-3-dev \
-            librsvg2-dev \
-            libayatana-appindicator3-dev
-          # WebKit2GTK (version differs across Ubuntu images; try 4.1 then 4.0)
-          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev \
-            || sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.0-dev
-          # libsoup also changed major version; prefer 3.0 with fallback to 2.4
-          sudo apt-get install -y --no-install-recommends libsoup-3.0-dev \
-            || sudo apt-get install -y --no-install-recommends libsoup2.4-dev
 
       - name: Setup pnpm
         env:
@@ -185,6 +208,9 @@ jobs:
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare Zhishu production configuration
+        run: node scripts/zhishu/prepare-release.mjs
+
       - name: Prepare Tauri signing key
         uses: ./.github/actions/prepare-tauri-signing-key
         with:
@@ -198,16 +224,12 @@ jobs:
           WINDOWS_RELEASE_ARCH: ${{ matrix.arch || 'x86_64' }}
         run: |
           $ErrorActionPreference = 'Stop'
-          # 只发布 MSI（和便携版 exe），不打用不上的 NSIS 安装包
+          # Windows 仅发布带更新签名的 NSIS EXE 安装包。
           if ($env:WINDOWS_RELEASE_ARCH -eq 'arm64') {
-            pnpm tauri build --target aarch64-pc-windows-msvc --bundles msi
+            pnpm tauri build --config src-tauri/tauri.release.local.conf.json --target aarch64-pc-windows-msvc --bundles nsis
           } else {
-            pnpm tauri build --bundles msi
+            pnpm tauri build --config src-tauri/tauri.release.local.conf.json --bundles nsis
           }
-
-      - name: Build Tauri App (Linux)
-        if: runner.os == 'Linux'
-        run: pnpm tauri build --bundles appimage,deb,rpm
 
       - name: Prepare Windows Assets
         if: runner.os == 'Windows'
@@ -217,136 +239,26 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path release-assets | Out-Null
-          # e.g., v3.5.0；手动干跑时是分支名，斜杠会被当成目录，换成 -
-          $VERSION = $env:GITHUB_REF_NAME -replace '/', '-'
+          # 正式发布与手动演练均使用已提交的应用版本
+          $VERSION = 'v' + (Get-Content package.json -Raw | ConvertFrom-Json).version
           $isArm64 = $env:WINDOWS_RELEASE_ARCH -eq 'arm64'
           $targetRoot = if ($isArm64) { 'src-tauri/target/aarch64-pc-windows-msvc/release' } else { 'src-tauri/target/release' }
           $assetSuffix = if ($isArm64) { '-arm64' } else { '' }
 
-          # 仅打包 MSI 安装器 + .sig（用于 Updater）
-          $msi = Get-ChildItem -Path (Join-Path $targetRoot 'bundle/msi') -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($null -eq $msi) {
-            # 兜底：全局搜索 .msi
-            $msi = Get-ChildItem -Path (Join-Path $targetRoot 'bundle') -Recurse -Include *.msi -ErrorAction SilentlyContinue | Select-Object -First 1
+          # 只收集 NSIS 安装器，不能误取裸程序 EXE 或旧构建残留。
+          $installers = @(Get-ChildItem -Path (Join-Path $targetRoot 'bundle/nsis') -File -Filter *.exe)
+          if ($installers.Count -ne 1) {
+            throw "Expected exactly one Windows NSIS installer, found $($installers.Count) ($env:WINDOWS_RELEASE_ARCH)"
           }
-          if ($null -ne $msi) {
-            # #8534：旧版本的应用内更新器以 `msiexec /passive /promptrestart` 安装、不带任何 REBOOT
-            # 选项，文件被占用时会不经提示直接重启系统，所以 MSI 自身必须带 REBOOT=ReallySuppress。
-            $installer = New-Object -ComObject WindowsInstaller.Installer
-            $db = $installer.GetType().InvokeMember('OpenDatabase', 'InvokeMethod', $null, $installer, @($msi.FullName, 0))
-            $view = $db.GetType().InvokeMember('OpenView', 'InvokeMethod', $null, $db, @('SELECT `Value` FROM `Property` WHERE `Property`=''REBOOT'''))
-            $view.GetType().InvokeMember('Execute', 'InvokeMethod', $null, $view, $null) | Out-Null
-            $record = $view.GetType().InvokeMember('Fetch', 'InvokeMethod', $null, $view, $null)
-            $reboot = if ($null -ne $record) { $record.GetType().InvokeMember('StringData', 'GetProperty', $null, $record, 1) } else { $null }
-            $view.GetType().InvokeMember('Close', 'InvokeMethod', $null, $view, $null) | Out-Null
-            if ($reboot -ne 'ReallySuppress') {
-              throw "MSI Property table must set REBOOT=ReallySuppress (found: '$reboot') - see #8534"
-            }
-            Write-Host "MSI REBOOT property: $reboot"
-
-            $dest = "CC-Switch-$VERSION-Windows$assetSuffix.msi"
-            Copy-Item $msi.FullName (Join-Path release-assets $dest)
-            Write-Host "Installer copied: $dest"
-            $sigPath = "$($msi.FullName).sig"
-            if (Test-Path $sigPath) {
-              Copy-Item $sigPath (Join-Path release-assets ("$dest.sig"))
-              Write-Host "Signature copied: $dest.sig"
-            } else {
-              throw "Signature not found for $($msi.Name)"
-            }
-          } else {
-            throw "No Windows MSI installer found ($env:WINDOWS_RELEASE_ARCH)"
+          $installer = $installers[0]
+          $sigPath = "$($installer.FullName).sig"
+          if (-not (Test-Path -LiteralPath $sigPath -PathType Leaf)) {
+            throw "Signature not found for $($installer.Name)"
           }
-
-          # 绿色版（portable）：仅可执行文件打 zip（不参与 Updater）
-          $exeCandidates = if ($isArm64) {
-            @('src-tauri/target/aarch64-pc-windows-msvc/release/cc-switch.exe')
-          } else {
-            @(
-              'src-tauri/target/release/cc-switch.exe',
-              'src-tauri/target/x86_64-pc-windows-msvc/release/cc-switch.exe'
-            )
-          }
-          $exePath = $exeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if ($null -ne $exePath) {
-            $portableDir = 'release-assets/CC-Switch-Portable'
-            New-Item -ItemType Directory -Force -Path $portableDir | Out-Null
-            Copy-Item $exePath $portableDir
-            $portableIniPath = Join-Path $portableDir 'portable.ini'
-            $portableContent = if ($isArm64) {
-              @(
-                '# CC Switch portable ARM64 build marker',
-                'portable=true',
-                'arch=arm64'
-              )
-            } else {
-              @(
-                '# CC Switch portable build marker',
-                'portable=true'
-              )
-            }
-            $portableContent | Set-Content -Path $portableIniPath -Encoding UTF8
-            $portableZip = "release-assets/CC-Switch-$VERSION-Windows$assetSuffix-Portable.zip"
-            Compress-Archive -Path "$portableDir/*" -DestinationPath $portableZip -Force
-            Remove-Item -Recurse -Force $portableDir
-            Write-Host "Windows portable zip created: CC-Switch-$VERSION-Windows$assetSuffix-Portable.zip"
-          } elseif ($isArm64) {
-            throw 'Portable ARM64 exe not found'
-          } else {
-            Write-Warning 'Portable exe not found'
-          }
-
-      - name: Prepare Linux Assets
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          set -euxo pipefail
-          mkdir -p release-assets
-          # e.g., v3.5.0；手动干跑时是分支名，斜杠会被当成目录，换成 -
-          VERSION="${GITHUB_REF_NAME//\//-}"
-          ARCH="${{ matrix.arch || 'x86_64' }}"
-          # Updater artifact: AppImage（含对应 .sig）
-          APPIMAGE=$(find src-tauri/target/release/bundle -name "*.AppImage" | head -1 || true)
-          if [ -z "$APPIMAGE" ]; then
-            echo "❌ No AppImage found under target/release/bundle" >&2
-            exit 1
-          fi
-          if [ ! -f "$APPIMAGE.sig" ]; then
-            echo "❌ Updater signature not found: $APPIMAGE.sig" >&2
-            exit 1
-          fi
-          NEW_APPIMAGE="CC-Switch-${VERSION}-Linux-${ARCH}.AppImage"
-          cp "$APPIMAGE" "release-assets/$NEW_APPIMAGE"
-          cp "$APPIMAGE.sig" "release-assets/$NEW_APPIMAGE.sig"
-          echo "AppImage copied: $NEW_APPIMAGE"
-          # 额外上传 .deb（用于 Debian/Ubuntu 自动更新）
-          DEB=$(find src-tauri/target/release/bundle -name "*.deb" | head -1 || true)
-          if [ -z "$DEB" ]; then
-            echo "❌ No .deb found under target/release/bundle" >&2
-            exit 1
-          fi
-          if [ ! -f "$DEB.sig" ]; then
-            echo "❌ Updater signature not found: $DEB.sig" >&2
-            exit 1
-          fi
-          NEW_DEB="CC-Switch-${VERSION}-Linux-${ARCH}.deb"
-          cp "$DEB" "release-assets/$NEW_DEB"
-          cp "$DEB.sig" "release-assets/$NEW_DEB.sig"
-          echo "Deb package copied: $NEW_DEB"
-          # 额外上传 .rpm（用于 Fedora/RHEL/openSUSE 等自动更新）
-          RPM=$(find src-tauri/target/release/bundle -name "*.rpm" | head -1 || true)
-          if [ -z "$RPM" ]; then
-            echo "❌ No .rpm found under target/release/bundle" >&2
-            exit 1
-          fi
-          if [ ! -f "$RPM.sig" ]; then
-            echo "❌ Updater signature not found: $RPM.sig" >&2
-            exit 1
-          fi
-          NEW_RPM="CC-Switch-${VERSION}-Linux-${ARCH}.rpm"
-          cp "$RPM" "release-assets/$NEW_RPM"
-          cp "$RPM.sig" "release-assets/$NEW_RPM.sig"
-          echo "RPM package copied: $NEW_RPM"
+          $dest = "Zhishu-Ccs-$VERSION-Windows$assetSuffix.exe"
+          Copy-Item -LiteralPath $installer.FullName -Destination (Join-Path release-assets $dest)
+          Copy-Item -LiteralPath $sigPath -Destination (Join-Path release-assets "$dest.sig")
+          Write-Host "Signed installer copied: $dest"
 
       - name: List prepared assets
         shell: bash
@@ -433,17 +345,20 @@ jobs:
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare Zhishu production configuration
+        run: node scripts/zhishu/prepare-release.mjs
+
       # 编译只做一次：编译失败是确定性的，重试没有意义。签名和公证依赖 Apple 的服务，
       # 在 macos-release 里单独重试，不会再重编。
       - name: Build Tauri App (${{ matrix.target }})
         timeout-minutes: 60
-        run: pnpm tauri build --target ${{ matrix.target }} --no-bundle
+        run: pnpm tauri build --config src-tauri/tauri.release.local.conf.json --target ${{ matrix.target }} --no-bundle
 
       - name: Upload binary
         uses: actions/upload-artifact@v7
         with:
           name: macos-binary-${{ matrix.target }}
-          path: src-tauri/target/${{ matrix.target }}/release/cc-switch
+          path: src-tauri/target/${{ matrix.target }}/release/zhishu-ccs
           if-no-files-found: error
           retention-days: 1
 
@@ -453,6 +368,7 @@ jobs:
     name: Bundle macOS release
     runs-on: macos-14
     needs: macos-binary
+    environment: release
 
     steps:
       - name: Checkout
@@ -501,19 +417,31 @@ jobs:
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare Zhishu production configuration
+        run: node scripts/zhishu/prepare-release.mjs
+
       - name: Prepare Tauri signing key
         uses: ./.github/actions/prepare-tauri-signing-key
         with:
           private-key: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           password: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
+      - name: Select ad-hoc signing for internal distribution
+        if: env.MACOS_SIGNING_MODE == 'adhoc'
+        run: echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+
       - name: Import Apple signing certificate
+        if: env.MACOS_SIGNING_MODE == 'developer-id'
         shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
           set -euo pipefail
           # Decode .p12 certificate from base64
           CERT_PATH="$RUNNER_TEMP/certificate.p12"
-          printf '%s' "${{ secrets.APPLE_CERTIFICATE }}" | (base64 --decode 2>/dev/null || base64 -D) > "$CERT_PATH"
+          printf '%s' "$APPLE_CERTIFICATE" | (base64 --decode 2>/dev/null || base64 -D) > "$CERT_PATH"
 
           # Save original default keychain for cleanup
           ORIGINAL_DEFAULT_KEYCHAIN=$(security default-keychain -d user | tr -d '"' | xargs)
@@ -521,18 +449,18 @@ jobs:
 
           # Create temporary keychain
           KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
-          security create-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" "$KEYCHAIN_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security default-keychain -s "$KEYCHAIN_PATH"
-          security unlock-keychain -p "${{ secrets.KEYCHAIN_PASSWORD }}" "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
           # Import certificate
           security import "$CERT_PATH" \
             -k "$KEYCHAIN_PATH" \
-            -P "${{ secrets.APPLE_CERTIFICATE_PASSWORD }}" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
             -T /usr/bin/codesign \
             -T /usr/bin/security
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${{ secrets.KEYCHAIN_PASSWORD }}" "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
           # Dynamically resolve signing identity (must be "Developer ID Application")
           IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
@@ -562,11 +490,11 @@ jobs:
           set -euo pipefail
           out=src-tauri/target/universal-apple-darwin/release
           mkdir -p "$out"
-          lipo -create -output "$out/cc-switch" \
-            macos-binaries/macos-binary-aarch64-apple-darwin/cc-switch \
-            macos-binaries/macos-binary-x86_64-apple-darwin/cc-switch
-          chmod +x "$out/cc-switch"
-          lipo -info "$out/cc-switch"
+          lipo -create -output "$out/zhishu-ccs" \
+            macos-binaries/macos-binary-aarch64-apple-darwin/zhishu-ccs \
+            macos-binaries/macos-binary-x86_64-apple-darwin/zhishu-ccs
+          chmod +x "$out/zhishu-ccs"
+          lipo -info "$out/zhishu-ccs"
 
       # 只打 .app（连同 updater 的 .app.tar.gz 和 .sig）：发布用的 DMG 在下面由 create-dmg 制作，
       # Tauri 自己的 DMG 从来不上传。失败只重试这一步，不会重编。
@@ -575,16 +503,22 @@ jobs:
         timeout-minutes: 45
         env:
           APPLE_SIGNING_IDENTITY: ${{ env.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ env.MACOS_SIGNING_MODE == 'developer-id' && secrets.APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ env.MACOS_SIGNING_MODE == 'developer-id' && secrets.APPLE_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ env.MACOS_SIGNING_MODE == 'developer-id' && secrets.APPLE_TEAM_ID || '' }}
         run: |
           set -euo pipefail
+          # Tauri treats even empty APPLE_* variables as notarization credentials.
+          # Ad-hoc builds must remove them from the child environment entirely.
+          if [ "$MACOS_SIGNING_MODE" = adhoc ]; then
+            unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID
+            unset APPLE_API_KEY APPLE_API_ISSUER APPLE_API_KEY_PATH
+          fi
           max_attempts=3
           for attempt in $(seq 1 "$max_attempts"); do
             echo "=== macOS bundle/notarization attempt ${attempt}/${max_attempts} ==="
             bundle_log="$RUNNER_TEMP/tauri-bundle-macos-${attempt}.log"
-            if pnpm tauri bundle --target universal-apple-darwin --bundles app 2>&1 | tee "$bundle_log"; then
+            if pnpm tauri bundle --config src-tauri/tauri.release.local.conf.json --target universal-apple-darwin --bundles app 2>&1 | tee "$bundle_log"; then
               echo "✅ macOS bundle/notarization succeeded"
               exit 0
             fi
@@ -612,8 +546,8 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p release-assets
-          # e.g., v3.5.0；手动干跑时是分支名，斜杠会被当成目录，换成 -
-          VERSION="${GITHUB_REF_NAME//\//-}"
+          # 正式发布与手动演练均使用已提交的应用版本
+          VERSION="$(node -p "'v' + require('./package.json').version")"
 
           # Locate bundle artifacts
           TAR_GZ=""; APP_PATH=""
@@ -638,11 +572,13 @@ jobs:
           fi
 
           # Staple notarization ticket to .app (Tauri already notarized it)
-          xcrun stapler staple "$APP_PATH"
-          echo "✅ .app stapled"
+          if [ "$MACOS_SIGNING_MODE" = developer-id ]; then
+            xcrun stapler staple "$APP_PATH"
+            echo "✅ .app stapled"
+          fi
 
           # 1) Collect .tar.gz (updater artifact)
-          NEW_TAR_GZ="CC-Switch-${VERSION}-macOS.tar.gz"
+          NEW_TAR_GZ="Zhishu-Ccs-${VERSION}-macOS.tar.gz"
           cp "$TAR_GZ" "release-assets/$NEW_TAR_GZ"
           if [ ! -f "$TAR_GZ.sig" ]; then
             echo "❌ Updater signature not found: $TAR_GZ.sig" >&2
@@ -652,7 +588,7 @@ jobs:
           echo "macOS updater artifact copied: $NEW_TAR_GZ"
 
           # 2) Collect .app as zip
-          NEW_ZIP="CC-Switch-${VERSION}-macOS.zip"
+          NEW_ZIP="Zhishu-Ccs-${VERSION}-macOS.zip"
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "release-assets/$NEW_ZIP"
           echo "macOS zip ready: $NEW_ZIP"
 
@@ -663,20 +599,21 @@ jobs:
           fi
 
           HOMEBREW_NO_AUTO_UPDATE=1 brew install create-dmg
-          NEW_DMG="CC-Switch-${VERSION}-macOS.dmg"
+          NEW_DMG="Zhishu-Ccs-${VERSION}-macOS.dmg"
           DMG_STAGE_DIR="$RUNNER_TEMP/dmg-stage"
           rm -rf "$DMG_STAGE_DIR"
           mkdir -p "$DMG_STAGE_DIR"
-          ditto "$APP_PATH" "$DMG_STAGE_DIR/CC Switch.app"
+          APP_BUNDLE_NAME="$(basename "$APP_PATH")"
+          ditto "$APP_PATH" "$DMG_STAGE_DIR/$APP_BUNDLE_NAME"
 
           create-dmg \
-            --volname "CC Switch" \
+            --volname "${APP_BUNDLE_NAME%.app}" \
             --background "src-tauri/icons/dmg-background.png" \
             --window-size 660 400 \
             --window-pos 200 120 \
             --icon-size 80 \
-            --icon "CC Switch.app" 180 220 \
-            --hide-extension "CC Switch.app" \
+            --icon "$APP_BUNDLE_NAME" 180 220 \
+            --hide-extension "$APP_BUNDLE_NAME" \
             --app-drop-link 480 220 \
             --codesign "$APPLE_SIGNING_IDENTITY" \
             --no-internet-enable \
@@ -687,6 +624,7 @@ jobs:
           echo "✅ Styled DMG created: $NEW_DMG"
 
       - name: Notarize macOS DMG
+        if: env.MACOS_SIGNING_MODE == 'developer-id'
         shell: bash
         timeout-minutes: 30
         env:
@@ -751,10 +689,11 @@ jobs:
           echo "=== Verifying .app: $APP_PATH ==="
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
           echo "✅ codesign verification passed"
-          spctl -a -t exec -vv "$APP_PATH"
-          echo "✅ spctl assessment passed"
-          xcrun stapler validate "$APP_PATH"
-          echo "✅ .app stapler validation passed"
+          if [ "$MACOS_SIGNING_MODE" = developer-id ]; then
+            spctl -a -t exec -vv "$APP_PATH"
+            xcrun stapler validate "$APP_PATH"
+            echo "✅ .app notarization verified"
+          fi
 
           # Verify .dmg (from release-assets/, created by create-dmg + notarized)
           DMG_PATH=$(find release-assets -maxdepth 1 -name "*.dmg" -type f | head -1 || true)
@@ -762,10 +701,11 @@ jobs:
             echo "=== Verifying .dmg: $DMG_PATH ==="
             codesign --verify --verbose=2 "$DMG_PATH"
             echo "✅ .dmg codesign verification passed"
-            spctl -a -t open --context context:primary-signature -vv "$DMG_PATH"
-            echo "✅ .dmg spctl assessment passed"
-            xcrun stapler validate "$DMG_PATH"
-            echo "✅ .dmg stapler validation passed"
+            if [ "$MACOS_SIGNING_MODE" = developer-id ]; then
+              spctl -a -t open --context context:primary-signature -vv "$DMG_PATH"
+              xcrun stapler validate "$DMG_PATH"
+              echo "✅ .dmg notarization verified"
+            fi
           else
             echo "❌ No .dmg found for verification — release would ship without verified DMG" >&2
             exit 1
@@ -802,15 +742,27 @@ jobs:
           fi
 
   publish-release:
-    name: Publish GitHub Release
+    name: Validate artifacts and publish to COS
     runs-on: ubuntu-22.04
-    needs: [release, macos-release]
-    # 只有推 tag 才发布。手动触发时也能选 tag 作为运行版本，单看 ref_type 会把干跑当成正式发布，
-    # 覆盖已发布 release 的正文和安装包
-    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [whats-new-check, release, macos-release]
+    # 手动运行和专用分支推送只校验并保存产物；仅 push tag 可上传 COS。
+    environment: ${{ github.event_name == 'push' && github.ref_type == 'tag' && 'cos-production' || 'release-validation' }}
+    concurrency:
+      group: cos-stable-publication
+      cancel-in-progress: false
     permissions:
-      contents: write
+      contents: read
     steps:
+      - name: Checkout release manifest tools
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: scripts
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
       - name: Download built release artifacts
         uses: actions/download-artifact@v8
         with:
@@ -828,129 +780,71 @@ jobs:
       # 不会留下一个缺 latest.json 的半成品 release。
       - name: Generate latest.json
         env:
-          REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ needs.whats-new-check.outputs.tag }}
         run: |
           set -euo pipefail
-          VERSION="${TAG#v}"
-          PUB_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          base_url="https://github.com/$REPO/releases/download/$TAG"
-          # 初始化空平台映射
-          mac_url=""; mac_sig=""
-          win_x64_url=""; win_x64_sig=""
-          win_arm64_url=""; win_arm64_sig=""
-          linux_x64_url=""; linux_x64_sig=""
-          linux_arm64_url=""; linux_arm64_sig=""
-          linux_x64_deb_url=""; linux_x64_deb_sig=""
-          linux_arm64_deb_url=""; linux_arm64_deb_sig=""
-          linux_x64_rpm_url=""; linux_x64_rpm_sig=""
-          linux_arm64_rpm_url=""; linux_arm64_rpm_sig=""
-          shopt -s nullglob
-          for sig in release-assets/*.sig; do
-            base=${sig%.sig}
-            fname=$(basename "$base")
-            url="$base_url/$fname"
-            sig_content=$(cat "$sig")
-            case "$fname" in
-              *.tar.gz)
-                # 视为 macOS updater artifact
-                mac_url="$url"; mac_sig="$sig_content";;
-              *-Windows-arm64.msi)
-                win_arm64_url="$url"; win_arm64_sig="$sig_content";;
-              *-Windows.msi)
-                win_x64_url="$url"; win_x64_sig="$sig_content";;
-              *-Linux-arm64.AppImage|*-Linux-arm64.appimage)
-                linux_arm64_url="$url"; linux_arm64_sig="$sig_content";;
-              *-Linux-x86_64.AppImage|*-Linux-x86_64.appimage)
-                linux_x64_url="$url"; linux_x64_sig="$sig_content";;
-              *-Linux-arm64.deb)
-                linux_arm64_deb_url="$url"; linux_arm64_deb_sig="$sig_content";;
-              *-Linux-x86_64.deb)
-                linux_x64_deb_url="$url"; linux_x64_deb_sig="$sig_content";;
-              *-Linux-arm64.rpm)
-                linux_arm64_rpm_url="$url"; linux_arm64_rpm_sig="$sig_content";;
-              *-Linux-x86_64.rpm)
-                linux_x64_rpm_url="$url"; linux_x64_rpm_sig="$sig_content";;
-            esac
-          done
-          # 缺任一平台都不能发：缺的那批用户会静默收不到更新
-          missing=""
-          [ -n "$mac_sig" ] || missing="$missing macOS"
-          [ -n "$win_x64_sig" ] || missing="$missing windows-x86_64"
-          [ -n "$win_arm64_sig" ] || missing="$missing windows-aarch64"
-          [ -n "$linux_x64_sig" ] || missing="$missing linux-x86_64"
-          [ -n "$linux_arm64_sig" ] || missing="$missing linux-aarch64"
-          [ -n "$linux_x64_deb_sig" ] || missing="$missing linux-x86_64-deb"
-          [ -n "$linux_arm64_deb_sig" ] || missing="$missing linux-aarch64-deb"
-          [ -n "$linux_x64_rpm_sig" ] || missing="$missing linux-x86_64-rpm"
-          [ -n "$linux_arm64_rpm_sig" ] || missing="$missing linux-aarch64-rpm"
-          if [ -n "$missing" ]; then
-            echo "❌ Missing updater signatures for:$missing" >&2
-            exit 1
-          fi
-          # 构造 JSON
-          tmp_json=$(mktemp)
-          {
-            echo '{'
-            echo "  \"version\": \"$VERSION\",";
-            echo "  \"notes\": \"Release $TAG\",";
-            echo "  \"pub_date\": \"$PUB_DATE\",";
-            echo '  "platforms": {'
-            first=1
-            if [ -n "$mac_url" ] && [ -n "$mac_sig" ]; then
-              # 为兼容 arm64 / x64，重复写入两个键，指向同一 universal 包
-              for key in darwin-aarch64 darwin-x86_64; do
-                [ $first -eq 0 ] && echo ','
-                echo "    \"$key\": {\"signature\": \"$mac_sig\", \"url\": \"$mac_url\"}"
-                first=0
-              done
-            fi
-            if [ -n "$win_x64_url" ] && [ -n "$win_x64_sig" ]; then
-              [ $first -eq 0 ] && echo ','
-              echo "    \"windows-x86_64\": {\"signature\": \"$win_x64_sig\", \"url\": \"$win_x64_url\"}"
-              first=0
-            fi
-            if [ -n "$win_arm64_url" ] && [ -n "$win_arm64_sig" ]; then
-              [ $first -eq 0 ] && echo ','
-              echo "    \"windows-aarch64\": {\"signature\": \"$win_arm64_sig\", \"url\": \"$win_arm64_url\"}"
-              first=0
-            fi
-            if [ -n "$linux_x64_url" ] && [ -n "$linux_x64_sig" ]; then
-              [ $first -eq 0 ] && echo ','
-              echo "    \"linux-x86_64\": {\"signature\": \"$linux_x64_sig\", \"url\": \"$linux_x64_url\"}"
-              first=0
-            fi
-            if [ -n "$linux_arm64_url" ] && [ -n "$linux_arm64_sig" ]; then
-              [ $first -eq 0 ] && echo ','
-              echo "    \"linux-aarch64\": {\"signature\": \"$linux_arm64_sig\", \"url\": \"$linux_arm64_url\"}"
-              first=0
-            fi
-            if [ -n "$linux_x64_deb_url" ] && [ -n "$linux_x64_deb_sig" ]; then
-              [ $first -eq 0 ] && echo ','
-              echo "    \"linux-x86_64-deb\": {\"signature\": \"$linux_x64_deb_sig\", \"url\": \"$linux_x64_deb_url\"}"
-              first=0
-            fi
-            if [ -n "$linux_arm64_deb_url" ] && [ -n "$linux_arm64_deb_sig" ]; then
-              [ $first -eq 0 ] && echo ','
-              echo "    \"linux-aarch64-deb\": {\"signature\": \"$linux_arm64_deb_sig\", \"url\": \"$linux_arm64_deb_url\"}"
-              first=0
-            fi
-            if [ -n "$linux_x64_rpm_url" ] && [ -n "$linux_x64_rpm_sig" ]; then
-              [ $first -eq 0 ] && echo ','
-              echo "    \"linux-x86_64-rpm\": {\"signature\": \"$linux_x64_rpm_sig\", \"url\": \"$linux_x64_rpm_url\"}"
-              first=0
-            fi
-            if [ -n "$linux_arm64_rpm_url" ] && [ -n "$linux_arm64_rpm_sig" ]; then
-              [ $first -eq 0 ] && echo ','
-              echo "    \"linux-aarch64-rpm\": {\"signature\": \"$linux_arm64_rpm_sig\", \"url\": \"$linux_arm64_rpm_url\"}"
-              first=0
-            fi
-            echo '  }'
-            echo '}'
-          } > "$tmp_json"
-          echo "Generated latest.json:" && cat "$tmp_json"
-          mv "$tmp_json" release-assets/latest.json
+          export RELEASE_PUB_DATE="$(git show -s --format=%cI HEAD)"
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          import { collectUpdaterPlatforms, targets, versionNumber } from './scripts/zhishu/release-artifacts.mjs';
+          const version = versionNumber(process.env.TAG);
+          const platforms = collectUpdaterPlatforms('release-assets', Object.keys(targets), version,
+            { updatePublicKey: process.env.ZHISHU_UPDATE_PUBLIC_KEY },
+            { downloadBaseUrl: process.env.COS_PUBLIC_BASE_URL.replace(/\/+$/, '') });
+          writeFileSync('release-assets/latest.json', JSON.stringify({
+            version,
+            notes: `Release ${process.env.TAG}`,
+            pub_date: process.env.RELEASE_PUB_DATE,
+            platforms,
+          }, null, 2) + '\n');
+          NODE
+
+      - name: Generate platform download manifest
+        env:
+          RELEASE_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.whats-new-check.outputs.tag }}
+        run: node scripts/generate-download-manifest.mjs release-assets "$RELEASE_TAG" "$COS_PUBLIC_BASE_URL" release-assets/client-release.json
+
+      - name: Verify signatures and prepare COS payload
+        env:
+          RELEASE_TAG: ${{ needs.whats-new-check.outputs.tag }}
+        run: node scripts/zhishu/cos-release.mjs prepare release-assets "$RELEASE_TAG" cos-payload
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Validate publication without uploading
+        run: python scripts/zhishu/publish-cos.py cos-payload --dry-run
+
+      - name: Save verified payload for retries
+        uses: actions/upload-artifact@v7
+        with:
+          name: cos-payload-${{ needs.whats-new-check.outputs.tag }}
+          path: cos-payload/*
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Install COS SDK
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        run: python -m pip install -r scripts/zhishu/cos-requirements.txt
+
+      - name: Check actual COS SDK upload contract
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        run: python -B -m unittest discover -s scripts/zhishu -p 'test_publish_cos.py' -k CosSdkContractTests
+
+      - name: Publish immutable artifacts and stable manifests
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+          COS_SESSION_TOKEN: ${{ secrets.COS_SESSION_TOKEN }}
+        run: python scripts/zhishu/publish-cos.py cos-payload
+
+      # 上游兼容入口保留；智枢仓库由后续独立作业创建 Release。
       - name: Upload Release Assets
+        if: github.repository == 'farion1231/cc-switch'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
@@ -965,11 +859,9 @@ jobs:
 
             ### 下载
 
-            - **macOS**: `CC-Switch-${{ github.ref_name }}-macOS.dmg`（推荐）或 `CC-Switch-${{ github.ref_name }}-macOS.zip`（解压即用）
-            - **Windows (x86_64)**: `CC-Switch-${{ github.ref_name }}-Windows.msi`（安装版）或 `CC-Switch-${{ github.ref_name }}-Windows-Portable.zip`（绿色版）
-            - **Windows (ARM64)**: `CC-Switch-${{ github.ref_name }}-Windows-arm64.msi`（安装版）或 `CC-Switch-${{ github.ref_name }}-Windows-arm64-Portable.zip`（绿色版）
-            - **Linux (x86_64)**: `CC-Switch-${{ github.ref_name }}-Linux-x86_64.AppImage` / `.deb` / `.rpm`
-            - **Linux (ARM64)**: `CC-Switch-${{ github.ref_name }}-Linux-arm64.AppImage` / `.deb` / `.rpm`
+            - **macOS**: `Zhishu-Ccs-${{ github.ref_name }}-macOS.dmg`（推荐）或 `Zhishu-Ccs-${{ github.ref_name }}-macOS.zip`（解压即用）
+            - **Windows (x86_64)**: `Zhishu-Ccs-${{ github.ref_name }}-Windows.exe`（安装版）
+            - **Windows (ARM64)**: `Zhishu-Ccs-${{ github.ref_name }}-Windows-arm64.exe`（安装版）
 
             > `.tar.gz` 为 Tauri updater 自动更新专用，无需手动下载。
 
@@ -978,3 +870,52 @@ jobs:
           files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-github-release:
+    name: Publish GitHub Release after COS
+    needs: [whats-new-check, publish-release]
+    if: github.repository == 'zws-code/zhishu-ccs' && github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified COS payload
+        uses: actions/download-artifact@v8
+        with:
+          name: cos-payload-${{ needs.whats-new-check.outputs.tag }}
+          path: cos-payload
+
+      - name: Publish signed installers on GitHub
+        id: github-release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.whats-new-check.outputs.tag }}
+          name: 智枢 CCS ${{ needs.whats-new-check.outputs.tag }}
+          draft: false
+          prerelease: false
+          make_latest: 'true'
+          overwrite_files: false
+          fail_on_unmatched_files: true
+          files: cos-payload/*
+          body: |
+            智枢 CCS ${{ needs.whats-new-check.outputs.tag }}
+
+            ### 下载安装包
+
+            在下方 Assets 中选择对应系统的文件：
+            - macOS（Intel / Apple Silicon 通用）：`.dmg`，也可使用 `.zip`。
+            - Windows x64：`-Windows.exe`；Windows ARM64：`-Windows-arm64.exe`。
+            - Linux 暂停打包。
+            - `.tar.gz` 和 `.sig` 用于客户端更新与签名校验。
+
+            [COS 下载清单](${{ env.COS_PUBLIC_BASE_URL }}/${{ needs.whats-new-check.outputs.tag }}/client-release.json)
+
+            客户端自动更新继续使用 COS 更新源；GitHub 提供相同发布文件的下载入口。
+
+            ${{ env.MACOS_SIGNING_MODE == 'developer-id' && 'macOS 安装包已通过 Developer ID 签名与 Apple 公证。' || 'macOS 安装包使用 ad-hoc 签名，未经过 Apple 公证，首次安装可能被系统拦截。' }}
+            Windows 安装包的 Tauri 更新签名不代表 Windows 系统代码签名。
+
+      - name: Show GitHub Release download link
+        env:
+          RELEASE_URL: ${{ steps.github-release.outputs.url }}
+        run: echo "[下载安装包 / GitHub Release]($RELEASE_URL)" >> "$GITHUB_STEP_SUMMARY"
