@@ -2,6 +2,16 @@
 
 > 这是按基线/事件累积的补丁台账。222 项清单针对 2026-10-29 的 4.0.21 快照，后续变更按事件追加；旧路径、版本和分支描述仅适用于该段，不是当前 4.0.22 的完整重新统计。当前现状见 [代码基线](baseline.md)。
 
+## 2026-11-01：版本递增与 tag 发布脚本
+
+复核 ZS-044（L1）：`package.json` 仅增加 `release:tag`、`test:release-tag` 命令，并把新回归接入 `test:release`。pnpm 的命令发现依赖该固定入口，不能仅新增自有脚本替代；实现与测试均新增在 `scripts/zhishu/tag-release{,.test}.mjs`（L0），操作说明更新于[发布文档](../releases/README.md)。
+
+复用 `cos-release.mjs::checkVersion`、`release-artifacts.mjs::versionNumber`、Cargo 锁文件同步和既有 Actions；不修改发布工作流、客户端更新协议/身份、凭据或业务存储。支持补丁/次/主版本递增、指定稳定 tag 和离线预览；检查通过后只提交版本文件及公告，向核实的 `zhishu-git` 原子推送独立发布分支与 tag。失败保留文件、提交和 tag，按日志重试原引用，不强推或移动已发布 tag。
+
+验证入口为 `pnpm test:release-tag`（临时 Git/bare 仓库与 Cargo 离线用例）及既有发布回归；本轮仅实现/验证脚本，不触发真实 GitHub/COS 发布，不将模拟推送视为跨平台安装与更新验收。
+
+本轮执行记录（2026-11-01）：提交前在独立基线上执行 TypeScript `--noEmit` 和完整 Node 发布回归，类型检查通过、58 项回归全部通过（含新增脚本 22 项，覆盖指定 tag、仅发送本次 tag、合并中止、带空格路径、真实 Cargo 离线同步）。脚本 Prettier、CLI 指定 tag 预览及 `git diff --check` 通过。COS Python 回归此前共执行 23 项，21 项通过、2 项因本机缺 COS SDK 跳过。原共享工作区的首次类型检查曾因并行上游合并引入的 `yaml` 未安装而失败，独立提交未混入该合并或该依赖。完整前端/Rust 测试、构建、真实 GitHub/COS 发布和 Windows/macOS 安装升级未执行。
+
 ## 2026-10-31：平台与上游边界收敛
 
 决策见 [ADR-0008](../adr/ADR-0008-upstream-patch-convergence.md)。本段覆盖下方历史条目对应能力的当前状态；历史表不改写。

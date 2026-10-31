@@ -30,6 +30,36 @@ Windows 仅构建 x64（Intel/AMD 64 位）和 ARM64 的 NSIS `.exe` 安装包�
 
 这里的“手动发布”指手动准备版本、提交并推送 tag；编译、签名、COS 上传和 GitHub Release 由 GitHub Actions 自动完成，不需要本机打包或手工往桶里传文件。
 
+### 一键准备并推送 tag
+
+先审查并提交本次业务改动，确保工作区干净（包括未跟踪文件）。之后可在仓库根目录执行：
+
+```sh
+pnpm release:tag --dry-run              # 只预览下一补丁版本，不改文件、不联网
+pnpm release:tag                        # 自动递增 patch，例如 0.0.3 → 0.0.4，并正式推送
+pnpm release:tag minor                  # 自动递增 minor，例如 0.0.3 → 0.1.0
+pnpm release:tag major                  # 自动递增 major，例如 0.0.3 → 1.0.0
+pnpm release:tag --tag v0.1.0            # 指定正式 tag
+pnpm release:tag --version 0.1.0         # 等价的版本号写法
+pnpm release:tag v0.1.0 --dry-run        # 预览指定版本
+```
+
+以上为互斥示例，选一个执行；除 `--dry-run`/`--help` 外均会真正提交和推送，触发正式发布。指定版本必须高于源码版本，仅接受稳定版本 `vX.Y.Z`。预览不检查远程占用或执行测试，不表示已满足发布条件。
+
+脚本位于 `scripts/zhishu/tag-release.mjs`，复用既有版本校验和 Actions 发布链路，依次执行：
+
+1. 核对三个源码版本及 Cargo.lock、工作区、Git 操作状态、已有本地 tag 和远程 tag/发布分支。固定核对 `zhishu-git` 的唯一 push URL 必须属于 `zws-code/zhishu-ccs`，不会使用 `origin` 或修改 remote。
+2. 更新三个源码版本；通过 `cargo update --workspace --offline --manifest-path src-tauri/Cargo.toml` 同步锁文件，拒绝应用版本以外的锁文件语义变化。需要事先安装仓库指定的 Rust 工具链及所需本地依赖；离线同步失败时不会自动改为联网更新依赖。
+3. 没有 `src/whats-new/<版本>.json` 时生成 `items: []`；如已提前编写并提交该版本公告，保留原内容。需展示更新内容时，应先写好公告并提交。
+4. 执行 `pnpm typecheck`、`pnpm test:release`、`pnpm test:release-cos`、公告格式回归和 `git diff --check`。不读取本机生产签名或 COS 凭据；Actions 仍负责正式配置、签名和云端校验。这些检查不替代完整前后端回归和跨平台安装/升级验收。
+5. 仅暂存版本文件与公告，创建 `chore(release): prepare <版本>` 提交和附注 tag，再通过一次 `git push --atomic` 同时推送 `codex/release-<版本>` 分支与 tag。当前本地分支不切换，发布提交留在当前分支；不推送或改写远程主线。
+
+推送完成表示已触发 Actions，仍须等待 COS 与 GitHub Release 作业成功并完成下文验收；若仓库环境要求审批，仍须在 Actions 中批准。
+
+失败时脚本保留本地文件供审查，不自动还原、删除 tag 或强推。检查失败尚未提交时，修复后可依照下方手动步骤完成同一版本，或仅还原脚本生成的版本改动后重新运行。若提交/tag 已创建但推送失败，日志会给出带固定提交 SHA 的原子推送重试命令；先核对远程结果，再重试原提交和 tag，不能直接再次递增或移动旧 tag。COS 已预留或上传同版本的情况继续按本文的原产物恢复规则处理。
+
+脚本回归入口：`pnpm test:release-tag`，已纳入 `pnpm test:release`；Git 提交与原子推送测试使用临时本地 bare 仓库，不触发真实发布。推荐经 `pnpm` 运行，以便 Windows 使用包管理器入口而不依赖 shell 参数拼接。
+
 ### 第一步：准备下一个版本
 
 当前源码版本为 `0.0.3`。以下以 `0.0.4` 演示，操作前重新核对线上清单和 tag；**已经正式发布的版本号不能重复使用**。
