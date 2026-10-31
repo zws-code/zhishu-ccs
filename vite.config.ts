@@ -14,7 +14,7 @@ export default defineConfig(({ command, mode }) => {
       env.VITE_ZHISHU_UPDATES_ENABLED !== "false"
     ) {
       throw new Error(
-        "Configure VITE_ZHISHU_UPDATES_ENABLED as true or false before a production build (see docs/zhishu/zhishu-release.md)",
+        "Configure VITE_ZHISHU_UPDATES_ENABLED as true or false before a production build (see docs/zhishu/releases/README.md)",
       );
     }
     for (const key of ["VITE_PLATFORM_API_URL", "VITE_PLATFORM_WEB_URL"]) {

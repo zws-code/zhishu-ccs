@@ -12,50 +12,19 @@ Windows 仅构建 x64（Intel/AMD 64 位）和 ARM64 的 NSIS `.exe` 安装包�
 
 新版本 `latest.json` 只含 `darwin-aarch64`、`darwin-x86_64`、`windows-aarch64`、`windows-x86_64` 四个条目；官网清单为 macOS DMG/ZIP 和两种 Windows EXE，共四个下载项。`release.json` 用 `packaging: nsis-v1` 标识新策略，恢复流程仍能验证未带该字段的历史 MSI/Linux 包。
 
-**上线顺序**：先部署 zhishu-proxy 的 Windows `kind=exe` 解析兼容，再发布客户端新版本。x64/ARM64 必须完成 MSI → EXE 的安装、更新、重启、卸载验证。Linux 暂停仅允许移除明确的六个旧 Linux 更新键，不放宽 Windows/macOS 缺包、同版本不可变或禁止降级规则。详见 [ADR-0003](adr/ADR-0003-windows-exe-release.md)。
+**上线顺序**：先部署 zhishu-proxy 的 Windows `kind=exe` 解析兼容，再发布客户端新版本。x64/ARM64 必须完成 MSI → EXE 的安装、更新、重启、卸载验证。Linux 暂停仅允许移除明确的六个旧 Linux 更新键，不放宽 Windows/macOS 缺包、同版本不可变或禁止降级规则。详见 [ADR-0003](../adr/ADR-0003-windows-exe-release.md)。
 
 0.0.1 的历史链接及文件不因新策略而改名或覆盖。
 
-## 0.0.3 正式发布结果（2026-10-31）
+## 发布记录
 
-- 已于北京时间 **19:23** 发布，[v0.0.3](https://github.com/zws-code/zhishu-ccs/releases/tag/v0.0.3) 已标记 GitHub Latest；源码 tag 固定在 `ae43931716e63976c2c1fee343c0fbea3f9698a8`。
-- [正式运行 41195037726](https://github.com/zws-code/zhishu-ccs/actions/runs/41195037726) 的 macOS universal、Windows x64/ARM64 EXE 构建、验签、COS 和 GitHub 发布全部成功。
-- 按用户明确要求，仅 `v0.0.3` 正式 tag 强制启用 COS 全球上传加速，日志确认 `COS_UPLOAD_ACCELERATE: true`；保留 3 GB 上传读取上限，未修改后续发布的仓库变量或客户端更新地址。
-- 两份稳定清单均为 0.0.3；10 个 COS 文件、11 个 GitHub 附件实际下载并通过大小/哈希检查，3 个独立更新包使用生产公钥验签通过。macOS 包的版本、身份、双架构和内嵌更新地址/公钥均已核对。
-- 本地 3613 项前端测试、4369 项 Rust 单元测试及 212 项集成测试最终通过；保留首轮已知 OAuth keep-alive 偶发失败及复测记录。
-- macOS 沿用 adhoc、未公证；用户已明确批准本次实机安装/升级验收延期。完整证据、产物哈希及例外见 [0.0.3 发布记录](RELEASE-0.0.3.md)。
+源码版本为 `0.0.3`；以下保存各次发布当时的事实，本次整理未重新查询 GitHub/COS 的线上状态。
 
-## 0.0.2 正式发布结果（2026-10-30）
-
-- 已于北京时间 **18:41:15** 发布，当时标记为 GitHub Latest：[v0.0.2](https://github.com/zws-code/zhishu-ccs/releases/tag/v0.0.2)。原正式源码为 `1aba22d89c9afd10ef8959af5aa2d9259d385e58`，tag 未移动。
-- [原构建 41032256949](https://github.com/zws-code/zhishu-ccs/actions/runs/41032256949) 的全部平台构建成功，普通上传过慢后经用户明确授权取消；[国际加速恢复 41042420751](https://github.com/zws-code/zhishu-ccs/actions/runs/41042420751) 复用原 payload 完成 COS 和 GitHub 发布，没有重新编译。
-- 两个稳定清单已切到 0.0.2，4 个更新平台条目、4 个网页下载项。10 个 COS 文件实际下载并核对哈希，3 个独立更新包验证生产签名；GitHub 11 个附件大小与哈希全部匹配。
-- macOS 为 Intel/Apple Silicon universal DMG/ZIP，Windows 为 x64/ARM64 EXE；Linux 本版暂停。macOS 仍使用 adhoc、未公证；旧版本升级实机验收按本次用户批准延期。
-- IP 下载页清单已更新；`api.hnzhishu.cn` 的下载页及清单路径返回备案提示 HTML，域名入口需另行处理。COS 国内直连及 GitHub 下载正常。
-- 本次恢复明确开启 `accelerate`，保留 3 GB 上传读取上限；没有修改后续发布的默认仓库变量。完整记录、批准范围与文件哈希见 [0.0.2 发布记录](RELEASE-0.0.2.md)。
-
-## 0.0.1 正式发布结果（2026-10-29）
-
-- `v0.0.1` 已正式发布，GitHub 发布时间为北京时间 **2026-10-29 15:21**。源码 tag 固定在 `b7619e916f3d7d1feb2d001c4ca279a99d8e6889`；[原正式构建](https://github.com/zws-code/zhishu-ccs/actions/runs/40825474319)完成全部平台编译与签名，上传参数不兼容的问题修复后，[复用原包的恢复发布](https://github.com/zws-code/zhishu-ccs/actions/runs/40834709561)中 COS 与 GitHub Release 两个作业均成功。没有重新编译或替换同版本安装包。
-- [GitHub Release v0.0.1](https://github.com/zws-code/zhishu-ccs/releases/tag/v0.0.1) 当时标记为 Latest；25 个附件的大小和 SHA-256 全部与原发布记录匹配。
-- COS 桶为广州 `zhishu-ccs-release-1252121424`，版本目录为 `ccs/stable/v0.0.1/`。24 个发布文件和独立 `release.json` 已上传；24 个文件均通过公网 HEAD 大小检查。
-- 根目录 `latest.json` 与 `client-release.json` 均已切到 `0.0.1`，并与版本目录对应清单逐字节一致；更新清单含 10 个平台/格式条目，网页清单含 12 个下载条目。
-- 已实际下载 45,320,138 字节的 macOS 更新包，SHA-256 为 `db4f238b4196a4552699b3c05e36f06bc637a605b171add32f7c3a2580d277f3`，用生产公钥验证 Tauri 更新签名成功。包内版本为 `0.0.1`，identifier 为 `com.zhishu.ccswitch.desktop`，包含 Intel 与 Apple Silicon 架构；已在实际二进制中核对 COS 更新地址和生产公钥。
-- 正式包已启用启动时检查更新和“设置 → 关于”检查/安装更新；本次为首次正式版本，尚未做两个正式版本间的实际安装升级验收，也未完成各系统的人工安装、启动与登录验收。旧测试包直接安装本次正式包。
-- macOS 使用 `adhoc`，未经过 Apple 公证；Windows 未配置系统代码签名，Tauri 更新签名独立保留。
-- 当前无自有域名、无 CDN；客户端使用 COS 默认 HTTPS 域名。用户已开启桶全球加速，并授权本次加速费用预算 5 元；仅本次恢复运行显式启用上传加速，累计上传读取上限 3 GB（含重试），未为后续发布自动启用加速。当次发布没有部署或重启平台网关。平台下载页后续接入状态见第 7 节及网关验收文档。
-
-直接下载安装包：
-
-| 平台 | GitHub 下载 | COS 国内直连 |
+| 版本 | 发布日期 | 证据 |
 | --- | --- | --- |
-| macOS（Intel / Apple Silicon 通用） | [DMG](https://github.com/zws-code/zhishu-ccs/releases/download/v0.0.1/Zhishu-Ccs-v0.0.1-macOS.dmg) | [DMG](https://zhishu-ccs-release-1252121424.cos.ap-guangzhou.myqcloud.com/ccs/stable/v0.0.1/Zhishu-Ccs-v0.0.1-macOS.dmg) |
-| Windows x64 | [MSI](https://github.com/zws-code/zhishu-ccs/releases/download/v0.0.1/Zhishu-Ccs-v0.0.1-Windows.msi) | [MSI](https://zhishu-ccs-release-1252121424.cos.ap-guangzhou.myqcloud.com/ccs/stable/v0.0.1/Zhishu-Ccs-v0.0.1-Windows.msi) |
-| Windows ARM64 | [MSI](https://github.com/zws-code/zhishu-ccs/releases/download/v0.0.1/Zhishu-Ccs-v0.0.1-Windows-arm64.msi) | [MSI](https://zhishu-ccs-release-1252121424.cos.ap-guangzhou.myqcloud.com/ccs/stable/v0.0.1/Zhishu-Ccs-v0.0.1-Windows-arm64.msi) |
-
-Linux、便携包及全部签名见上述 Release 的 **Assets**。
-
-当前下载根地址：`https://zhishu-ccs-release-1252121424.cos.ap-guangzhou.myqcloud.com/ccs/stable`。
+| 0.0.3 | 2026-10-31 | [构建、验签、哈希与验收例外](0.0.3.md) |
+| 0.0.2 | 2026-10-30 | [EXE 切换、原产物恢复与验收例外](0.0.2.md) |
+| 0.0.1 | 2026-10-29 | [首次正式发布与历史下载项](0.0.1.md) |
 
 ## 日常手动发布：以后照此操作
 
@@ -63,7 +32,7 @@ Linux、便携包及全部签名见上述 Release 的 **Assets**。
 
 ### 第一步：准备下一个版本
 
-当前正式版本为 `0.0.3`。下一次可以使用 `0.0.4`，以下以它为例；**已经正式发布的版本号不能重复使用**。
+当前源码版本为 `0.0.3`。以下以 `0.0.4` 演示，操作前重新核对线上清单和 tag；**已经正式发布的版本号不能重复使用**。
 
 1. 在本机仓库完成本次要发布的代码，先用 `git status --short` 核对改动。
 2. 将以下文件中的应用版本统一改为 `0.0.4`：
@@ -141,7 +110,7 @@ git push zhishu-git v0.0.4
 
 上传器同时传输最多四个独立文件，仍在全部文件完成、签名与公网检查通过后才切换稳定清单。日志中的 `Upload stream` 是数据流读取进度，`COS verified` 表示对象已写入并核对大小与哈希元数据。
 
-GitHub 的海外构建机直传广州桶可能很慢；本次普通上传遇到了这一情况。若希望以后每次正式 tag 发布也加速，可自行在 Repository Variables 设置 `COS_UPLOAD_ACCELERATE=true`；不设置则默认 `false`。上传才使用 `cos.accelerate.myqcloud.com`，桶检查与客户端更新/下载地址继续使用原域名。此选项需要桶已开启全球加速，并会额外按流量计费；当前跨境上行公布价为 1.25 元/GB，实际以[腾讯云控制台与定价](https://buy.cloud.tencent.com.cn/price/cos)为准。
+GitHub 的海外构建机直传广州桶可能很慢；0.0.2 的普通上传曾出现这一情况，见对应发布记录。若希望以后每次正式 tag 发布也加速，可自行在 Repository Variables 设置 `COS_UPLOAD_ACCELERATE=true`；不设置则默认 `false`。上传才使用 `cos.accelerate.myqcloud.com`，桶检查与客户端更新/下载地址继续使用原域名。此选项需要桶已开启全球加速，并会额外按流量计费；实际费用以[腾讯云控制台与定价](https://buy.cloud.tencent.com.cn/price/cos)为准。
 
 也可只在下面的恢复工作流中勾选一次 `accelerate`，不改变后续发布默认行为。当前实现对每次加速运行限制累计上传读取量 3 GB（包含 SDK 重试）；触及上限时终止，不切换清单。这个保护限制本次上传的数据量，不是整个腾讯云账户的账单限额。
 
@@ -155,11 +124,11 @@ GitHub 的海外构建机直传广州桶可能很慢；本次普通上传遇到�
 
 ### 上传脚本修复后：用原包恢复发布
 
-如果正式 tag 的安装包已构建成功并保存，但需要修复上传脚本，重跑旧的正式工作流仍使用旧脚本。此时到 [Resume verified COS release](https://github.com/zws-code/zhishu-ccs/actions/workflows/resume-cos-release.yml)，点击 **Run workflow**，选择已修复脚本所在的分支（本次为 `codex/release-0.0.2`），填写原正式构建的 **run_id**。桶全球加速已开启且愿意承担本次流量费用时，可勾选 `accelerate`；默认不勾选。
+如果正式 tag 的安装包已构建成功并保存，但需要修复上传脚本，重跑旧的正式工作流仍使用旧脚本。此时到 [Resume verified COS release](https://github.com/zws-code/zhishu-ccs/actions/workflows/resume-cos-release.yml)，点击 **Run workflow**，选择包含已审查脚本修复的分支，填写原正式构建的 **run_id**。桶全球加速已开启且愿意承担本次流量费用时，可勾选 `accelerate`；默认不勾选。
 
 run_id 是原 Actions 页面地址末尾的数字。例如 0.0.2 原正式运行是 `41032256949`，网址为 `https://github.com/zws-code/zhishu-ccs/actions/runs/41032256949`。恢复入口会核对原工作流、正式 tag、原提交和未过期的 `cos-payload-v<版本>`，再次验证签名与哈希后实际上传 COS，再创建 GitHub Release。它不编译、不移动 tag、不生成另一套同版本包；原产物已过期时不能使用，应发新版本。
 
-取消的正式运行仅在 `Save verified payload for retries` 已成功、原 tag 未移动且存在唯一未过期 payload 时可恢复，仍重新验证全部签名与哈希。不能用取消来跳过构建或产物检查；0.0.2 因普通上传过慢，维护者在发布会话中明确批准停止并改用国际加速，记录见 [0.0.2 发布记录](RELEASE-0.0.2.md)。
+取消的正式运行仅在 `Save verified payload for retries` 已成功、原 tag 未移动且存在唯一未过期 payload 时可恢复，仍重新验证全部签名与哈希。不能用取消来跳过构建或产物检查；0.0.2 因普通上传过慢，维护者在发布会话中明确批准停止并改用国际加速，记录见 [0.0.2 发布记录](0.0.2.md)。
 
 注意：**这个恢复工作流会实际发布**，与 `Release to Tencent COS` 的手动演练不同。后台也可推送专用分支 `codex/cos-resume` 触发恢复，但提交说明必须带单独一行 `Resume-Release-Run: <原正式run_id>`；本次需要加速时再加单独一行 `Resume-Release-Accelerate: true`。日常优先使用上述页面输入方式。
 
@@ -169,7 +138,7 @@ run_id 是原 Actions 页面地址末尾的数字。例如 0.0.2 原正式运行
 
 ### 当前接入：COS 默认域名直连
 
-当前无自有域名，先使用上述 COS 默认 HTTPS 地址，`COS_PREFIX=ccs/stable`，`ZHISHU_UPDATE_URL` 为下载根地址加 `/latest.json`。此模式下桶使用公有读私有写，让客户端匿名下载公开安装包和清单；私钥和云凭据只保存到 GitHub Secrets，不上传到桶。
+既有发布记录使用 COS 默认 HTTPS 地址，`COS_PREFIX=ccs/stable`，`ZHISHU_UPDATE_URL` 为下载根地址加 `/latest.json`。此模式下桶使用公有读私有写，让客户端匿名下载公开安装包和清单；私钥和云凭据只保存到 GitHub Secrets，不上传到桶。
 
 默认域名的强制下载响应头不表示禁止程序读取 JSON；仍需实际验证更新清单和安装包下载。这个阶段没有 CDN 缓存/加速，不把 COS 直连描述为 CDN 已接入。
 
@@ -200,7 +169,7 @@ COS 桶
         ├── Zhishu-Ccs-v1.0.0-macOS.dmg
         ├── Zhishu-Ccs-v1.0.0-macOS.tar.gz
         ├── Zhishu-Ccs-v1.0.0-macOS.tar.gz.sig
-        └── Windows/Linux 安装包与签名
+        └── Windows x64/ARM64 EXE 与签名
 ```
 
 `COS_PUBLIC_BASE_URL` 例如 `https://download.你的域名/ccs/stable`；其 URL 路径必须与 `COS_PREFIX` 一致。以上域名与版本仅是示例，不能直接当成已配置的地址。
@@ -245,7 +214,7 @@ COS/CDN 更新地址强制 HTTPS。平台 API 的 HTTP 开关不影响更新地�
 
 COS 凭据建议放在 `cos-production` Environment Secrets，构建作业无需读取；也支持 Repository Secrets。预检阶段不连接腾讯云，真正发布前上传器会检查凭据与权限。
 
-现有密钥位置为 `~/.tauri/zhishu-ccs.key` 和 `.pub`，可以用于这次首次正式发布。若决定为正式版新建身份，仅在首次发布前执行一次：
+正式版本必须复用已发布客户端信任的更新密钥；本地文件是否存在不能由文档保证。以下仅为尚未发布的新产品首次创建身份的示例，已发布产品不能照此重新生成并替换密钥：
 
 ```sh
 pnpm tauri signer generate -w ~/.tauri/zhishu-ccs-production.key
@@ -379,8 +348,8 @@ python3 -B scripts/zhishu/publish-cos.py <已验证的cos-payload目录> --dry-r
 
 Tauri 客户端读取当前下载源的 `latest.json`；目前为 COS 默认域名，接入 CDN 后使用 CDN 域名。网页下载列表读取的是 `client-release.json`，两者不能互换。
 
-相邻 `zhishu-proxy` 仓库已将 `/download` 页面的同源 `/client-release.json` 接到 COS 稳定清单，并移除旧的本地安装包托管代码与内置空清单；首次生效需部署新版网关。部署后客户端每次发布只更新 COS，平台无需再次构建或重启。本客户端工作流不连接 SSH；安装包由浏览器直接从 COS 下载。旧反向代理静态规则与部署验收见[网关客户端下载接入](../../../zhishu-proxy/docs/zhishu/客户端发布与接入.md)，源码接入完成不代表生产网关已经更新。
+相邻 `zhishu-proxy` 仓库已将 `/download` 页面的同源 `/client-release.json` 接到 COS 稳定清单，并移除旧的本地安装包托管代码与内置空清单；首次生效需部署新版网关。部署后客户端每次发布只更新 COS，平台无需再次构建或重启。本客户端工作流不连接 SSH；安装包由浏览器直接从 COS 下载。旧反向代理静态规则与部署验收见[网关客户端下载接入](../../../../zhishu-proxy/docs/zhishu/客户端发布与接入.md)，源码接入完成不代表生产网关已经更新。
 
-首次正式包手动安装验收 macOS、Windows、Linux 的安装、启动、登录和工具接入。以后用两个真实正式版本验证发现更新、下载、验签、安装和重启。脚本和模拟回归通过不代表跨平台安装、Apple 公证、真实模型请求或计费已验收。
+当前发行矩阵须手动验收 macOS、Windows 的安装、启动、登录和工具接入；恢复 Linux 发行时再补对应验收。以后用两个真实正式版本验证发现更新、下载、验签、安装和重启。脚本和模拟回归通过不代表跨平台安装、Apple 公证、真实模型请求或计费已验收。
 
 参考：[Tauri Updater](https://tauri.app/plugin/updater/)、[腾讯云 PUT Object 禁止覆盖规则](https://intl.cloud.tencent.com/document/product/436/7749?lang=en)、[COS Python SDK](https://cloud.tencent.com/document/product/436/12269)。

@@ -1,4 +1,8 @@
-# 目录与功能提交整理验证
+# 历史验证记录
+
+> 本页保留各次任务的执行结果和未验证项；测试数量、代码路径、分支状态及临时资料均属于当时快照。本次文档整理没有重跑这些历史测试。当前行为以 [代码基线](../development/baseline.md)、功能说明和源码为准。
+
+## 目录与功能提交整理（2026-10-29）
 
 日期：2026-10-29；环境：本机 macOS，使用仓库现有 node_modules 与 Rust 缓存。
 范围：ADR-0002 的文件归位、调用边界、脚本路径及功能提交压缩；不代表批准发布。
@@ -53,7 +57,13 @@ CC_SWITCH_TEST_HOME="$(mktemp -d)" cargo test --manifest-path src-tauri/Cargo.to
 
 ## 二开审查修复（2026-10-29，fix/zhishu-review-20261029）
 
-范围、复现条件及遗留风险见 [审查报告](REVIEW-2026-10-29.md)。本节记录后续修复，不覆盖上面目录整理阶段的历史结果。
+审查起点为 `bf9228e3`，固定基线 4.0.21；以下合并原二开审查报告的有效结论，不覆盖上面目录整理阶段的结果。
+
+- 修复批量写入、同步回调在退出、换账号或离开页面后继续执行的问题；已提交的单次原子 IPC 不强制中断。
+- 读取本机成员名单失败不再按成功空列表处理；修正 `claudeDesktopStatus` 缓存键，并复用统一刷新适配器。
+- 当时修复旧 Key 替换失败仍使用已拒绝凭证的缺陷；该客户端建 Key 链路随后由 ADR-0004 专用 `/access` 协议整体取代，不能据此恢复旧逻辑。
+- 当时清理的 `commands/misc.rs` 两个函数为无调用方的二开补丁，消除了 dead-code 基线错误；保留上游受控终端功能和便携更新 TODO。
+- 原报告建议的 v1 凭据库迁移未实施；当前实际是账号独立 v2 明文目录，见 [代码基线](../development/baseline.md)。本次没有新增凭据迁移或生产安全验收。
 
 | 检查 | 结果 |
 |---|---|
@@ -88,14 +98,14 @@ Rust doctest 由仓库现有 `doctest = false` 禁用。
 | `pnpm test:unit tests/zhishu/lib/platformAuth.test.ts tests/zhishu/components/PlatformLogin.test.tsx` | 2 文件、31 项通过 |
 | `git diff --check` | 通过 |
 
-测试只使用本机模拟平台、临时目录和模拟凭据库。未运行全量测试、Clippy、前端类型检查或构建，也未进行真实平台登录、真实凭据库、Windows/Linux 与安装包验证。HTTP 明文传输及地址附带内容的清除行为见 [平台登录文档](platform-login.md)。
+测试只使用本机模拟平台、临时目录和模拟凭据库。未运行全量测试、Clippy、前端类型检查或构建，也未进行真实平台登录、真实凭据库、Windows/Linux 与安装包验证。HTTP 明文传输及地址附带内容的清除行为见 [平台登录文档](../features/platform-login.md)。
 
 
 ## 客户端专用 API 改造（2026-10-31）
 
-范围：按 [客户端专用接口契约](client-api-integration.md) 将平台登录、恢复、账户、基础同步与额度查询统一到 `/api/zhishu/v1/client`，删除自有旧平台调用、Key 查找/创建/替换/撤销与网络模型发现逻辑，不保留旧接口回退。前后端契约、额度与订阅展示、版本 2 私密快照、网关地址适配及相关文档同步更新。
+范围：按 [客户端专用接口契约](../api/client-api.md) 将平台登录、恢复、账户、基础同步与额度查询统一到 `/api/zhishu/v1/client`，删除自有旧平台调用、Key 查找/创建/替换/撤销与网络模型发现逻辑，不保留旧接口回退。前后端契约、额度与订阅展示、版本 2 私密快照、网关地址适配及相关文档同步更新。
 
-侵入等级为 L0 自有业务、L1 注册/翻译、L2 可选共享 Provider 元数据；复用 ProviderService、应用锁、路径解析、原子配置发布/恢复、keyring 与账户查询隔离。不修改上游 DAO/schema、代理或通用配置引擎。决策、兼容与回退见 [ADR-0004](adr/ADR-0004-client-api-only.md)，上游薄接入见 [补丁登记](UPSTREAM_PATCHES.md) CLIENT-20261031-01～03。
+侵入等级为 L0 自有业务、L1 注册/翻译、L2 可选共享 Provider 元数据；复用 ProviderService、应用锁、路径解析、原子配置发布/恢复、keyring 与账户查询隔离。不修改上游 DAO/schema、代理或通用配置引擎。决策、兼容与回退见 [ADR-0004](../adr/ADR-0004-client-api-only.md)，上游薄接入见 [补丁登记](../development/upstream-patches.md) CLIENT-20261031-01～03。
 
 | 检查 | 本次结果 |
 |---|---|
@@ -142,7 +152,7 @@ CC_SWITCH_TEST_HOME="$(mktemp -d /tmp/zhishu-client-api.XXXXXX)" cargo test --of
 - 删除旧模型目录的 `api_format`、`mode`、嵌套 limit 和 camelCase 等元数据回退；模型映射与摘要读取 `/access` 白名单字段。测试使用专用 Key 元数据及当前协议字段，移除一项只验证旧清理流程的 Rust 用例和其他用例中的旧清理断言。
 - 保留退出不改 Provider/原生文件、同账号恢复、跨账号隔离、摘要不泄密、原文件损坏保护、授权撤回及本地配置适配等有效回归。下载页仍在使用的构建网站地址、通用上游 API 和实际生效的配置迁移不属于旧平台 API 清理。
 
-等级为 L0 自有业务、测试及契约清理 + L1 自有翻译键删除；复用现有 ProviderService、配置锁、私密原子存储和会话 keyring，无新增依赖、数据库迁移或上游核心补丁。[ADR-0004](adr/ADR-0004-client-api-only.md)、[补丁登记](UPSTREAM_PATCHES.md)、AGENTS 和基础数据文档已同步。
+等级为 L0 自有业务、测试及契约清理 + L1 自有翻译键删除；复用现有 ProviderService、配置锁、私密原子存储和会话 keyring，无新增依赖、数据库迁移或上游核心补丁。[ADR-0004](../adr/ADR-0004-client-api-only.md)、[补丁登记](../development/upstream-patches.md)、AGENTS 和基础数据文档已同步。
 
 | 检查 | 本轮结果 |
 |---|---|
@@ -165,7 +175,7 @@ CC_SWITCH_TEST_HOME="$(mktemp -d /tmp/zhishu-client-api.XXXXXX)" cargo test --of
 
 改动范围：新增自有清理编排、IPC wrapper、确认框和结果展示；目录按平台地址 + 用户 ID 独立私密存储，迁移有效的旧单文件 v2；普通退出仍保留目录/供应商/工具配置。清理按账号复用全应用安全删除，清理快照后退出；保留登录账号记录、服务器地址和已记住密码；逐应用失败及 keyring/服务端退出分别报告。结果只存在 Auth Context 内存，在退出后通过独立可关闭弹窗展示，不占用登录表单；关闭或重新登录成功后清除。前端清理期间阻止新登录/轮询，隔离旧响应，账号变化关闭原详情页。
 
-复用 ProviderService Adapter、操作锁、私密原子写入和既有配置审计/恢复，无新的核心配置写入路径。L0 自有模块 + L1 注册及五种语言入口；[ADR-0005](adr/ADR-0005-account-local-cleanup.md)、[补丁登记](UPSTREAM_PATCHES.md)、基础数据文档及 AGENTS 已同步。
+复用 ProviderService Adapter、操作锁、私密原子写入和既有配置审计/恢复，无新的核心配置写入路径。L0 自有模块 + L1 注册及五种语言入口；[ADR-0005](../adr/ADR-0005-account-local-cleanup.md)、[补丁登记](../development/upstream-patches.md)、基础数据文档及 AGENTS 已同步。
 
 | 检查 | 本轮最终结果 |
 |---|---|
@@ -223,7 +233,7 @@ CC_SWITCH_TEST_HOME="$(mktemp -d /tmp/zhishu-client-api.XXXXXX)" cargo test --of
 
 已执行：`./node_modules/.bin/tsc --noEmit` 通过；本次修改的现存前端/测试文件 Prettier 检查通过；`cargo fmt --check --manifest-path src-tauri/Cargo.toml` 通过；9 个相关前端测试文件共 202 项通过；`CC_SWITCH_TEST_HOME` 指向独立临时目录的 `cargo test --offline --manifest-path src-tauri/Cargo.toml --lib zhishu:: --quiet` 共 149 项通过。运行时代码与测试中的 Harness/DSH 标识扫描无匹配。另已编译 Rust 测试目标；未执行全仓测试、Clippy、桌面实机或原生 CLI 验收。
 
-本次不迁移或删除用户机器上的旧 Harness 配置及数据库行。新分支不再识别该应用 ID，旧数据需要在原发布版本管理或迁出。提交重组与最终文件树核对见 [整理记录](HISTORY_REWRITE_2026-10-31.md) 和 [ADR-0006](adr/ADR-0006-zws-history-without-harness.md)。
+本次不迁移或删除用户机器上的旧 Harness 配置及数据库行。新分支不再识别该应用 ID，旧数据需要在原发布版本管理或迁出。提交重组与最终文件树核对见 [整理记录](commit-reorganization.md) 和 [ADR-0006](../adr/ADR-0006-zws-history-without-harness.md)。
 
 ## DSH 平台供应商适配（2026-10-31）
 
@@ -238,3 +248,25 @@ CC_SWITCH_TEST_HOME="$(mktemp -d /tmp/zhishu-client-api.XXXXXX)" cargo test --of
 后续现场复核（2026-10-31）：开发数据库中的手动项和平台项均标记已写入原生配置，`web`、`desktop`、`headless` profile 也均含两项；先前“仅数据库保存”的诊断已不能解释当时的不可见。平台项有 177 个模型，其中 6 个曾含 DSH schema 不接受的 `reasoningEfforts.ultra`，手动项只有 5 个模型。已在智枢 DSH 模型适配中限制思考档位，并在重复同步时清理已有托管模型的非法档位；本轮未直接修改真实 `~/.dsh`。期间用户侧配置发生更新，复核时数据库与原生 profile 已无 `ultra`。当前打开的 DSH 模型选择器已实际显示「智枢平台 · 智枢router-ccs-标准」及其 GPT-6-Luna 等模型，手动项同时可见；不能仅凭这次观察断定是谁触发了重同步。
 
 本轮验证：隔离 `CC_SWITCH_TEST_HOME` 与 `DSH_HOME` 的 `cargo test --locked --offline --lib zhishu:: -- --test-threads=1` 共 152 项通过；最终代码的 `cargo test --locked --offline --lib dsh -- --test-threads=1` 共 66 项通过，包含 DSH 原生 YAML 不含 `ultra`、重复同步不改写、已有非法档位清理；`cargo fmt --check`、`cargo clippy --locked --offline -- -D warnings` 和 `git diff --check` 通过。已只读查看本机 DSH 模型选择器，确认平台分组可见；未执行平台模型实际请求、完整仓库测试或发布。REA 对已安装 DSH 应用包的外部分析被自动审批阻止，因此以本机 `dsh 0.2.1-rc.5` 版本、官方同版本 schema、隔离回归和当前界面观察为依据，不宣称安装包内部已核验。
+
+## 文档分类与源码核对（2026-10-31）
+
+范围：`docs/zhishu` 按 development、features、api、releases、history、adr、upstream-sync 分类，根目录只留总索引。合并两份提交整理映射，旧审查报告的有效结论并入本页；发布指南与各版本证据分离。依据当前源码更新 0.0.3 / 上游 4.0.22 / schema 24、真实模块位置和 DSH 平台同步范围。旧分支记录保留原适用范围，不覆盖前面的历史测试结果。
+
+复用当前 ProviderService/Adapter、已有 IPC 和开发/发布脚本的事实说明，不新增业务实现。L0 文档整理，Vite/开发脚本只修正文档提示路径（固定入口按 L1 复核），`AGENTS.md` 和贡献指南同步引用；补丁登记复核 ZS-006、ZS-222。无数据库、凭据、原生配置、平台请求或跨平台行为变更。
+
+| 本次检查 | 结果 |
+| --- | --- |
+| 文档索引可达性 | 27 份文档全部可从总索引访问，无孤立文档 |
+| 本地 Markdown 引用 | 122 处本地链接及其中 6 个章节锚点有效，含相邻网关仓库引用 |
+| 当前文档源码入口 | 59 个完整源码路径存在；历史迁移表和目标示例单独标识 |
+| 版本、schema、白名单与 IPC 静态核对 | 源码版本 0.0.3、schema 24；13 项前后端平台白名单一致，含 DSH；21 个前端 wrapper 命令均已实际注册 |
+| JSON 示例解析 | 12 段均可解析 |
+| `pnpm typecheck` | 通过；初次只读沙箱无法打开 pnpm 存储锁，正常权限重跑成功 |
+| 开发脚本回归 | `node --test scripts/zhishu/macos-dev-sign.test.mjs scripts/zhishu/dev-isolated.test.mjs`：9 项通过，1 项真实钥匙串测试按默认设置跳过 |
+| 修改的工具入口格式与语法 | Vite / macOS 签名模块 Prettier、Node 语法检查及 `sh -n` 均通过 |
+| `git diff --check` | 通过 |
+
+本次未运行全量前端/Rust 测试、构建、真实钥匙串、CLI 请求、安装升级或发布验收；旧记录中的“已执行”不属于本轮结果。保留用户原有 DSH 适配与验证内容、其他源码改动及 `out/`；未创建提交或推送。回退仅恢复本次文档位置/内容与提示引用，不涉及运行时数据。
+
+最终检查期间发现其他任务新增 ADR-0008 及多处前后端未提交修改。上表 27 份文档和 122 处链接包含工作区中的并行 ADR；本次提交仅整理原有 26 份文档，并行 ADR、索引条目及实现说明留在工作区，由对应任务提交。本次类型/脚本测试不作为并行实现的验证证据。

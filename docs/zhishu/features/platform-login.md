@@ -1,4 +1,4 @@
-# 智枢router 平台登录（第一版）
+# 平台登录与会话
 
 主窗口启动后先显示登录页，登录成功后进入原有应用界面。侧栏显示平台账户并提供退出入口；不再区分新手模式与高级模式。
 
@@ -28,3 +28,10 @@
 - 登录页是主窗口的产品入口，不是本地配置的安全隔离机制。现有托盘与原有本地工具管理逻辑保持原样，平台接口仍必须由后端校验会话权限。后续平台专属操作必须在 Rust 端验证登录状态。
 
 左下角账户区域显示平台美元余额，侧栏收起时仍显示金额。余额每分钟及窗口重新可见时随账户信息刷新，也可点击余额行手动刷新。小于 0.01 美元的非零余额显示六位小数，其余显示两位。
+
+## 实现与回归入口
+
+- 账户态、恢复门禁和登录页：`src/zhishu/auth/PlatformAuthContext.tsx`、`PlatformLogin.tsx`；IPC wrapper：`src/zhishu/api/platformAuth.ts`。
+- HTTP 与认证：`src-tauri/src/zhishu/services/platform_auth.rs`；会话、密码及设备路径：`src-tauri/src/zhishu/storage/platform_session.rs`、`platform_login_history.rs`、`platform_storage.rs`。
+- command 由 `src-tauri/src/zhishu/commands/mod.rs` 导出，在 `src-tauri/src/lib.rs` 注册。接口字段见 [专用 API 契约](../api/client-api.md)，账号清理见 [ADR-0005](../adr/ADR-0005-account-local-cleanup.md)。
+- 前端回归：`tests/zhishu/lib/platformAuth.test.ts`、`tests/zhishu/components/PlatformLogin.test.tsx`；Rust 模拟测试与实现同文件。历史执行结果见 [验证记录](../history/validation.md)。

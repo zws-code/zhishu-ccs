@@ -1,8 +1,8 @@
-# 客户端专用接口接入改造
+# 客户端专用 API 契约与实现映射
 
 > 服务端：Zhishu Proxy，接口版本 v1。文档日期：2026-10-31。
-> 2026-10-31 客户端实施：源码已切换专用接口，旧平台调用和 Key 生命周期逻辑已删除。L0 自有业务 + L1 注册/翻译 + L2 共享元数据扩展，见 [ADR-0004](adr/ADR-0004-client-api-only.md) 和 [验证记录](VALIDATION.md)。以下保留服务端接入契约，真实平台验收另行记录。
-> 本文是 CCS 平台基础数据接入的要求。旧 `platform-managed-models.md` 中的客户端 Key 整理流程不再作为新接入依据。
+> 2026-10-31 客户端实施：源码已切换专用接口，旧平台调用和 Key 生命周期逻辑已删除。L0 自有业务 + L1 注册/翻译 + L2 共享元数据扩展，见 [ADR-0004](../adr/ADR-0004-client-api-only.md) 和 [验证记录](../history/validation.md)。以下保留服务端接入契约，真实平台验收另行记录。
+> 本文的 HTTP/DTO 契约用于解释客户端实现；服务端内部事务、管理后台行为及线上部署需在服务端仓库单独核验，不能由客户端源码推定。
 
 ## 1. 职责与必须停止的旧行为
 
@@ -18,7 +18,7 @@
 - 使用旧 `/api/v1/client/credentials` 或 `/api/zhishu/v1/client/credentials` 作为兼容回退。
 - 新接口不可用时恢复任何上述旧逻辑。
 
-网关本次已移除旧 `POST /api/v1/client/credentials` 和 `POST /api/zhishu/v1/client/credentials`，两者均返回 404，不提供兼容回退。普通面板接口仍服务于平台 Web 管理；本次 CCS 源码已停止调用这些面板接口整理 Key；旧版本客户端不会因为服务端更新而自动完成改造。
+客户端请求器使用封闭的方法/路径白名单，拒绝旧面板和 credentials 路由，不提供旧接口回退。旧客户端和服务端部署状态须分别核验。
 
 客户端继续负责自身的本地快照、状态展示、重试、Provider 管理、工具能力适配和配置文件写入。删除本地 Provider、退出某个客户端不能触发删除共享平台 Key。
 
@@ -52,7 +52,7 @@
 3. 客户端读取快照，按各工具规则同步 Provider 与配置。
 4. 展示刷新通过 /account 和 /usage/summary 完成；不重复整理 Key 或应用工具配置。
 
-所有这些接口返回 `Cache-Control: no-store`。令牌与 Key 不进入普通前端查询缓存、诊断日志或错误信息。
+HTTP 契约要求这些接口返回 `Cache-Control: no-store`，实际响应头需在服务端或联调时核验。令牌与 Key 不进入普通前端查询缓存、诊断日志或错误信息。
 
 ### 登录与续期示例
 
@@ -104,7 +104,7 @@ Content-Type: application/json
 }
 ```
 
-网页地址来自平台配置；返回相对路径时，相对于当前登录平台 origin 解析。开关为 false 时不应展示相应入口。当前登录请求支持 `turnstile_token`，或 `tencent_captcha_ticket` 与 `tencent_captcha_randstr` 配对字段；验证码能力不足时报告无法登录，不绕过校验。
+网页地址来自平台配置；返回相对路径时，相对于当前登录平台 origin 解析。开关为 false 时不应展示相应入口。服务端契约可接受 `turnstile_token`，或 `tencent_captcha_ticket` 与 `tencent_captcha_randstr` 配对字段；当前 CCS 尚未实现验证码交互，启用这些验证时明确拒绝密码登录，不绕过校验。
 
 TOTP 中间响应的 data 示例：
 
@@ -240,26 +240,11 @@ GET /usage/summary 在当前没有符合条件的分组时：
 
 账号余额刷新返回与 account 同形状的数据。GET /usage/summary 使用与快照相同的账户、分组、Key 元信息、额度和订阅结构，但不含 `credential.key`、连接配置和模型目录；不创建、删除 Key。它不能作为取得 Key 明文的替代接口。
 
-## 4. 服务端 Key 生命周期
+## 4. Key 生命周期边界
 
-| 情况 | 行为 |
-|---|---|
-| 正常、已授权的公开按量分组，名称有指定前缀 | 缺少专用 Key 时创建 |
-| 正常且已授权的专属按量分组 | 不限制名称，缺少时创建 |
-| 订阅分组初次接入 | 有有效订阅才创建 |
-| 同一分组已有专用 Key | 多客户端共用 |
-| Key 自身过期或额度耗尽 | 返回标识，不补建替换 |
-| 订阅到期、暂停或额度耗尽 | 已有 Key 继续返回，不删除、不替换 |
-| 到期后没有其他有效订阅 | 仍保留已有 Key，返回额度标识 |
-| 续订或同组存在其他有效订阅 | 按当前有效权益返回状态，沿用原 Key |
-| 分组删除、禁用、授权撤销或公开分组失去前缀 | 服务端整理时删除对应专用 Key |
-| 分组重新符合条件 | 允许重新创建 |
+客户端只消费成功 `/access` 响应中的授权分组、凭证、模型与额度；分组前缀、Key 申请/撤销、到期及续订规则属于服务端责任。客户端不从 ID 或名称寻找替代 Key，不因网络失败或额度不足自行创建凭证。
 
-订阅分组的授权依据是订阅关联本身；删除该组全部订阅关联属于撤销授权，到期或暂停属于额度状态变化。整理只在 POST /access 时执行，账户与额度只读请求不做整理。
-
-删除后的 Key 不返回 `deleted` 占位记录。客户端只根据成功同步的数据和自身规则处理本地 Provider。无任何有效分组时成功返回空 groups；获取依据失败时返回错误，不能把错误理解为全部分组已删除。
-
-管理后台只读展示“客户端专用”Key，修改、删除、改组、启停及重置受到后端限制。识别依据服务端关联表，不根据历史 CCS 命名自动接管旧 Key。本次不迁移旧 CCS 快照。
+成功空集合与获取失败分别处理；目录失败保留既有供应商。删除本地 Provider 或退出登录不撤销共享模型 Key。具体本地协调见 [功能说明](../features/platform-managed-models.md)。
 
 ## 5. 失败语义与本地两阶段衔接
 
@@ -271,7 +256,7 @@ HTTP 失败使用平台原有错误外壳：
 
 - 登录缺失、失效、过期或用户禁用：按认证失败处理；不得把它转为创建模型 Key。
 - 429：平台登录或创建频率等限制；客户端自行决定重试。
-- 分组、用户授权、订阅、关联查询或 Key 整理失败：整次 /access 失败，数据库整理事务回滚，本地不应用空快照。
+- 分组、用户授权、订阅、关联查询或 Key 整理失败：客户端收到整次 /access 失败时保留本机快照，不应用空数据；服务端事务回滚须由服务端验证。
 - 模型目录单独失败：/access 可成功返回分组和凭证，同时该组 `catalog_status=failed`、`models=null`；保留失败状态，不将目录误判为空目录删除。
 - 额度不可用：同步仍可成功，使用 quota 标识展示；与网络/同步失败分别处理。
 - 请求取消或响应丢失时，服务端事务可能已经提交；再次 /access 复用关联，客户端不得自行创建补偿 Key。
@@ -281,13 +266,13 @@ CCS 修改位置与映射：
 
 | 当前能力 | 客户端改造 |
 |---|---|
-| discover_group_catalogs | 替换为 /access 聚合请求与 DTO 映射 |
+| discover_group_catalogs | 已通过 /access 聚合请求与 DTO 映射 |
 | platform_sync_catalog | 保留 IPC；获取新快照并私密原子保存，不写工具配置 |
 | platform_get_catalog | 仍只读本机白名单摘要，不包含明文 Key/JWT |
 | platform_get_catalog_key | 保留显式查看与平台、用户、分组归属校验 |
 | platform_sync_providers | 保持读取本地快照，工具协议适配与 Provider/配置更新归客户端 |
-| 原 /auth/me 账户刷新 | 改为 /client/account |
-| 原 /subscriptions/progress + /subscriptions 额度刷新 | 改为 /client/usage/summary |
+| 账户刷新 | GET /api/zhishu/v1/client/account |
+| 额度刷新 | GET /api/zhishu/v1/client/usage/summary |
 
 本地 `keyAvailable` 目前表示快照中存在凭证明文，不能直接改成额度可用；新增额度状态字段承接 `quota`。按 `baseUrl + userId` 隔离数据，拒绝登录切换后的迟到响应。订阅过期在新快照中仍有分组和 Key；不再根据客户端旧前缀规则过滤服务端已授权的专属分组。
 
@@ -311,7 +296,7 @@ CCS 修改位置与映射：
 | catalog_status / catalog_error | failed / error | failed 不等同于 Key 缺失或额度不足 |
 | quota / subscriptions | 新增额度及订阅状态字段 | 与 keyAvailable 分开保存和展示 |
 
-现有工具适配器如把未知能力转换为布尔默认值，后续接入时需调整为显式的本地适配决策，不能将默认值写回为平台已声明的能力。客户端实施已将适配输入的工具/流式能力改为可空值，并记录必要的本地工具默认策略。新协议快照应有独立版本标识；开发阶段的旧 CCS 快照不做字段迁移或凭证接管，需要重新执行新基础同步。
+工具/流式能力的适配输入保留可空值；工具必须使用默认值时由 Adapter 显式决定，不写回平台已声明能力。本机目录为版本 2，HTTP schema_version 为 1，两者不是同一版本号。旧单文件 v2 仅按账号归属迁移，v1 不迁移字段或接管凭证，需重新同步；详见 ADR-0005。
 
 ## 6. CCS 验收清单（执行情况见验证记录）
 
@@ -323,3 +308,14 @@ CCS 修改位置与映射：
 - 平台快照失败、单组模型失败和成功空列表有不同处理；保留其他账号、自建 Provider 和有效本地数据。
 - 新接口不可用时有失败提示与重试路径，不回退旧接口。
 - 新快照的模型能力完整映射，未知参数保留未知；完成目标工具的真实配置及模型调用验收。
+
+## 7. 当前源码入口
+
+| 职责 | 文件 |
+| --- | --- |
+| HTTP 白名单、登录、续期、账户、access 和 usage 请求 | `src-tauri/src/zhishu/services/platform_auth.rs` |
+| 响应 DTO、版本与模型字段校验 | `src-tauri/src/zhishu/services/client_api.rs` |
+| 账号快照 v2 与旧文件迁移 | `src-tauri/src/zhishu/services/platform_models/base_data.rs` |
+| 本地协调与格式适配 | `src-tauri/src/zhishu/services/platform_models/`、`src-tauri/src/zhishu/integrations/ccswitch/platform_models.rs` |
+| 前端 IPC 与类型 | `src/zhishu/api/platformAuth.ts`、`platformModels.ts`、`platformUsage.ts` |
+| 导出与实际注册 | `src-tauri/src/zhishu/commands/mod.rs`、`src-tauri/src/lib.rs` |

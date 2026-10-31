@@ -1,8 +1,10 @@
 # Zhishu CCS 上游补丁登记
 
+> 这是按基线/事件累积的补丁台账。222 项清单针对 2026-10-29 的 4.0.21 快照，后续变更按事件追加；旧路径、版本和分支描述仅适用于该段，不是当前 4.0.22 的完整重新统计。当前现状见 [代码基线](baseline.md)。
+
 ## 2026-10-31：4.0.22 冲突复核
 
-以 `4.0.22` (`b7642674`) 为新上游基线；逐项决议及验证见 [同步报告](upstream-sync/2026-10-31.md) 与 [ADR-0007](adr/ADR-0007-merge-4.0.22.md)。本轮没有新增平行 Provider 核心。
+以 `4.0.22` (`b7642674`) 为新上游基线；逐项决议及验证见 [同步报告](../upstream-sync/2026-10-31.md) 与 [ADR-0007](../adr/ADR-0007-merge-4.0.22.md)。本轮没有新增平行 Provider 核心。
 
 | 既有补丁 | 决议 | 侵入等级 | 复核 |
 |---|---|---|---|
@@ -21,8 +23,8 @@
 共 222 条。重新核对命令：`git diff --name-status --find-renames c4db63c6 HEAD`，排除 A 项。
 
 对应本地功能整理：`feat/zhishu-structure-cleanup`；尚未创建 PR/Issue，不虚构编号。
-合并前应补充实际 PR 链接。所有测试状态以 [验证记录](VALIDATION.md) 为准，表内是关联验证范围。
-L3 的统一依据见 [ADR-0002](adr/ADR-0002-structure-and-history.md)，数据库另见 ADR-0001。
+合并前应补充实际 PR 链接。所有测试状态以 [验证记录](../history/validation.md) 为准，表内是关联验证范围。
+L3 的统一依据见 [ADR-0002](../adr/ADR-0002-structure-and-history.md)，数据库另见 ADR-0001。
 
 | ID | 上游文件 | 修改目的 | 为什么不能仅新增/包装 | 级别 | 对应测试 | 最后复核 |
 |---|---|---|---|---|---|---|
@@ -133,7 +135,7 @@ L3 的统一依据见 [ADR-0002](adr/ADR-0002-structure-and-history.md)，数据
 | ZS-105 | `src-tauri/src/claude_desktop_config.rs` | 品牌/共存；配置历史 | 现有实际写入/切换/路径分派中的扩展与审计挂载必须覆盖原调用链；自有实现迁出，保留核心调用点 | L3 | Provider/MCP/Skills/配置历史隔离回归 | 2026-10-29 / ADR-0002 |
 | ZS-106 | `src-tauri/src/codex_config.rs` | 开发隔离 | 现有实际写入/切换/路径分派中的扩展与审计挂载必须覆盖原调用链；自有实现迁出，保留核心调用点 | L3 | Provider/MCP/Skills/配置历史隔离回归 | 2026-10-29 / ADR-0002 |
 | ZS-107 | `src-tauri/src/commands/config.rs` | 工具扩展 | 现有实际写入/切换/路径分派中的扩展与审计挂载必须覆盖原调用链；自有实现迁出，保留核心调用点 | L3 | Provider/MCP/Skills/配置历史隔离回归 | 2026-10-29 / ADR-0002 |
-| ZS-108 | `src-tauri/src/commands/misc.rs` | 撤销未使用的平台启动扩展；保留便携更新 TODO | 新增 Adapter 无法消除原文件中无调用方函数的 dead-code 告警；本轮删除 76 行旧二开代码，相对 4.0.21 仅剩 TODO 注释，无运行逻辑差异 | L1 | 引用搜索；Rust 全量回归与严格 clippy，结果见 VALIDATION.md | 2026-10-29 / REVIEW-2026-10-29.md |
+| ZS-108 | `src-tauri/src/commands/misc.rs` | 撤销未使用的平台启动扩展；保留便携更新 TODO | 新增 Adapter 无法消除原文件中无调用方函数的 dead-code 告警；本轮删除 76 行旧二开代码，相对 4.0.21 仅剩 TODO 注释，无运行逻辑差异 | L1 | 引用搜索；Rust 全量回归与严格 clippy，结果见历史验证记录 | 2026-10-29 / 历史验证记录 |
 | ZS-109 | `src-tauri/src/commands/provider.rs` | 工具扩展 | 现有实际写入/切换/路径分派中的扩展与审计挂载必须覆盖原调用链；自有实现迁出，保留核心调用点 | L3 | Provider/MCP/Skills/配置历史隔离回归 | 2026-10-29 / ADR-0002 |
 | ZS-110 | `src-tauri/src/commands/settings.rs` | 品牌/共存 | 现有实际写入/切换/路径分派中的扩展与审计挂载必须覆盖原调用链；自有实现迁出，保留核心调用点 | L3 | Provider/MCP/Skills/配置历史隔离回归 | 2026-10-29 / ADR-0002 |
 | ZS-111 | `src-tauri/src/config.rs` | 品牌/共存；开发隔离；配置历史 | 现有实际写入/切换/路径分派中的扩展与审计挂载必须覆盖原调用链；自有实现迁出，保留核心调用点 | L3 | Provider/MCP/Skills/配置历史隔离回归 | 2026-10-29 / ADR-0002 |
@@ -252,14 +254,7 @@ L3 的统一依据见 [ADR-0002](adr/ADR-0002-structure-and-history.md)，数据
 ## 历史合并登记（原记录保留）
 
 下面是原 4.0.21 冲突修复阶段的记录；其中“未提交合并”等描述属于当时状态。
-最终文件位置和完整覆盖以本页上表为准。
-
-# Zhishu CCS 上游补丁登记
-
-> 本文件记录**真实存在**的对上游 CC Switch 已有文件的修改。只有审查实际 `git diff` 后才能填入记录。
-
-| ID | 文件 | 修改目的 | 替代方案评估 | 侵入级别 | 验证方式 | 上游同步复核 |
-|---|---|---|---|---|---|---|
+原差异覆盖见本页对应历史清单；当前文件位置以源码和文档总索引为准。
 
 ## 变更审查规范
 
@@ -319,7 +314,7 @@ L3 的统一依据见 [ADR-0002](adr/ADR-0002-structure-and-history.md)，数据
 
 ## 2026-10-29 Windows EXE / Linux 暂停打包补丁
 
-依据：[ADR-0003](adr/ADR-0003-windows-exe-release.md)。功能分支：`feat/windows-exe-release`。
+依据：[ADR-0003](../adr/ADR-0003-windows-exe-release.md)。功能分支：`feat/windows-exe-release`。
 
 | ID | 上游文件 | 原因 | 为什么不能仅新增/包装 | 级别 | 对应测试 | 最后复核 |
 |---|---|---|---|---|---|---|
@@ -331,15 +326,15 @@ L3 的统一依据见 [ADR-0002](adr/ADR-0002-structure-and-history.md)，数据
 
 ## 0.0.2 发布准备复核（2026-10-30）
 
-复核 ZS-044、ZS-046、ZS-047、ZS-148：应用版本统一为 0.0.2，侵入等级 L1。版本字段由 npm/Cargo/Tauri 固定入口读取，不能由新增 Adapter 替代；复用既有打包、签名、COS 发布与更新实现，应用身份和更新协议不变。新增 `src/whats-new/0.0.2.json`；验证及发布状态见 [0.0.2 发布记录](RELEASE-0.0.2.md)。
+复核 ZS-044、ZS-046、ZS-047、ZS-148：应用版本统一为 0.0.2，侵入等级 L1。版本字段由 npm/Cargo/Tauri 固定入口读取，不能由新增 Adapter 替代；复用既有打包、签名、COS 发布与更新实现，应用身份和更新协议不变。新增 `src/whats-new/0.0.2.json`；验证及发布状态见 [0.0.2 发布记录](../releases/0.0.2.md)。
 
 发布准备补充复核 ZS-003（L1）：`.github/workflows/release.yml` 的 COS SDK 契约测试发现目录由 `scripts` 改为实际的 `scripts/zhishu`；自有恢复工作流同步修正。原命令实测执行 0 项测试，固定工作流入口必须直接修正，新增模块不能改变 unittest 的发现目录。未改变构建、签名、上传策略及权限。
 
-2026-10-30 加速恢复补充：仅修改自有 `scripts/zhishu/resume-release.mjs` 与回归，L1；支持在完整 payload 保存成功后取消的正式运行，仍核对原 tag/SHA、唯一未过期产物及后续签名/哈希。没有新增上游文件补丁；本次用户授权见 [0.0.2 发布记录](RELEASE-0.0.2.md)。
+2026-10-30 加速恢复补充：仅修改自有 `scripts/zhishu/resume-release.mjs` 与回归，L1；支持在完整 payload 保存成功后取消的正式运行，仍核对原 tag/SHA、唯一未过期产物及后续签名/哈希。没有新增上游文件补丁；本次用户授权见 [0.0.2 发布记录](../releases/0.0.2.md)。
 
 ## 2026-10-31 客户端专用 API
 
-依据：[ADR-0004](adr/ADR-0004-client-api-only.md)。自有旧平台请求、Key 生命周期及网络模型发现已删除，复用上游 Provider 与配置引擎。
+依据：[ADR-0004](../adr/ADR-0004-client-api-only.md)。自有旧平台请求、Key 生命周期及网络模型发现已删除，复用上游 Provider 与配置引擎。
 
 | ID | 上游文件 | 原因 | 为什么不能仅新增/包装 | 级别 | 对应测试 | 最后复核 |
 |---|---|---|---|---|---|---|
@@ -354,14 +349,14 @@ L3 的统一依据见 [ADR-0002](adr/ADR-0002-structure-and-history.md)，数据
 
 ## 2026-10-31 账号基础数据隔离与清理退出
 
-依据：[ADR-0005](adr/ADR-0005-account-local-cleanup.md)。用户明确保留单活动会话，暂缓多账号同时登录。
+依据：[ADR-0005](../adr/ADR-0005-account-local-cleanup.md)。用户明确保留单活动会话，暂缓多账号同时登录。
 
 | ID | 上游文件 | 原因 | 为什么不能仅新增/包装 | 级别 | 对应测试 | 最后复核 |
 |---|---|---|---|---|---|---|
 | ACCOUNT-20261031-01 | `src-tauri/src/lib.rs` | 注册 `platform_logout_and_clear_account` | Tauri 固定注册表必须挂载新命令，自有实现通过 facade 导出 | L1 | platformAuth IPC / Rust 清理退出 | 2026-10-31 |
 | ACCOUNT-20261031-02 | `src/i18n/locales/{zh,zh-TW,en,ja,tr}.json` | 增加清理确认、结果与账号隔离说明 | 共享 i18n 加载入口读取现有字典 | L1 | PlatformLogin / PlatformCatalogPage | 2026-10-31 |
 
-业务、存储迁移和测试均位于自有命名空间。复用既有全应用供应商删除、ProviderService Adapter、操作锁、私密原子写入及配置审计/恢复；保留上游代码，无 DAO 或通用配置引擎改动。验证状态见 [VALIDATION](VALIDATION.md)。
+业务、存储迁移和测试均位于自有命名空间。复用既有全应用供应商删除、ProviderService Adapter、操作锁、私密原子写入及配置审计/恢复；保留上游代码，无 DAO 或通用配置引擎改动。验证状态见 [VALIDATION](../history/validation.md)。
 
 清理弹窗视觉迭代仅修改自有 `PlatformAccountCleanup`、`PlatformProviderDeletionResult` 及对应测试，复用上游 Dialog 原有插槽，未修改通用 Dialog。五语文案仍归 ACCOUNT-20261031-02；等级仍为 L0/L1。
 
@@ -381,8 +376,14 @@ L3 的统一依据见 [ADR-0002](adr/ADR-0002-structure-and-history.md)，数据
 
 复核 ZS-044、ZS-046、ZS-047、ZS-148：package/Tauri/Cargo/lock 版本统一为 0.0.3，L1，工具固定读取的版本字段不能通过 Adapter 替代。Cargo 生成锁文件，不升级依赖。
 
-复核 ZS-003（L1）：GitHub 固定工作流增加本次发布分支演练入口，并仅为 v0.0.3 正式 tag 强制启用 COS 全球上传加速；其他 ref 保持现有仓库变量语义。复用既有签名、3 GB 加速读取上限、不可变产物及双清单检查，不改客户端更新地址/公钥。验证与剩余风险见 [0.0.3 发布记录](RELEASE-0.0.3.md)。
+复核 ZS-003（L1）：GitHub 固定工作流增加本次发布分支演练入口，并仅为 v0.0.3 正式 tag 强制启用 COS 全球上传加速；其他 ref 保持现有仓库变量语义。复用既有签名、3 GB 加速读取上限、不可变产物及双清单检查，不改客户端更新地址/公钥。验证与剩余风险见 [0.0.3 发布记录](../releases/0.0.3.md)。
 
 ## 2026-10-31 zws 历史整理分支
 
-依据 [ADR-0006](adr/ADR-0006-zws-history-without-harness.md)，本分支移除二开新增的 Harness 应用入口及其适配。上文涉及 DSH 的条目是旧发布历史，不代表本分支仍有该能力。受影响的上游文件集中在 `app_config.rs`、`settings.rs`、`provider.rs`、`services/provider/{mod,live}.rs`、`services/{mcp,skill,stream_check}.rs`、`commands/{config,provider}.rs`、`lib.rs`、前端应用列表/表单/设置及五语字典。没有替代新增模块能够取消这些既有枚举分支与固定注册项；移除属于 L1/L3 反向补丁。WorkBuddy、平台同步与配置历史继续复用上游 ProviderService、CLI 配置、DAO、IPC 和原子写入路径。回退为切回原 `ccs-dev`，不迁移或删除本机数据。验证范围见 [VALIDATION](VALIDATION.md)。
+依据 [ADR-0006](../adr/ADR-0006-zws-history-without-harness.md)，当时的独立整理分支移除二开新增的 Harness 应用入口及其适配。该记录不表示当前分支缺少 DSH；后续已合入上游 4.0.22，当前平台同步也覆盖 DSH。受影响的上游文件集中在 `app_config.rs`、`settings.rs`、`provider.rs`、`services/provider/{mod,live}.rs`、`services/{mcp,skill,stream_check}.rs`、`commands/{config,provider}.rs`、`lib.rs`、前端应用列表/表单/设置及五语字典。没有替代新增模块能够取消这些既有枚举分支与固定注册项；移除属于 L1/L3 反向补丁。WorkBuddy、平台同步与配置历史继续复用上游 ProviderService、CLI 配置、DAO、IPC 和原子写入路径。回退为切回原 `ccs-dev`，不迁移或删除本机数据。验证范围见 [VALIDATION](../history/validation.md)。
+
+## 2026-10-31 文档分类与引用修正
+
+本次为 L0 文档整理，固定工具入口的文档提示路径修正按 L1 复核；复核既有 ZS-006（贡献指南）与 ZS-222（Vite 配置）：只更新指向新文档目录的链接或错误提示字符串。固定入口中的字符串不能由新增文档或 Adapter 自动替换；不改变构建校验、IPC、配置写入或运行行为。macOS 开发脚本中的文档提示属于自有文件，同步修正。
+
+旧审查报告的有效修复与遗留风险已合入历史验证记录，两份提交映射合并保留；版本发布证据与操作指南分离。强制标准按已有 ADR-0004/0005 修正被替代的业务示例，核心红线不变。用户原有 DSH 适配、验证与 AGENTS 修改保留。实际本次检查见历史验证记录的文档整理小节。

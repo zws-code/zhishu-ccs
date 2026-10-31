@@ -1,10 +1,10 @@
 # AGENTS.md
 
-> 最近核对：2026-10-25。以当前代码、IPC 注册、脚本和测试为准；文档中的命令入口或测试用例存在，不代表本次已执行或真实平台已验收。
+> 文档与源码路径最近核对：2026-10-31。以当前代码、IPC 注册、脚本和测试为准；文档中的命令入口或测试用例存在，不代表本次已执行或真实平台已验收。
 
 ## 0. 二开标准与文档入口
 
-- **必读标准**：[《Zhishu CCS 二次开发实施标准》](docs/zhishu/SECONDARY_DEVELOPMENT_STANDARD.md)（ZCCS-DEV-001，v1.0，2026-10-29 生效）是本项目强制执行的二开工程标准；修改前先阅读，并结合本文件的具体业务边界执行。目标是持续保留上游可合并性，实现自有业务隔离、上游最小补丁、数据可迁移和发布可回滚。
+- **必读标准**：[《Zhishu CCS 二次开发实施标准》](docs/zhishu/development/standard.md)（ZCCS-DEV-001，v1.0，2026-10-29 生效）是本项目强制执行的二开工程标准；修改前先阅读，并结合本文件的具体业务边界执行。目标是持续保留上游可合并性，实现自有业务隔离、上游最小补丁、数据可迁移和发布可回滚。
 - **实施前说明**：明确用户场景、验收标准、可复用的上游能力、拟新增/修改文件、L0–L4 侵入等级，以及数据、安全、跨平台风险和验证方案。优先复用 Provider、CLI 配置、MCP、Skills、代理、DAO 和 IPC，不复制整套核心平行维护。
 - **模块与补丁边界**：新增智枢业务优先放在 `src/zhishu/`、`src-tauri/src/zhishu/`，通过 Adapter 复用上游服务；导航和 command 注册保持薄接入。修改上游已有文件时说明无法仅靠新增模块或包装解决的原因，并更新补丁登记；L3 核心改动需 ADR、备选方案、测试及回退计划，L4 默认禁止，须单独架构决策批准。继续遵守本文件“禁止删除上游代码”的要求。
 - **规范与现状核对**：标准中的目标目录、示例接口和 remote 命名不能直接视为当前实现；命令、路径、存储及接口以当前代码核验。发现规范与现有行为或本文件约束冲突时，明确记录差异和替代方案，必要时通过 ADR 修订；不得静默突破红线，也不得借本次任务擅自迁移凭据、改写配置或调整远程。
@@ -13,13 +13,13 @@
 | 文档 | 用途 |
 | --- | --- |
 | [开发与维护入口](docs/zhishu/README.md) | 自有模块归属、代码位置和功能文档索引 |
-| [二次开发实施标准](docs/zhishu/SECONDARY_DEVELOPMENT_STANDARD.md) | 架构边界、L0–L4 分级、开发流程、安全与验收要求 |
-| [Fork 基线与限制](docs/zhishu/BASELINE.md) | 已记录的上游基线、remote、产品身份及已知差异；操作前重新核对 |
-| [上游补丁登记](docs/zhishu/UPSTREAM_PATCHES.md) | 上游文件改动原因、替代方案、风险等级与关联测试 |
+| [二次开发实施标准](docs/zhishu/development/standard.md) | 架构边界、L0–L4 分级、开发流程、安全与验收要求 |
+| [Fork 基线与限制](docs/zhishu/development/baseline.md) | 已记录的上游基线、remote、产品身份及已知差异；操作前重新核对 |
+| [上游补丁登记](docs/zhishu/development/upstream-patches.md) | 上游文件改动原因、替代方案、风险等级与关联测试 |
 | [架构决策记录（ADR）](docs/zhishu/adr/README.md) | 核心改动、持久化数据、应用身份、签名及更新策略的决策要求 |
 | [上游同步报告](docs/zhishu/upstream-sync/README.md) | 每次同步的来源 SHA、冲突、影响面、验证和回退记录 |
-| [验证记录](docs/zhishu/VALIDATION.md) | 历史检查结果与未验证项，不代表本次任务已执行 |
-| [打包、发布与更新](docs/zhishu/zhishu-release.md) | 发行操作入口；涉及发布时先读，遵守本文件发布边界 |
+| [验证记录](docs/zhishu/history/validation.md) | 历史检查结果与未验证项，不代表本次任务已执行 |
+| [打包、发布与更新](docs/zhishu/releases/README.md) | 发行操作入口；涉及发布时先读，遵守本文件发布边界 |
 
 ## 1. 项目定位与边界
 
@@ -37,24 +37,24 @@
 - `src/main.tsx`：启动、全局 Provider、错误边界及平台登录门禁；`src/App.tsx`、`src/lib/navigation.ts`：基于 React 状态的页面切换及导航持久化。
 - `src/components/`、`src/hooks/`：界面、交互及业务 Hook。
 - `src/config/`：应用定义、供应商预设及模型元数据；新增应用需同时检查前后端类型。
-- `src/lib/api/`：Tauri `invoke` 封装；`platformAuth.ts`、`platformModels.ts`、`platformUsage.ts`、`configHistory.ts` 定义平台登录、两阶段同步、订阅额度和配置修改记录契约；共享类型另见 `src/types.ts`、`src/lib/api/types.ts`。
-- `src/lib/query/`：TanStack Query 查询、mutation、缓存键和失效处理；平台目录、订阅额度和配置修改记录分别见 `platformCatalog.ts`、`platformUsage.ts`、`configHistory.ts`；平台同步能力白名单见 `src/config/platformConfig.ts`。
-- `src/contexts/PlatformAuthContext.tsx`：账户态、恢复重试、可见窗口活动上报和退出缓存清理；`src/components/platform/PlatformLogin.tsx` 同时包含登录门禁及恢复失败页。
-- `src/components/platform/PlatformCatalogPage.tsx`、`PlatformCatalogDetails.tsx`、`PlatformCatalogKey.tsx`：平台基础数据、分组/模型详情及显式 Key 查看；`PlatformConnectButton.tsx`：当前应用的本地供应商同步。
+- `src/lib/api/`：上游 Tauri `invoke` 封装；自有 API 位于 `src/zhishu/api/` 和 `src/zhishu/config-history/api/`，`platformAuth.ts`、`platformModels.ts`、`platformUsage.ts`、`configHistory.ts` 定义平台登录、两阶段同步、订阅额度和配置修改记录契约；共享类型另见 `src/types.ts`、`src/lib/api/types.ts`。
+- `src/lib/query/`：上游查询入口；自有查询位于 `src/zhishu/models/query/` 和 `src/zhishu/config-history/query/`，平台目录、订阅额度和配置修改记录分别见 `platformCatalog.ts`、`platformUsage.ts`、`configHistory.ts`；平台同步能力白名单见 `src/zhishu/models/platformConfig.ts`。
+- `src/zhishu/auth/PlatformAuthContext.tsx`：账户态、恢复重试、可见窗口活动上报和退出缓存清理；`src/zhishu/auth/PlatformLogin.tsx` 同时包含登录门禁及恢复失败页。
+- `src/zhishu/models/components/PlatformCatalogPage.tsx`、`PlatformCatalogDetails.tsx`、`PlatformCatalogKey.tsx`：平台基础数据、分组/模型详情及显式 Key 查看；`PlatformConnectButton.tsx`：当前应用的本地供应商同步。
 - `src-tauri/src/lib.rs`：后端启动、插件、共享状态和 command 注册。
-- `src-tauri/src/commands/`、`src-tauri/src/services/`：IPC 入口及业务实现；平台业务目前也直接位于 commands 中。
+- `src-tauri/src/commands/`、`src-tauri/src/services/`：IPC 入口及业务实现；平台 command 由 `src-tauri/src/zhishu/commands/mod.rs` 导出，自有业务位于 `zhishu/services/`，存储位于 `zhishu/storage/`。
 - `src-tauri/src/config.rs`、`codex_config.rs`、`gemini_config.rs`：路径解析、格式读写、兼容及原子写入。
 - `src-tauri/src/live/`、`src-tauri/src/mode/`：关键字段投影、文件补丁、写锁、模式状态及崩溃恢复。
 - `src-tauri/src/database/`、`settings.rs`、`app_store.rs`：SQLite、设备设置和应用数据目录覆盖。
-- `src-tauri/src/commands/platform_auth.rs`、`platform_session.rs`、`platform_login_history.rs`：平台认证、刷新与七天闲置过期、系统凭据库存储及记住密码；`platform_storage.rs`：会话、登录记录与目录快照的设备路径入口；`platform_http_log.rs`：平台 HTTP 脱敏诊断。
-- `src-tauri/src/commands/platform_models.rs`：平台/本地两阶段同步与账户清理；`platform_models/base_data.rs` 存取设备目录快照，`catalog.rs` 解析模型能力，`adapter.rs` 适配工具格式，`connection.rs` 处理模型选择与目录刷新，`sync_report.rs` 维护受监测文件清单并生成同步前后哈希与操作报告。
-- `src-tauri/src/config_history.rs`、`commands/config_history.rs`：配置修改记录、内部写入指纹、同步操作报告、备份定位及文件还原；前端入口见 `src/components/settings/ConfigChangeHistoryPanel.tsx`。
+- `src-tauri/src/zhishu/services/platform_auth.rs`：平台认证与刷新；`src-tauri/src/zhishu/storage/` 中的 `platform_session.rs`、`platform_login_history.rs`、`platform_storage.rs` 负责七天闲置、系统凭据库、记住密码和设备路径；`src-tauri/src/zhishu/services/platform_http_log.rs` 负责 HTTP 脱敏诊断。
+- `src-tauri/src/zhishu/services/platform_models/mod.rs`：平台/本地两阶段同步；同目录 `base_data.rs` 存取账号快照，`catalog.rs` 解析模型能力，`connection.rs` 调和模型目录，`sync_report.rs` 生成同步报告。工具格式适配位于 `src-tauri/src/zhishu/integrations/ccswitch/platform_models.rs`；清理退出编排位于 `src-tauri/src/zhishu/services/platform_cleanup.rs`。
+- `src-tauri/src/zhishu/storage/config_history.rs`、`src-tauri/src/zhishu/commands/config_history.rs`：配置修改记录、内部写入指纹、同步操作报告、备份定位及文件还原；前端入口见 `src/zhishu/config-history/ConfigChangeHistoryPanel.tsx`。
 - `src-tauri/src/zhishu/integrations/ccswitch/workbuddy_config.rs`：WorkBuddy 配置适配；业务入口见同目录的 `workbuddy.rs`。
 - `tests/`、`src-tauri/tests/`：前端测试及 Rust 集成/金标测试；Rust 单元测试也与源码同文件。
 
 ## 3. 常用命令
 
-命令定义已核对 `package.json`、`CONTRIBUTING.md`、[打包发布文档](docs/zhishu-release.md)和 `.github/workflows/ci.yml`；入口存在不代表每次执行均已通过。
+命令定义已核对 `package.json`、`CONTRIBUTING.md`、[打包发布文档](docs/zhishu/releases/README.md)和 `.github/workflows/ci.yml`；入口存在不代表每次执行均已通过。
 
 - pnpm 版本以 `package.json` 的 `packageManager` 为准；Rust 工具链以 `rust-toolchain.toml` 为准，当前为 1.95。
 - 仓库没有 `lint`/ESLint 脚本；前端检查使用 TypeScript 和 Prettier，后者仅覆盖 `src/`。
@@ -75,19 +75,19 @@
 | Rust 测试，macOS/Linux 隔离示例 | `CC_SWITCH_TEST_HOME="$(mktemp -d)" cargo test --manifest-path src-tauri/Cargo.toml` |
 
 - 前端单元测试使用 `pnpm test:unit`。
-- `pnpm dev` 使用 `scripts/dev-isolated.mjs`，默认目录为 `~/.zhishu-ccs-dev-home`，可用绝对路径 `ZHISHU_CCS_DEV_HOME` 指定。**只隔离应用数据和 Codex**；Claude、Gemini 及其他 CLI 默认仍走真实用户目录，不能把整个开发环境视为全量隔离。
+- `pnpm dev` 使用 `scripts/zhishu/dev-isolated.mjs`，默认目录为 `~/.zhishu-ccs-dev-home`，可用绝对路径 `ZHISHU_CCS_DEV_HOME` 指定。**只隔离应用数据和 Codex**；Claude、Gemini 及其他 CLI 默认仍走真实用户目录，不能把整个开发环境视为全量隔离。
 - 启动器只为子进程设置隔离 `CODEX_HOME`，不复制真实凭证，并为新 Codex 目录初始化文件凭证模式。其他工具写入测试需使用各自目录覆盖/夹具；Rust 测试用 `CC_SWITCH_TEST_HOME`，同时检查已有目录覆盖和 `WORKBUDDY_CONFIG_DIR` 等变量，不能修改智能体自身的 `HOME`/`CODEX_HOME` 来隔离。
-- Rust 编译前需存在 `dist/`；打包始终启用更新包签名，需要配置发布私钥，具体配置见[底层打包命令](docs/zhishu-release.md#打包命令)。CI 后端使用 nextest；本地未安装该扩展时使用上表的 `cargo test`，不要把扩展缺失报告成代码失败。
+- Rust 编译前需存在 `dist/`；打包始终启用更新包签名，需要配置发布私钥，具体配置见[底层打包命令](docs/zhishu/releases/README.md#打包命令)。CI 后端使用 nextest；本地未安装该扩展时使用上表的 `cargo test`，不要把扩展缺失报告成代码失败。
 
 ### 打包、发布与更新
 
-- **唯一操作文档：[智枢客户端下载、打包、发布与更新](docs/zhishu-release.md)。** 涉及发布、签名、安装包、下载清单或更新时先读该文档。
+- **唯一操作文档：[智枢客户端下载、打包、发布与更新](docs/zhishu/releases/README.md)。** 涉及发布、签名、安装包、下载清单或更新时先读该文档。
 - 正式发布只走 `zws-code/zhishu-ccs` 的 GitHub Actions → 腾讯云 COS/CDN。手动运行或推送专用分支 `codex/cos-validation` 只构建并校验；推 `vX.Y.Z` tag 才上传并切换稳定清单，COS 成功后由独立作业复用同一份 payload 创建 GitHub Release 下载入口。首次正式发布不兼容旧测试客户端更新入口。当前无自有域名，先用广州桶 `zhishu-ccs-release-1252121424` 的 COS 默认 HTTPS 地址直连，CDN 尚未接入。
 - 二开旧 SSH 发布工具、服务器脚本和配置示例已删除；原 `release:init/server/build/publish/import/help` 命令已移除。上游 GitHub Release/R2 实现保留，但不在智枢仓库执行；智枢使用独立 Release 作业，仅该作业授予 `contents: write`。
 - `pnpm release:check` 校验 COS 配置（不连接云端）；`pnpm test:release` 运行 Node 发布回归；`pnpm test:release-cos` 运行 Python 模拟上传回归。底层 `build` 仅用于本机构建验证。
 - GitHub Repository Variables 配置平台与 CDN 地址、公钥及 COS 桶/地域/前缀；更新私钥放 Repository Secrets，COS 凭据可放 `cos-production` Environment Secrets。不提交或输出密钥。
 - 正式构建已保存原 payload、上传脚本需要修复时，可用 `resume-cos-release.yml` 恢复：核对原正式 tag/提交/产物来源并再次验签与校验哈希，不重编译、不移动 tag；该工作流的手动运行会实际发布。后台专用分支 `codex/cos-resume` 需提交说明带 `Resume-Release-Run: <原正式run_id>`。
-- 0.0.1 已于 2026-10-29 正式发布至 COS 与 GitHub Release（Latest），原构建 run `40825474319`，成功恢复 run `40834709561`；实际 macOS 包已核对更新源/公钥并下载验签，跨版本安装升级仍待后续正式版本验收。上传器四路并发，`COS_UPLOAD_ACCELERATE` 默认关闭；仅显式启用时使用已开启的桶全球加速，累计上传读取上限 3 GB/次（含重试），不改变客户端更新地址。
+- 历史发布和验签事实见 `docs/zhishu/releases/0.0.1.md`、`0.0.2.md`、`0.0.3.md`；各次 Latest 状态、验收例外仅适用于当时，源码当前为 0.0.3，跨版本实机升级仍按记录待验收。上传器四路并发，`COS_UPLOAD_ACCELERATE` 默认关闭；仅显式启用时使用已开启的桶全球加速，累计上传读取上限 3 GB/次（含重试），不改变客户端更新地址。
 - COS 版本目录不可覆盖，全部文件与签名校验并通过公网检查后才发布稳定清单；禁止降版本或遗漏已发布平台。失败重试复用原产物，不重新编译覆盖同版本。两个清单逐个发布，不宣称对象存储支持跨对象事务。
 - 默认 macOS 使用 Developer ID 签名/公证；显式 `adhoc` 模式跳过公证，不能称已公证。Tauri 更新签名始终独立保留。
 - 当前 Git remote 仍须核对：`origin` 是上游，`zhishu-origin` 是二开 GitLab，`zhishu-git` 是自己的 GitHub；发布 tag 推到 `zhishu-git`，不推上游。
@@ -119,7 +119,7 @@
 - 通用引擎的首写备份位于设备目录 `~/.zhishu-ccs/backups/live-first-write/`；`live-state.json` 保存本机模式与 pending，二者不跟随数据库目录覆盖。
 - `mode/operation.rs` 在发布前失败时放弃；开始发布后按 pending 前滚恢复，并保留检测到的外部修改。不要统一改成“失败就全量回滚”。
 - 平台供应商同步通过 `ProviderService` 复用各工具的配置写入与恢复路径；旧单模型接入命令及其专用 `snapshot.rs` 已移除。不要恢复整库或整个配置目录。
-- 平台供应商同步不做同步前检测、确认或备份：外部修改不阻塞同步，同步直接按本机目录数据调和托管供应商；未变化的托管行不改写原生文件，外部编辑因此保留。`platform_models/sync_report.rs` 在同步前后快照托管供应商与受监测文件哈希，`ProviderSyncReport` 按差值记录增删改与变更文件，失败或部分失败同样留痕。
+- 平台供应商同步不做同步前检测、确认或备份：外部修改不阻塞同步，同步直接按本机目录数据调和托管供应商；未变化的托管行不改写原生文件，外部编辑因此保留。`zhishu/services/platform_models/sync_report.rs` 在同步前后快照托管供应商与受监测文件哈希，`ProviderSyncReport` 按差值记录增删改与变更文件，失败或部分失败同样留痕。
 - 配置修改记录区分供应商数据库变更与实际文件变更；`ProviderSyncReport` 记录增删改、变更文件及备份路径，新同步不再创建 `backups/platform-sync/` 备份，仅历史记录可能带有备份路径，既有入口仍可打开。同步报告不能作为单文件历史还原。
 - 聚合模式增删成员写独立的操作摘要记录（`config_history::record_operation_summary`，`ConfigOperationSummary`）：即使只改派生的模型目录（仅记指纹）或文件完全没变也留痕；摘要不是文件级记录，同样不能作为单文件还原。
 - 单文件历史还原必须保留路径归属、当前内容、解析和路由模式检查，先保存独立 `config-change-history/restore-backups/` 备份，再走既有原子发布/pending 恢复。清空历史不能删除恢复备份。
@@ -176,7 +176,7 @@
 - 页面导航沿用 `App.tsx` 与 `lib/navigation.ts` 的状态模型；局部 UI 使用 React state，平台账户态使用 `PlatformAuthContext`。
 - 后端数据沿用 TanStack Query；供应商缓存键包含应用 ID，例如 `["providers", appId]`。平台目录键为 `["platformCatalog", baseUrl, userId]`，订阅额度键也包含平台地址和用户 ID；跨账户不得复用数据，退出后的迟到响应不得重建已清空的缓存。
 - mutation 后按实际副作用失效缓存：本地供应商同步刷新对应应用列表、相关原生配置/代理状态和 `configChangeHistory`，不刷新 `platformUsage`；平台目录更新只更新对应账户的目录查询。沿用调用方现有范围，不用全局失效把本地同步变成隐式平台请求。
-- IPC 优先封装在 `src/lib/api/`，再由 query/hook 调用；平台 HTTP 认证和供应商协调继续由 Rust 处理。
+- 上游 IPC 封装在 `src/lib/api/`，自有 IPC 位于 `src/zhishu/api/` 或对应功能子目录，再由 query/hook 调用；平台 HTTP 认证和供应商协调继续由 Rust 处理。
 - 普通错误按现有场景使用 `extractErrorMessage` 和国际化兜底；平台错误使用 `platformAuthError`，不展示任意 IPC 异常或服务端原始响应。
 - 通用通知使用 `src/lib/toast.ts` 的去重封装；用户文案使用 i18n，修改共享翻译键时检查 `zh`、`zh-TW`、`en`、`ja`、`tr`。
 - Rust 业务层沿用 `Result<T, AppError>`，通过 `?` 传播并附带路径/上下文；多数 command 映射为字符串错误，平台 command 保留 `PlatformAuthError`。
@@ -198,7 +198,7 @@
 - [ ] 普通退出后保留目录、供应商和工具配置中的 API Key，登录会话不可恢复；未登录不能经平台接口查看或同步 Key，同账号重新登录可复用目录。验证账号独立快照、旧 v2 迁移、v1 拒绝、前端缓存清理及迟到响应隔离；清理退出须覆盖其他账号保护、部分失败、安全保留项与 keyring 清理失败。
 - [ ] command 改动同时验证前端参数/返回类型、Rust 序列化和 mock；新应用另测原生配置样例及平台白名单边界。
 
-相关回归入口：`tests/lib/platformAuth.test.ts`、`platformModels.test.ts`，`tests/components/PlatformLogin.test.tsx`、`PlatformCatalogPage.test.tsx`、`PlatformConnectButton.test.tsx`、`PlatformUsageFooter.test.tsx`、`ConfigChangeHistory.test.tsx`；后端见 `platform_auth.rs`、`platform_session.rs`、`platform_models.rs` 及其子模块、`config_history.rs` 的同文件测试。
+相关回归入口：`tests/zhishu/lib/platformAuth.test.ts`、`platformModels.test.ts`，`tests/zhishu/components/PlatformLogin.test.tsx`、`PlatformCatalogPage.test.tsx`、`PlatformConnectButton.test.tsx`、`PlatformUsageFooter.test.tsx`、`ConfigChangeHistory.test.tsx`；后端见 `src-tauri/src/zhishu/services/platform_auth.rs`、`platform_models/` 和 `src-tauri/src/zhishu/storage/` 对应实现的同文件测试。
 
 ## 8. 智能体工作纪律
 
@@ -213,8 +213,8 @@
 
 ## 待人工确认项
 
-- TODO：确定二开对应的上游基线 commit/tag；当前 `origin` 仍指向上游，逐文件的原版/二开归属不能仅凭目录判定。
-- TODO：确认登录过期后返回登录页是否符合产品要求，还是需要新增离线进入主界面的降级路径。
-- 客户端协议以 `docs/zhishu/client-api-integration.md` 和 ADR-0004 为准；真实多设备共享 Key、系统凭据库和 CLI 端到端验收仍待执行。
+- 当前已合入上游 4.0.22 / `b76426741ef93069e2f374ac01ca7ef5760e1d0e`，见代码基线；后续同步前重新核对。`origin` 仍是上游，不能仅凭目录判断文件归属。
+- 当前登录失效返回登录页，恢复暂时失败进入重试页；未实现未经验证的离线入口。若改变产品策略须另行确认与评审。
+- 客户端协议以 `docs/zhishu/api/client-api.md` 和 ADR-0004 为准；真实多设备共享 Key、系统凭据库和 CLI 端到端验收仍待执行。
 - TODO：补充 WorkBuddy 目标版本与真实 `models.json` 的运行验收；平台同步已实现，不能再列为尚未接入。
 - TODO：补充 macOS、Windows、Linux 上系统凭据库与七天会话恢复的实际验收记录；已有模拟测试不替代真实系统、断网和重启验证。

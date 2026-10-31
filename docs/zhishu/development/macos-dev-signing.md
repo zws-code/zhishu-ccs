@@ -44,7 +44,7 @@ MACOS_DEV_SIGNING_IDENTITY='<证书的完整 SHA-1 指纹>' pnpm dev
 
 无需删除已保存的登录信息，不修改全局钥匙串 ACL，也不把密码或 refresh token 改存明文文件。
 
-这是本机开发签名；安装包签名、Apple 公证与 updater 更新签名仍按 [打包发布文档](zhishu-release.md) 单独配置。
+这是本机开发签名；安装包签名、Apple 公证与 updater 更新签名仍按 [打包发布文档](../releases/README.md) 单独配置。
 
 ## 回归验证
 

@@ -4,7 +4,7 @@
 # Without this, every rebuild gets a new ad-hoc code identity and macOS asks
 # for the login keychain password again whenever the app reads a saved
 # credential. Self-signed identities also use cdhash Keychain partitions.
-# See docs/zhishu/macos-dev-signing.md for certificate setup.
+# See docs/zhishu/development/macos-dev-signing.md for certificate setup.
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)

@@ -10,7 +10,8 @@ const identityTypes = [
   "Apple Distribution:",
   "3rd Party Mac Developer Application:",
 ];
-const setupHint = "See docs/zhishu/macos-dev-signing.md for certificate setup.";
+const setupHint =
+  "See docs/zhishu/development/macos-dev-signing.md for certificate setup.";
 
 export function selectIdentity(output, requested = "") {
   const identities = [
