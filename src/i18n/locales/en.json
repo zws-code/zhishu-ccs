@@ -1,5 +1,6 @@
 {
   "platformCatalog": {
+    "accountIsolation": "Catalogs are stored separately by platform address and user ID. Only the currently signed-in account is shown here.",
     "deleteAllHint": "Delete the current account’s platform providers across all Agent apps, including hidden apps. Keep platform base data and server keys.",
     "deleteAllResult": "Deletion results for all Agent apps",
     "deleteResultApp": "Agent app",
@@ -24,7 +25,6 @@
     "nativeChangedCount": "{{count}} native configuration files changed",
     "noNativeChangesShort": "No native configuration files changed",
     "syncCompleted": "Providers: {{added}} added, {{updated}} updated, {{removed}} removed; {{fileState}}. See configuration history for details.",
-    "credentialsCleared": "Platform data was kept and credentials were cleared. Sync platform data to restore access.",
     "group": "Group",
     "actions": "Actions",
     "groupStatus": "Group status",
@@ -5341,5 +5341,48 @@
     "daily": "Daily",
     "weekly": "Weekly",
     "monthly": "Monthly"
+  },
+  "platformCleanup": {
+    "working": "Clearing local account data and signing out…",
+    "signingOut": "Signing out…",
+    "action": "Sign out and clear this account’s local data",
+    "title": "Clear data and sign out?",
+    "scope": "Remove this account’s platform catalog and managed providers across all apps, then sign out.",
+    "retained": "Saved accounts, server addresses and remembered passwords are kept.",
+    "partialHint": "Providers that cannot be safely removed are kept and listed in the results.",
+    "confirm": "Clear and sign out",
+    "result": "Account cleanup results",
+    "complete": "Signed out. Local platform data has been cleared.",
+    "partial": "Signed out. Some items still need attention.",
+    "providers": "Platform providers",
+    "catalog": "Platform catalog",
+    "session": "Local sign-in",
+    "serverLogout": "Platform sign-out",
+    "done": "Completed",
+    "failed": "Incomplete",
+    "retryHint": "Review the incomplete items. To retry, sign in to this account again, address the reported issues, then run cleanup again.",
+    "scopeDetails": "What else is kept",
+    "dismiss": "Dismiss dialog",
+    "providerCounts": "{{removed}} removed · {{skipped}} kept",
+    "retainedDetails": "Login history, server addresses and remembered passwords are kept, along with other accounts, custom providers, Auth Center accounts, configuration history and recovery backups. Shared server API keys are not revoked. Retained items may still contain credentials."
+  },
+  "platformDeletion": {
+    "result": "Provider removal results",
+    "failed": "Removal did not finish. Close this dialog to retry.",
+    "partial": "Some providers could not be removed. Expand the details to review.",
+    "retained": "The platform catalog and server API keys are kept. You can sync providers again later."
+  },
+  "platformDetails": {
+    "description": "Saved group information and model capabilities",
+    "tabs": "Group details",
+    "overview": "Overview",
+    "groupInfo": "Group information",
+    "expires": "Expires",
+    "period": "Period",
+    "used": "Used / USD",
+    "limit": "Limit / USD",
+    "search": "Search models by name or ID",
+    "modelCount": "Showing {{shown}} of {{total}} models",
+    "noMatches": "No matching models. Try another name or ID."
   }
 }

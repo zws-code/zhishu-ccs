@@ -335,3 +335,30 @@ L3 的统一依据见 [ADR-0002](adr/ADR-0002-structure-and-history.md)，数据
 | CLIENT-20261031-03 | `src/i18n/locales/{zh,zh-TW,en,ja,tr}.json` | 新额度状态和原因文案 | 现有 i18n 通过共享字典读取 | L1 | PlatformUsageFooter / PlatformCatalogPage | 2026-10-31 |
 
 其余实现均在 `src/zhishu/`、`src-tauri/src/zhishu/` 和对应测试、文档内。不修改上游 DAO、代理、配置写入/恢复引擎，不引入依赖。
+
+2026-10-31 后续清理复核 CLIENT-20261031-03：删除五份共享翻译中的二开 `platformCatalog.credentialsCleared` 键，旧凭证清理状态及页面分支已移除；对应 `PlatformCatalogPage` 回归改用新协议的缺凭证状态。其余清理位于自有模块和测试，没有新增上游核心补丁。
+
+
+## 2026-10-31 账号基础数据隔离与清理退出
+
+依据：[ADR-0005](adr/ADR-0005-account-local-cleanup.md)。用户明确保留单活动会话，暂缓多账号同时登录。
+
+| ID | 上游文件 | 原因 | 为什么不能仅新增/包装 | 级别 | 对应测试 | 最后复核 |
+|---|---|---|---|---|---|---|
+| ACCOUNT-20261031-01 | `src-tauri/src/lib.rs` | 注册 `platform_logout_and_clear_account` | Tauri 固定注册表必须挂载新命令，自有实现通过 facade 导出 | L1 | platformAuth IPC / Rust 清理退出 | 2026-10-31 |
+| ACCOUNT-20261031-02 | `src/i18n/locales/{zh,zh-TW,en,ja,tr}.json` | 增加清理确认、结果与账号隔离说明 | 共享 i18n 加载入口读取现有字典 | L1 | PlatformLogin / PlatformCatalogPage | 2026-10-31 |
+
+业务、存储迁移和测试均位于自有命名空间。复用既有全应用供应商删除、ProviderService Adapter、操作锁、私密原子写入及配置审计/恢复；保留上游代码，无 DAO 或通用配置引擎改动。验证状态见 [VALIDATION](VALIDATION.md)。
+
+清理弹窗视觉迭代仅修改自有 `PlatformAccountCleanup`、`PlatformProviderDeletionResult` 及对应测试，复用上游 Dialog 原有插槽，未修改通用 Dialog。五语文案仍归 ACCOUNT-20261031-02；等级仍为 L0/L1。
+
+全应用供应商删除反馈迁至自有 `PlatformProviderDeletionDialog`，目录页及自有 Hook 增加可关闭结果与通知选择；五语 `platformDeletion` 文案沿用 ACCOUNT-20261031-02 的翻译入口。L0/L1，复用通用 Dialog 与既有删除/缓存刷新能力，未改上游核心。
+
+
+## 2026-10-31 平台基础数据详情布局
+
+| ID | 上游文件 | 原因 | 为什么不能仅新增/包装 | 级别 | 对应测试 | 最后复核 |
+|---|---|---|---|---|---|---|
+| DETAILS-20261031-01 | `src/i18n/locales/{zh,zh-TW,en,ja,tr}.json` | 增加详情页签、模型搜索、数量与用量表头文案 | 复用共享 i18n 字典加载入口 | L1 | PlatformCatalogPage / typecheck | 2026-10-31 |
+
+布局与本地搜索位于自有 `PlatformCatalogDetails`、`PlatformCatalogModels`，L0；复用上游 Sheet、Tabs、Collapsible、Input 和既有显式 Key 组件。概览改用单一滚动区域，移除内部 SheetBody 包装，避免其 `scroll-stable` 与 `overscroll-contain` 截断滚轮；未改通用 Sheet 或全局 CSS，未删除任何上游实现。无 IPC、持久化或配置写入变化；回退只需恢复自有详情布局及相应翻译/测试，不涉及数据迁移。

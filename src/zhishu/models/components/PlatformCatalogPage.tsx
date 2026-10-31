@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetTrigger } from "@/components/ui/sheet";
 import { PlatformConnectButton } from "@/zhishu/models/components/PlatformConnectButton";
 import { PlatformCatalogDetails } from "@/zhishu/models/components/PlatformCatalogDetails";
-import { PlatformProviderDeletionResult } from "@/zhishu/models/components/PlatformProviderDeletionResult";
+import { PlatformProviderDeletionDialog } from "@/zhishu/models/components/PlatformProviderDeletionDialog";
 import { usePlatformProviderDeletion } from "@/zhishu/models/usePlatformProviderDeletion";
 import { usePlatformAuth } from "@/zhishu/auth/PlatformAuthContext";
 import { platformAuthError } from "@/zhishu/api/platformAuth";
@@ -20,12 +20,23 @@ import { toast } from "@/lib/toast";
 
 /** 展示设备快照，提供联网更新基础数据、本地同步及全应用删除供应商入口。 */
 export function PlatformCatalogPage() {
+  const account = usePlatformAuth()?.account;
+  return (
+    <AccountCatalogPage
+      key={JSON.stringify([account?.baseUrl, account?.user.id])}
+    />
+  );
+}
+
+function AccountCatalogPage() {
   const { t, i18n } = useTranslation();
   const auth = usePlatformAuth();
   const account = auth?.account;
   const queryClient = useQueryClient();
   const catalog = usePlatformCatalog();
-  const deletion = usePlatformProviderDeletion(null);
+  const deletion = usePlatformProviderDeletion(null, undefined, {
+    notify: false,
+  });
   const sync = useMutation({
     mutationFn: () => (auth?.syncCatalog ?? platformModelsApi.syncCatalog)(),
     onSuccess: async (result) => {
@@ -94,7 +105,6 @@ export function PlatformCatalogPage() {
             <PlatformConnectButton
               disabled={
                 !data ||
-                data.credentialsCleared ||
                 deletion.pending ||
                 sync.isPending ||
                 auth?.catalogSyncing
@@ -122,6 +132,14 @@ export function PlatformCatalogPage() {
           </>
         }
       />
+      {account && (deletion.result || deletion.error) && (
+        <PlatformProviderDeletionDialog
+          account={account}
+          result={deletion.result}
+          error={deletion.error}
+          onDismiss={deletion.dismissResult}
+        />
+      )}
       <div
         id="main-content"
         className="min-h-0 flex-1 overflow-y-auto px-6 pb-10 pt-4"
@@ -139,7 +157,7 @@ export function PlatformCatalogPage() {
                 {t("platformCatalog.account", "当前账号")}
               </span>
               <span className="text-fg-1" title={account?.baseUrl}>
-                {account?.user.email}
+                {account?.user.email} · ID {account?.user.id}
               </span>
             </span>
             <span>
@@ -162,29 +180,14 @@ export function PlatformCatalogPage() {
               </span>
             )}
           </div>
-        </div>
-        {deletion.error && (
-          <p role="alert" className="mb-4 text-danger">
-            {deletion.error}
+          <p className="break-all text-caption text-fg-2">{account?.baseUrl}</p>
+          <p className="text-caption text-fg-3">
+            {t("platformCatalog.accountIsolation")}
           </p>
-        )}
-        {deletion.result && (
-          <PlatformProviderDeletionResult result={deletion.result} />
-        )}
+        </div>
         {catalog.isLoading && (
           <p role="status">
             {t("platformCatalog.loading", "正在读取本地基础数据…")}
-          </p>
-        )}
-        {data?.credentialsCleared && (
-          <p
-            role="status"
-            className="mb-3 rounded-control border border-border bg-subtle px-3 py-2 text-caption text-fg-2"
-          >
-            {t(
-              "platformCatalog.credentialsCleared",
-              "基础数据已保留，凭证已清除。同步平台基础数据后可恢复使用。",
-            )}
           </p>
         )}
         {catalog.isError && (

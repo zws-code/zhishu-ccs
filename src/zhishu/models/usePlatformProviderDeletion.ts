@@ -18,6 +18,7 @@ import { toast } from "@/lib/toast";
 export function usePlatformProviderDeletion(
   app: AppId | null,
   providers: Record<string, Provider> = {},
+  { notify = true }: { notify?: boolean } = {},
 ) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -63,6 +64,7 @@ export function usePlatformProviderDeletion(
       if (currentIdentity.current !== target.identity) return;
       await refreshPlatformProviders(queryClient, target.app ?? undefined);
       if (currentIdentity.current !== target.identity) return;
+      if (!notify) return;
       const message = t("platformCatalog.deleteCompleted", {
         defaultValue: "已删除 {{removed}} 个平台供应商，保留 {{skipped}} 个",
         removed: result.removed,
@@ -80,7 +82,7 @@ export function usePlatformProviderDeletion(
     onError: async (error, target) => {
       if (currentIdentity.current !== target.identity) return;
       await refreshPlatformProviders(queryClient, target.app ?? undefined);
-      if (currentIdentity.current === target.identity)
+      if (notify && currentIdentity.current === target.identity)
         toast.error(platformAuthError(error));
     },
   });
@@ -105,6 +107,7 @@ export function usePlatformProviderDeletion(
       matchesTarget && deletion.isError
         ? platformAuthError(deletion.error)
         : null,
+    dismissResult: deletion.reset,
     remove: () => {
       if (disabled || !account || !identity) return;
       deletion.mutate({

@@ -102,6 +102,7 @@ pub(crate) struct GroupDiscovery {
 }
 
 struct Session {
+    email: String,
     base_url: String,
     user_id: i64,
     tokens: TokenPair,
@@ -291,6 +292,7 @@ async fn finish_login(
         )
     };
     let session = Session {
+        email: account.user.email.clone(),
         persistence,
         persistence_dirty: false,
         last_used_at: now(),
@@ -678,6 +680,7 @@ async fn get_account_with_activity(
             if let Some((record, refresh_token)) = store.load().await? {
                 let base_url = normalize_base_url(&record.base_url)?;
                 state.session = Some(Session {
+                    email: String::new(),
                     base_url,
                     user_id: record.user_id,
                     last_used_at: record.last_used_at,
@@ -719,9 +722,11 @@ async fn get_account_with_activity(
         invalidate_session(&mut state).await;
         return Ok(None);
     }
+    let user = user.into_user()?;
+    session.email = user.email.clone();
     Ok(Some(PlatformAccount {
         base_url: session.base_url.clone(),
-        user: user.into_user()?,
+        user,
     }))
 }
 
@@ -731,30 +736,46 @@ pub async fn platform_logout(state: State<'_, PlatformAuthState>) -> Result<(), 
 }
 
 async fn logout(state: &Mutex<AuthState>) -> Result<(), PlatformAuthError> {
+    let (local, remote) = logout_results(state, false).await;
+    local.and(remote)
+}
+
+async fn logout_results(
+    state: &Mutex<AuthState>,
+    complete: bool,
+) -> (Result<(), PlatformAuthError>, Result<(), PlatformAuthError>) {
     let mut state = state.lock().await;
     state.pending = None;
     state.restoration_checked = true;
-    let cleared = if let Some(store) = &state.store {
-        store.clear().await
+    let local = if let Some(store) = &state.store {
+        if complete {
+            store.clear_completely().await
+        } else {
+            store.clear().await
+        }
     } else {
         Ok(())
     };
-    // 先清本机会话再尽力撤销服务端令牌，网络错误不能恢复已经退出的本地账户。
+    // 无论本机凭据清理或服务端撤销是否失败，都丢弃内存会话；分别报告两种失败。
     let session = state.session.take();
-    if let Some(session) = session {
-        if !session.tokens.refresh_token.is_empty() {
-            let _: Value = request(
-                &client()?,
-                &session.base_url,
-                Method::POST,
-                "/auth/logout",
-                Some(json!({"refresh_token": session.tokens.refresh_token})),
-                None,
-            )
-            .await?;
+    let remote = async {
+        if let Some(session) = session {
+            if !session.tokens.refresh_token.is_empty() {
+                let _: Value = request(
+                    &client()?,
+                    &session.base_url,
+                    Method::POST,
+                    "/auth/logout",
+                    Some(json!({"refresh_token": session.tokens.refresh_token})),
+                    None,
+                )
+                .await?;
+            }
         }
+        Ok(())
     }
-    cleared
+    .await;
+    (local, remote)
 }
 
 impl PlatformAuthState {
@@ -766,10 +787,36 @@ impl PlatformAuthState {
         logout(&self.0).await
     }
 
+    /// 调用方必须持有 APPLY_LOCK；清理流程最后退出，不再次获取操作锁。
+    pub(crate) async fn logout_after_cleanup(
+        &self,
+    ) -> (Result<(), PlatformAuthError>, Result<(), PlatformAuthError>) {
+        logout_results(&self.0, true).await
+    }
+
+    pub(crate) async fn cleanup_email(
+        &self,
+        base_url: &str,
+        user_id: i64,
+    ) -> Result<String, PlatformAuthError> {
+        let state = self.0.lock().await;
+        Self::with_local_identity_locked(&state, |origin, current| {
+            if origin != base_url || current != user_id {
+                return Err(error("UNAUTHORIZED", "登录状态已改变，请重新操作"));
+            }
+            let email = &state.session.as_ref().expect("validated session").email;
+            if email.is_empty() {
+                return Err(error("UNAUTHORIZED", "请先完成账号验证"));
+            }
+            Ok(email.clone())
+        })
+    }
+
     #[cfg(test)]
     pub(crate) fn for_test(base_url: String, user_id: i64) -> Self {
         Self(Mutex::new(AuthState {
             session: Some(Session {
+                email: "test@example.com".into(),
                 base_url,
                 user_id,
                 tokens: TokenPair {
@@ -1076,6 +1123,7 @@ mod tests {
     fn model_session(base: String) -> PlatformAuthState {
         PlatformAuthState(Mutex::new(AuthState {
             session: Some(Session {
+                email: String::new(),
                 base_url: base,
                 user_id: 1,
                 persistence: None,
@@ -1237,6 +1285,7 @@ mod tests {
         ]);
         let state = Mutex::new(AuthState {
             session: Some(Session {
+                email: String::new(),
                 base_url: base,
                 user_id: 1,
                 persistence: None,
@@ -1274,6 +1323,7 @@ mod tests {
         ]);
         let state = Mutex::new(AuthState {
             session: Some(Session {
+                email: String::new(),
                 base_url: base,
                 user_id: 1,
                 persistence: None,
@@ -1293,6 +1343,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn cleanup_logout_reports_local_and_remote_failures_separately() {
+        use std::sync::atomic::Ordering;
+        let (base, server) = mock_server(vec![(
+            "POST /api/zhishu/v1/client/auth/logout ",
+            503,
+            json!({"message":"private response"}),
+        )]);
+        let (_dir, store, vault) =
+            crate::zhishu::storage::platform_session::tests::saved_store(&base, now()).await;
+        let auth = PlatformAuthState::for_test(base, 1);
+        {
+            let mut state = auth.0.lock().await;
+            state.store = Some(store.clone());
+            state.session.as_mut().unwrap().tokens.refresh_token = "saved-refresh".into();
+        }
+        vault.unavailable.store(true, Ordering::SeqCst);
+        let (local, remote) = auth.logout_after_cleanup().await;
+        assert_eq!(local.err().unwrap().code, "SESSION_STORE");
+        assert!(!remote.err().unwrap().message.contains("private response"));
+        assert!(auth.0.lock().await.session.is_none());
+        vault.unavailable.store(false, Ordering::SeqCst);
+        assert!(store.load().await.unwrap().is_none());
+        server.join().unwrap();
+    }
+
+    #[tokio::test]
     async fn logout_clears_local_tokens_even_if_revocation_fails() {
         let (base, server) = mock_server(vec![(
             "POST /api/zhishu/v1/client/auth/logout ",
@@ -1301,6 +1377,7 @@ mod tests {
         )]);
         let state = Mutex::new(AuthState {
             session: Some(Session {
+                email: String::new(),
                 base_url: base,
                 user_id: 1,
                 persistence: None,
@@ -1546,6 +1623,7 @@ mod tests {
             store: Some(store.clone()),
             restoration_checked: true,
             session: Some(Session {
+                email: String::new(),
                 base_url: base,
                 user_id: 1,
                 last_used_at: now(),

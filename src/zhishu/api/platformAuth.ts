@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { PlatformDeleteSummary } from "./platformModels";
 
 export interface PlatformAccount {
   baseUrl: string;
@@ -11,6 +12,21 @@ export interface PlatformAccount {
     balance: number;
   };
 }
+export interface PlatformCleanupStep {
+  completed: boolean;
+  error: { code: string; message: string } | null;
+}
+export interface PlatformCleanupReport {
+  baseUrl: string;
+  userId: number;
+  email: string;
+  providers: PlatformDeleteSummary | null;
+  providerError: { code: string; message: string } | null;
+  catalog: PlatformCleanupStep;
+  session: PlatformCleanupStep;
+  serverLogout: PlatformCleanupStep;
+}
+
 export interface PlatformClientConfig {
   schema_version: number;
   site_name: string;
@@ -69,6 +85,11 @@ export const platformAuthApi = {
   login2fa: (code: string) =>
     invoke<PlatformLoginResult>("platform_login_2fa", { code }),
   logout: () => invoke<void>("platform_logout"),
+  logoutAndClear: (baseUrl: string, userId: number) =>
+    invoke<PlatformCleanupReport>("platform_logout_and_clear_account", {
+      baseUrl,
+      userId,
+    }),
 };
 
 export function platformAuthError(error: unknown): string {

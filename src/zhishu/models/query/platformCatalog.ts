@@ -13,8 +13,9 @@ export function usePlatformCatalog(enabled = true) {
       account?.baseUrl ?? "",
       account?.user.id ?? 0,
     ),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const catalog = await platformModelsApi.catalog();
+      if (signal.aborted) throw new Error("Account catalog read cancelled");
       return catalog?.baseUrl === account?.baseUrl &&
         catalog?.userId === account?.user.id
         ? catalog

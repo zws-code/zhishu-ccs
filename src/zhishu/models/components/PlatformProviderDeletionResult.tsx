@@ -5,13 +5,15 @@ import { platformAuthError } from "@/zhishu/api/platformAuth";
 
 export function PlatformProviderDeletionResult({
   result,
+  defaultOpen = true,
 }: {
   result: PlatformDeleteSummary;
+  defaultOpen?: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <details
-      open
+      open={defaultOpen}
       className="mb-4 rounded-control border border-border bg-surface text-caption"
     >
       <summary className="cursor-pointer px-3 py-2 font-medium text-fg-1">

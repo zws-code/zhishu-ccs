@@ -134,16 +134,27 @@ impl SessionStore {
         .await
     }
     fn clear_sync(&self) -> Result<(), PlatformAuthError> {
+        self.clear_sync_with_mode(false)
+    }
+    fn clear_sync_with_mode(&self, complete: bool) -> Result<(), PlatformAuthError> {
         let record = self.read();
         if matches!(&record, Ok(None)) {
             return Ok(());
         }
+        let unreadable = record.is_err();
         // 先失效本机会话指针，避免凭据库锁定、无法删除令牌时再次恢复已退出的账户。
         let invalidated = self.write(None);
         let removed = record
             .ok()
             .flatten()
             .map(|record| self.vault.remove(&record.credential_id));
+        if complete {
+            invalidated?;
+            if unreadable {
+                return Err(storage_error());
+            }
+            return removed.unwrap_or(Ok(()));
+        }
         match invalidated {
             Ok(()) => {
                 if matches!(removed, Some(Err(_))) {
@@ -163,18 +174,12 @@ impl SessionStore {
             Err(err) => Err(err),
         }
     }
-    // 保留只读账户元数据入口；退出登录不再据此清理工具凭证。
-    #[allow(dead_code)]
-    pub async fn identity(&self) -> Result<Option<(String, i64)>, PlatformAuthError> {
-        self.blocking(|store| {
-            Ok(store
-                .read()?
-                .map(|record| (record.base_url, record.user_id)))
-        })
-        .await
-    }
     pub async fn clear(&self) -> Result<(), PlatformAuthError> {
         self.blocking(|store| store.clear_sync()).await
+    }
+    pub async fn clear_completely(&self) -> Result<(), PlatformAuthError> {
+        self.blocking(|store| store.clear_sync_with_mode(true))
+            .await
     }
     pub async fn create(
         &self,
@@ -282,6 +287,15 @@ pub(crate) mod tests {
         store.write(Some(&record)).unwrap();
         (dir, store, vault)
     }
+    #[tokio::test]
+    async fn complete_cleanup_reports_vault_failure_even_when_session_is_disabled() {
+        let (_dir, store, vault) = saved_store("https://example.com", now()).await;
+        vault.unavailable.store(true, Ordering::SeqCst);
+        assert!(store.clear_completely().await.is_err());
+        vault.unavailable.store(false, Ordering::SeqCst);
+        assert!(store.load().await.unwrap().is_none());
+    }
+
     #[test]
     fn inactivity_expires_only_after_seven_days_and_rejects_clock_reversal() {
         let record = SessionRecord {

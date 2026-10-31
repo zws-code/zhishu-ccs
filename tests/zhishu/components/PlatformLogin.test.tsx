@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -23,6 +24,7 @@ import {
 import {
   platformAuthApi,
   type PlatformAccount,
+  type PlatformCleanupReport,
 } from "@/zhishu/api/platformAuth";
 import { toast } from "sonner";
 import { settingsApi } from "@/lib/api/index";
@@ -41,6 +43,7 @@ vi.mock("@/zhishu/api/platformAuth", async (original) => ({
     login: vi.fn(),
     login2fa: vi.fn(),
     logout: vi.fn(),
+    logoutAndClear: vi.fn(),
   },
 }));
 vi.mock("@/zhishu/api/platformModels", () => ({
@@ -48,8 +51,26 @@ vi.mock("@/zhishu/api/platformModels", () => ({
 }));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string) =>
-      zh.platformAuth[key.split(".")[1] as keyof typeof zh.platformAuth] || key,
+    t: (key: string, options?: string | Record<string, unknown>) => {
+      const value = key
+        .split(".")
+        .reduce<unknown>(
+          (object, part) =>
+            object && typeof object === "object"
+              ? (object as Record<string, unknown>)[part]
+              : undefined,
+          zh,
+        );
+      const text =
+        typeof value === "string"
+          ? value
+          : typeof options === "string"
+            ? options
+            : String(options?.defaultValue ?? key);
+      return text.replace(/\{\{(\w+)\}\}/g, (_, name) =>
+        String(typeof options === "object" ? (options[name] ?? "") : ""),
+      );
+    },
   }),
 }));
 vi.mock("sonner", () => ({ toast: { warning: vi.fn(), error: vi.fn() } }));
@@ -159,6 +180,7 @@ beforeEach(() => {
   vi.mocked(platformAuthApi.login).mockReset();
   vi.mocked(platformAuthApi.login2fa).mockReset();
   vi.mocked(platformAuthApi.logout).mockReset().mockResolvedValue(undefined);
+  vi.mocked(platformAuthApi.logoutAndClear).mockReset();
 });
 
 describe("platform login", () => {
@@ -622,27 +644,27 @@ describe("catalog sync after verified login", () => {
     });
     renderGate();
     await waitFor(() =>
-      expect(screen.getByTestId("catalog-status")).toHaveTextContent(
-        "工具配置失败",
-      ),
+      expect(screen.getByTestId("catalog-status")).toHaveTextContent("idle"),
     );
+    expect(toast.error).toHaveBeenCalledWith("工具配置失败");
     expect(screen.getByText("工具主页")).toBeInTheDocument();
     expect(platformAuthApi.logout).not.toHaveBeenCalled();
   });
 
-  it("shows warnings from partial automatic provider sync", async () => {
+  it("shows provider compatibility warnings only as a toast, not catalog errors", async () => {
     vi.mocked(platformAuthApi.account).mockResolvedValue(account);
     vi.mocked(platformModelsApi.sync).mockResolvedValue({
       added: 1,
       removed: 0,
       skipped: 0,
-      warnings: ["部分工具同步失败"],
+      warnings: ["Gemini CLI 不能使用该分组的 GPT/Claude 模型"],
     });
     renderGate();
     await waitFor(() =>
-      expect(screen.getByTestId("catalog-status")).toHaveTextContent(
-        "部分工具同步失败",
-      ),
+      expect(screen.getByTestId("catalog-status")).toHaveTextContent("idle"),
+    );
+    expect(toast.warning).toHaveBeenCalledWith(
+      "Gemini CLI 不能使用该分组的 GPT/Claude 模型",
     );
     expect(screen.getByText("工具主页")).toBeInTheDocument();
   });
@@ -758,5 +780,221 @@ describe("catalog sync after verified login", () => {
     fireEvent.click(screen.getByText("重试同步目录"));
     expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce();
     await act(async () => finish(catalog));
+  });
+});
+
+const cleanupReport: PlatformCleanupReport = {
+  baseUrl: account.baseUrl,
+  userId: account.user.id,
+  email: account.user.email,
+  providers: {
+    removed: 2,
+    skipped: 0,
+    warnings: [],
+    nativeFilesChanged: 0,
+    apps: [],
+  },
+  providerError: null,
+  catalog: { completed: true, error: null },
+  session: { completed: true, error: null },
+  serverLogout: { completed: true, error: null },
+};
+
+async function openCleanup() {
+  fireEvent.click(
+    await screen.findByRole("button", { name: zh.platformCleanup.action }),
+  );
+  return screen.getByRole("alertdialog");
+}
+
+describe("account cleanup logout", () => {
+  it("requires explicit confirmation and cancel preserves login", async () => {
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    renderGate();
+    const dialog = await openCleanup();
+    expect(
+      within(dialog).getByText(zh.platformCleanup.scope),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(zh.platformCleanup.retained),
+    ).toBeInTheDocument();
+    expect(platformAuthApi.logoutAndClear).not.toHaveBeenCalled();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: zh.common.cancel }),
+    );
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByText("工具主页")).toBeInTheDocument();
+    expect(platformAuthApi.logout).not.toHaveBeenCalled();
+  });
+
+  it("shows a dismissible result dialog and preserves saved login details", async () => {
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    vi.mocked(platformAuthApi.logoutAndClear).mockResolvedValue(cleanupReport);
+    vi.mocked(platformAuthApi.history).mockResolvedValue([
+      {
+        id: "saved-account",
+        baseUrl: "https://saved-platform.test",
+        email: account.user.email,
+        rememberPassword: true,
+      },
+    ]);
+    vi.mocked(platformAuthApi.savedPassword).mockResolvedValue(
+      "remembered-password",
+    );
+    const client = renderGate();
+    const dialog = await openCleanup();
+    client.setQueryData(["providers", "claude"], { private: "old-account" });
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: zh.platformCleanup.confirm }),
+    );
+    await screen.findByText(zh.platformCleanup.complete);
+    expect(platformAuthApi.logoutAndClear).toHaveBeenCalledOnce();
+    expect(platformAuthApi.logoutAndClear).toHaveBeenCalledWith(
+      account.baseUrl,
+      account.user.id,
+    );
+    expect(platformAuthApi.logout).not.toHaveBeenCalled();
+    expect(screen.queryByText("工具主页")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("密码")).toBeInTheDocument();
+    expect(client.getQueryData(["providers", "claude"])).toBeUndefined();
+    const resultDialog = screen.getByRole("dialog", {
+      name: zh.platformCleanup.result,
+    });
+    expect(
+      within(resultDialog).getByText(zh.platformCleanup.complete),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("密码").closest("main")).not.toContainElement(
+      resultDialog,
+    );
+    const appDetails = within(resultDialog)
+      .getByText(zh.platformCatalog.deleteAllResult)
+      .closest("details");
+    expect(appDetails).not.toHaveAttribute("open");
+    fireEvent.click(
+      within(resultDialog).getByRole("button", { name: zh.common.close }),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(zh.platformCleanup.complete),
+    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByLabelText("密码")).toHaveValue("remembered-password"),
+    );
+    expect(screen.getByLabelText("邮箱")).toHaveValue(account.user.email);
+    expect(screen.getByLabelText(zh.platformAuth.address)).toHaveValue(
+      "https://saved-platform.test",
+    );
+    expect(platformAuthApi.removeLogin).not.toHaveBeenCalled();
+    expect(platformAuthApi.forgetPassword).not.toHaveBeenCalled();
+  });
+
+  it("reports partial failures and retained providers without claiming complete cleanup", async () => {
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    vi.mocked(platformAuthApi.logoutAndClear).mockResolvedValue({
+      ...cleanupReport,
+      providers: {
+        ...cleanupReport.providers!,
+        skipped: 1,
+        warnings: ["没有可用备用供应商"],
+      },
+      session: {
+        completed: false,
+        error: { code: "CREDENTIAL_STORE", message: "请解锁系统凭据库" },
+      },
+      serverLogout: {
+        completed: false,
+        error: { code: "NETWORK", message: "服务端退出暂时不可用" },
+      },
+    });
+    renderGate();
+    const dialog = await openCleanup();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: zh.platformCleanup.confirm }),
+    );
+    await screen.findByText(zh.platformCleanup.partial);
+    expect(screen.getByText("没有可用备用供应商")).toBeInTheDocument();
+    expect(screen.getByText("请解锁系统凭据库")).toBeInTheDocument();
+    expect(screen.getByText("服务端退出暂时不可用")).toBeInTheDocument();
+    expect(
+      screen.queryByText(zh.platformCleanup.complete),
+    ).not.toBeInTheDocument();
+  });
+
+  it("blocks login and polling during cleanup and discards late catalog responses", async () => {
+    let finishCleanup!: (result: PlatformCleanupReport) => void;
+    let finishCatalog!: (result: PlatformCatalog) => void;
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    vi.mocked(platformModelsApi.syncCatalog).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishCatalog = resolve;
+        }),
+    );
+    vi.mocked(platformAuthApi.logoutAndClear).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishCleanup = resolve;
+        }),
+    );
+    const client = renderGate();
+    const dialog = await openCleanup();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: zh.platformCleanup.confirm }),
+    );
+    await waitFor(() =>
+      expect(platformAuthApi.logoutAndClear).toHaveBeenCalledOnce(),
+    );
+    expect(screen.getByText(zh.platformCleanup.working)).toBeInTheDocument();
+    const calls = vi.mocked(platformAuthApi.account).mock.calls.length;
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+      document.dispatchEvent(new Event("visibilitychange"));
+      finishCatalog(catalog);
+    });
+    expect(platformAuthApi.account).toHaveBeenCalledTimes(calls);
+    expect(screen.queryByLabelText("密码")).not.toBeInTheDocument();
+    expect(platformModelsApi.sync).not.toHaveBeenCalled();
+    expect(
+      client.getQueryData(
+        platformCatalogKeys.account(account.baseUrl, account.user.id),
+      ),
+    ).toBeUndefined();
+    await act(async () => finishCleanup(cleanupReport));
+    await screen.findByLabelText("密码");
+  });
+
+  it("does not claim logout when the cleanup IPC rejects before identity validation", async () => {
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    vi.mocked(platformAuthApi.logoutAndClear).mockRejectedValue({
+      code: "UNAUTHORIZED",
+      message: "账号已经改变",
+    });
+    renderGate();
+    const dialog = await openCleanup();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: zh.platformCleanup.confirm }),
+    );
+    await screen.findByText("账号已经改变");
+    expect(
+      screen.queryByText(zh.platformCleanup.complete),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("密码")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: zh.platformAuth.retryRestore }),
+    ).toBeInTheDocument();
+  });
+
+  it("ordinary logout never calls account cleanup", async () => {
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    renderGate();
+    fireEvent.click(
+      await screen.findByRole("button", { name: zh.platformAuth.logout }),
+    );
+    await screen.findByLabelText("密码");
+    expect(platformAuthApi.logout).toHaveBeenCalledOnce();
+    expect(platformAuthApi.logoutAndClear).not.toHaveBeenCalled();
+    expect(
+      screen.queryByLabelText(zh.platformCleanup.result),
+    ).not.toBeInTheDocument();
   });
 });

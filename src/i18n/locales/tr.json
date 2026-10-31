@@ -1,5 +1,6 @@
 {
   "platformCatalog": {
+    "accountIsolation": "Kataloglar platform adresi ve kullanıcı kimliğine göre ayrı saklanır. Burada yalnızca giriş yapılmış hesabın verileri gösterilir.",
     "deleteAllHint": "Gizli uygulamalar dahil tüm Agent uygulamalarında mevcut hesabın platform sağlayıcılarını siler. Platform temel verileri ve sunucu anahtarları korunur.",
     "deleteAllResult": "Tüm Agent uygulamaları için silme sonuçları",
     "deleteResultApp": "Agent uygulaması",
@@ -24,7 +25,6 @@
     "nativeChangedCount": "{{count}} yerel yapılandırma dosyası değişti",
     "noNativeChangesShort": "Yerel yapılandırma dosyaları değişmedi",
     "syncCompleted": "Sağlayıcılar: {{added}} eklendi, {{updated}} güncellendi, {{removed}} kaldırıldı; {{fileState}}. Ayrıntılar yapılandırma geçmişindedir.",
-    "credentialsCleared": "Platform verileri korundu, kimlik bilgileri temizlendi. Erişimi geri yüklemek için platform verilerini eşitleyin.",
     "group": "Grup",
     "actions": "İşlemler",
     "groupStatus": "Grup durumu",
@@ -5243,5 +5243,48 @@
     "daily": "Günlük",
     "weekly": "Haftalık",
     "monthly": "Aylık"
+  },
+  "platformCleanup": {
+    "working": "Yerel hesap verileri temizleniyor ve oturum kapatılıyor…",
+    "signingOut": "Oturum kapatılıyor…",
+    "action": "Oturumu kapat ve bu hesabın yerel verilerini temizle",
+    "title": "Verileri temizleyip çıkılsın mı?",
+    "scope": "Bu hesabın platform kataloğu ve tüm uygulamalardaki yönetilen sağlayıcıları kaldırılır, ardından oturum kapatılır.",
+    "retained": "Kayıtlı hesaplar, sunucu adresleri ve hatırlanan parolalar korunur.",
+    "partialHint": "Güvenle kaldırılamayan sağlayıcılar korunur ve sonuçlarda gösterilir.",
+    "confirm": "Temizle ve çık",
+    "result": "Hesap temizleme sonuçları",
+    "complete": "Oturum kapatıldı. Yerel platform verileri temizlendi.",
+    "partial": "Oturum kapatıldı. Bazı öğeler hâlâ işlem gerektiriyor.",
+    "providers": "Platform sağlayıcıları",
+    "catalog": "Platform kataloğu",
+    "session": "Yerel oturum",
+    "serverLogout": "Platform oturumu",
+    "done": "Tamamlandı",
+    "failed": "Tamamlanmadı",
+    "retryHint": "Tamamlanmayan öğeleri inceleyin. Yeniden denemek için bu hesapla giriş yapın, bildirilen sorunları giderin ve temizlemeyi tekrar çalıştırın.",
+    "scopeDetails": "Korunan diğer veriler",
+    "dismiss": "Pencereyi kapat",
+    "providerCounts": "{{removed}} silindi · {{skipped}} korundu",
+    "retainedDetails": "Giriş geçmişi, sunucu adresleri ve kayıtlı parolalar korunur. Diğer hesaplar, özel sağlayıcılar, Yetkilendirme Merkezi hesapları, yapılandırma geçmişi ve kurtarma yedekleri de korunur. Sunucudaki paylaşılan API anahtarları iptal edilmez. Korunan öğeler kimlik bilgileri içerebilir."
+  },
+  "platformDeletion": {
+    "result": "Sağlayıcı silme sonuçları",
+    "failed": "Silme tamamlanmadı. Kapatıp yeniden deneyebilirsiniz.",
+    "partial": "Bazı sağlayıcılar silinemedi. Ayrıntıları açıp inceleyin.",
+    "retained": "Platform kataloğu ve sunucu API anahtarları korunur. Sağlayıcıları daha sonra yeniden eşitleyebilirsiniz."
+  },
+  "platformDetails": {
+    "description": "Kaydedilen grup bilgileri ve model yetenekleri",
+    "tabs": "Grup ayrıntıları",
+    "overview": "Genel bakış",
+    "groupInfo": "Grup bilgileri",
+    "expires": "Bitiş",
+    "period": "Dönem",
+    "used": "Kullanılan / USD",
+    "limit": "Sınır / USD",
+    "search": "Model adı veya kimliğiyle ara",
+    "modelCount": "{{total}} modelden {{shown}} tanesi gösteriliyor",
+    "noMatches": "Eşleşen model yok. Başka bir ad veya kimlik deneyin."
   }
 }

@@ -1591,6 +1591,7 @@ pub fn run() {
             zhishu::commands::platform_get_catalog_key,
             zhishu::commands::platform_sync_catalog,
             zhishu::commands::platform_logout,
+            zhishu::commands::platform_logout_and_clear_account,
             commands::get_providers,
             commands::get_current_provider,
             commands::add_provider,

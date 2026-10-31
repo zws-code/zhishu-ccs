@@ -13,6 +13,7 @@ import {
   platformAuthError,
   type PlatformAccount,
   type PlatformLoginResult,
+  type PlatformCleanupReport,
 } from "@/zhishu/api/platformAuth";
 
 import {
@@ -26,11 +27,15 @@ import { platformCatalogKeys } from "@/zhishu/models/query/platformCatalogKeys";
 interface PlatformAuthContextValue {
   account: PlatformAccount | null;
   loading: boolean;
+  logoutAction: "cleanup" | "logout" | null;
   error: string;
   recoveryPending: boolean;
   refresh: () => Promise<void>;
   acceptLogin: (result: PlatformLoginResult) => void;
   logout: () => Promise<void>;
+  logoutAndClear: () => Promise<void>;
+  cleanupResult: PlatformCleanupReport | null;
+  dismissCleanupResult: () => void;
   catalogSyncing: boolean;
   catalogSyncError: string;
   syncCatalog: () => Promise<PlatformCatalog>;
@@ -43,11 +48,17 @@ const PlatformAuthContext = createContext<PlatformAuthContextValue | null>(
 export function PlatformAuthProvider({ children }: { children: ReactNode }) {
   const [account, setAccount] = useState<PlatformAccount | null>(null);
   const [loading, setLoading] = useState(true);
+  const [logoutAction, setLogoutAction] = useState<"cleanup" | "logout" | null>(
+    null,
+  );
   const [error, setError] = useState("");
   const [recoveryPending, setRecoveryPending] = useState(false);
   const accountRef = useRef<PlatformAccount | null>(null);
   const queryClient = useQueryClient();
   const refreshing = useRef(false);
+  const endingSession = useRef(false);
+  const [cleanupResult, setCleanupResult] =
+    useState<PlatformCleanupReport | null>(null);
   // 登录/退出/身份变化时递增；异步请求只允许更新自己所属会话，防止迟到响应重建旧缓存。
   const generation = useRef(0);
   const [autoSyncing, setAutoSyncing] = useState(false);
@@ -67,7 +78,8 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
       code: "UNAUTHORIZED",
       message: "登录状态已改变，请重新同步",
     });
-    if (!identity) return Promise.reject(changedAccount());
+    if (!identity || endingSession.current)
+      return Promise.reject(changedAccount());
     if (catalogRequest.current?.generation === current) {
       return catalogRequest.current.promise;
     }
@@ -125,12 +137,10 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
         await refreshPlatformProviders(queryClient);
         if (current !== generation.current) return;
         if (result.warnings.length) {
-          setCatalogSyncError(result.warnings.join("\n"));
           toast.warning(result.warnings[0]);
         }
       } catch (cause) {
         if (current !== generation.current) return;
-        setCatalogSyncError(platformAuthError(cause));
         toast.error(platformAuthError(cause));
         void queryClient.invalidateQueries({
           queryKey: ["configChangeHistory"],
@@ -142,7 +152,7 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
   }, [account?.baseUrl, account?.user.id, syncCatalog, queryClient]);
 
   const refresh = useCallback(async () => {
-    if (refreshing.current) return;
+    if (refreshing.current || endingSession.current) return;
     refreshing.current = true;
     let current = generation.current;
     try {
@@ -202,7 +212,8 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
   }, [account, recoveryPending, refresh]);
 
   const acceptLogin = (result: PlatformLoginResult) => {
-    if (result.status === "authenticated") {
+    if (result.status === "authenticated" && !endingSession.current) {
+      setCleanupResult(null);
       generation.current += 1;
       autoSynced.current = null;
       setAutoSyncing(false);
@@ -214,8 +225,14 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
       setError("");
     }
   };
-  const logout = async () => {
-    // 先阻断前端旧请求并清空账户缓存，再让 Rust 清理登录会话；本地 API Key 保留。
+  const endSession = async (clearAccount: boolean) => {
+    if (endingSession.current) return;
+    const identity = accountRef.current;
+    if (clearAccount && !identity) return;
+    endingSession.current = true;
+    setLogoutAction(clearAccount ? "cleanup" : "logout");
+    setCleanupResult(null);
+    // 先阻断旧请求并清空账户缓存，再由 Rust 执行对应的退出流程。
     const current = ++generation.current;
     accountRef.current = null;
     setAutoSyncing(false);
@@ -228,26 +245,48 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
     try {
       await queryClient.cancelQueries();
       queryClient.clear();
-      await platformAuthApi.logout();
+      if (clearAccount && identity) {
+        const result = await platformAuthApi.logoutAndClear(
+          identity.baseUrl,
+          identity.user.id,
+        );
+        if (current === generation.current) setCleanupResult(result);
+      } else {
+        await platformAuthApi.logout();
+      }
     } catch (cause) {
       if (current === generation.current) {
-        setError(`本机已退出登录。${platformAuthError(cause)}`);
+        setError(
+          clearAccount
+            ? platformAuthError(cause)
+            : `本机已退出登录。${platformAuthError(cause)}`,
+        );
+        // IPC 拒绝可能发生在身份校验前；不能声称已退出，也不能放行未验证账户。
+        if (clearAccount) setRecoveryPending(true);
       }
     } finally {
+      endingSession.current = false;
+      setLogoutAction(null);
       if (current === generation.current) setLoading(false);
     }
   };
+  const logout = () => endSession(false);
+  const logoutAndClear = () => endSession(true);
 
   return (
     <PlatformAuthContext.Provider
       value={{
         account,
         loading,
+        logoutAction,
         error,
         recoveryPending,
         refresh,
         acceptLogin,
         logout,
+        logoutAndClear,
+        cleanupResult,
+        dismissCleanupResult: () => setCleanupResult(null),
         catalogSyncing: catalogSyncing || autoSyncing,
         catalogSyncError,
         syncCatalog,

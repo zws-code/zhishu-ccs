@@ -1,5 +1,6 @@
 {
   "platformCatalog": {
+    "accountIsolation": "基础数据按平台地址和用户 ID 分别保存在本机，此处仅展示当前登录账号的数据。",
     "deleteAllHint": "删除当前账号在所有 Agent 应用中的平台供应商（含未显示应用），保留平台基础数据和服务端 Key。",
     "deleteAllResult": "所有 Agent 应用删除结果",
     "deleteResultApp": "Agent 应用",
@@ -24,7 +25,6 @@
     "nativeChangedCount": "{{count}} 个原生配置文件变更",
     "noNativeChangesShort": "未修改原生配置文件",
     "syncCompleted": "供应商列表：新增 {{added}}，更新 {{updated}}，删除 {{removed}}；{{fileState}}。详情见配置修改记录。",
-    "credentialsCleared": "基础数据已保留，凭证已清除。同步平台基础数据后可恢复使用。",
     "group": "分组",
     "actions": "操作",
     "groupStatus": "分组状态",
@@ -5341,5 +5341,48 @@
     "daily": "每日",
     "weekly": "每周",
     "monthly": "每月"
+  },
+  "platformCleanup": {
+    "working": "正在清理本机账号数据并退出…",
+    "signingOut": "正在退出登录…",
+    "action": "退出并清除此账号本机数据",
+    "title": "清理数据并退出？",
+    "scope": "移除此账号的平台基础数据及所有应用中的平台供应商，并退出登录。",
+    "retained": "保留登录账号记录、服务器地址和已记住密码。",
+    "partialHint": "无法安全删除的供应商会保留，并在结果中说明。",
+    "confirm": "清理并退出",
+    "result": "账号清理结果",
+    "complete": "已退出登录，本机平台数据已清理。",
+    "partial": "已退出登录，部分数据未能清理。",
+    "providers": "平台供应商",
+    "catalog": "平台基础数据",
+    "session": "本机登录状态",
+    "serverLogout": "平台会话退出",
+    "done": "已完成",
+    "failed": "未完成",
+    "retryHint": "请查看未完成项。需要重试时，重新登录该账号，处理提示的问题后再次清理。",
+    "scopeDetails": "查看清理范围说明",
+    "dismiss": "关闭弹窗",
+    "providerCounts": "删除 {{removed}} · 保留 {{skipped}}",
+    "retainedDetails": "保留登录账号记录、服务器地址及已记住密码；其他账号、自建供应商、授权中心账号、配置修改记录及恢复备份也会保留。不删除服务端共享 API Key，保留项中仍可能含有凭据。"
+  },
+  "platformDeletion": {
+    "result": "供应商删除结果",
+    "failed": "删除未完成，可关闭后重试。",
+    "partial": "部分供应商未能删除，请展开明细查看。",
+    "retained": "平台基础数据和服务端 API Key 均保留，之后可重新同步供应商。"
+  },
+  "platformDetails": {
+    "description": "查看本机保存的分组信息与模型能力",
+    "tabs": "分组详情内容",
+    "overview": "分组概览",
+    "groupInfo": "基本信息",
+    "expires": "到期",
+    "period": "周期",
+    "used": "已用 / USD",
+    "limit": "上限 / USD",
+    "search": "搜索模型名称或 ID",
+    "modelCount": "显示 {{shown}} / {{total}} 个模型",
+    "noMatches": "没有匹配的模型，试试其他名称或 ID。"
   }
 }

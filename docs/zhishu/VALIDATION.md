@@ -129,3 +129,90 @@ CC_SWITCH_TEST_HOME="$(mktemp -d /tmp/zhishu-client-api.XXXXXX)" cargo test --of
 - 真实系统 keyring、macOS/Windows/Linux 实机矩阵、各 CLI 的模型调用与配置运行未验收。
 - 本次仅执行完整 Rust `--lib`；独立集成测试目标、开发/发布脚本、安装、签名、公证和跨版本升级未执行，未发布或推送。
 - 保留用户原有 README/基础数据文档修改、接入契约文件和未跟踪 `out/`；未创建提交。
+
+
+## 客户端旧逻辑与测试清理（2026-10-31）
+
+用户要求先提交前一轮改造，已在 `ccs-dev` 创建 `6f0c38d2`（`feat(zhishu): migrate platform integration to client-only APIs`），没有推送；随后继续清理二开残留，本节对应后续独立工作区差异。
+
+清理范围：
+
+- 删除无生产入口的 `clear_account_credentials`、`clear_cached_catalog_credentials`、`CatalogStore::clear_credentials`、`SessionStore::identity` 与凭证替换为登录占位符的包装函数，移除对应 `allow(dead_code)`。
+- 删除旧 `credentialsCleared`/`credentials_cleared` 状态、错误码、页面禁用/提示分支及五种语言中的自有旧文案；缺失凭证使用新协议的分组状态表示。正常版本 2 快照继续读取，旧版本仍不迁移；空白凭证或损坏快照拒绝读取并保留原文件。
+- 删除旧模型目录的 `api_format`、`mode`、嵌套 limit 和 camelCase 等元数据回退；模型映射与摘要读取 `/access` 白名单字段。测试使用专用 Key 元数据及当前协议字段，移除一项只验证旧清理流程的 Rust 用例和其他用例中的旧清理断言。
+- 保留退出不改 Provider/原生文件、同账号恢复、跨账号隔离、摘要不泄密、原文件损坏保护、授权撤回及本地配置适配等有效回归。下载页仍在使用的构建网站地址、通用上游 API 和实际生效的配置迁移不属于旧平台 API 清理。
+
+等级为 L0 自有业务、测试及契约清理 + L1 自有翻译键删除；复用现有 ProviderService、配置锁、私密原子存储和会话 keyring，无新增依赖、数据库迁移或上游核心补丁。[ADR-0004](adr/ADR-0004-client-api-only.md)、[补丁登记](UPSTREAM_PATCHES.md)、AGENTS 和基础数据文档已同步。
+
+| 检查 | 本轮结果 |
+|---|---|
+| `pnpm typecheck` | 通过 |
+| `pnpm format:check` | 通过 |
+| `pnpm test:unit tests/zhishu` | 21 文件、228 项通过，其中目录页面 23 项 |
+| `pnpm build:renderer` | 通过；保留浏览器数据过旧、duration 类歧义、混合导入与大 chunk 的既有警告 |
+| `cargo fmt --check --manifest-path src-tauri/Cargo.toml` | 通过 |
+| `CC_SWITCH_TEST_HOME="$(mktemp -d /tmp/zhishu-client-cleanup.XXXXXX)" cargo test --offline --manifest-path src-tauri/Cargo.toml --lib zhishu:: --quiet` | 最终 194 项通过，无失败或忽略；最后模型字段清理后重新执行 |
+| `cargo clippy --offline --manifest-path src-tauri/Cargo.toml -- -D warnings` | 最终通过 |
+| 源码及测试残留扫描 | `src/zhishu`、`src-tauri/src/zhishu`、`tests/zhishu` 内旧平台路径、旧清理函数/状态/占位 Key、旧平台 Key 命名与 dead-code 豁免均无匹配；两个目录映射模块的旧字段回退亦无匹配 |
+| `git diff --check` / 变更文档链接 | 通过 / 相对链接目标均存在 |
+
+本轮没有重复执行全仓前端、全量 Rust 库或独立集成测试，前一轮结果仍按上一节记录；未操作真实账户或 CLI 配置，未进行多设备共享 Key、真实 keyring、跨平台运行、安装升级或发布验收。保留原有未跟踪 `out/`；后续清理未自动提交或推送。
+
+
+## 账号基础数据隔离与清理退出（2026-10-31）
+
+本轮用户授权新增「退出并清除此账号本机数据」，并要求平台基础数据区分账号；多账号同时保持登录明确暂缓。保留上一节尚未提交的自有旧逻辑清理及用户 `out/`，不自动提交或推送。
+
+改动范围：新增自有清理编排、IPC wrapper、确认框和结果展示；目录按平台地址 + 用户 ID 独立私密存储，迁移有效的旧单文件 v2；普通退出仍保留目录/供应商/工具配置。清理按账号复用全应用安全删除，清理快照后退出；保留登录账号记录、服务器地址和已记住密码；逐应用失败及 keyring/服务端退出分别报告。结果只存在 Auth Context 内存，在退出后通过独立可关闭弹窗展示，不占用登录表单；关闭或重新登录成功后清除。前端清理期间阻止新登录/轮询，隔离旧响应，账号变化关闭原详情页。
+
+复用 ProviderService Adapter、操作锁、私密原子写入和既有配置审计/恢复，无新的核心配置写入路径。L0 自有模块 + L1 注册及五种语言入口；[ADR-0005](adr/ADR-0005-account-local-cleanup.md)、[补丁登记](UPSTREAM_PATCHES.md)、基础数据文档及 AGENTS 已同步。
+
+| 检查 | 本轮最终结果 |
+|---|---|
+| `pnpm typecheck` | 通过 |
+| `pnpm format:check` | 通过 |
+| `pnpm test:unit tests/zhishu` | 21 文件、236 项通过；登录/门禁 37 项，目录页 24 项，auth IPC 4 项 |
+| `pnpm build:renderer` | 通过；既有浏览器数据过旧、duration 类歧义、混合导入与大 chunk 警告保留 |
+| `cargo fmt --check --manifest-path src-tauri/Cargo.toml` | 通过 |
+| `CC_SWITCH_TEST_HOME="$(mktemp -d /tmp/zhishu-cleanup-scope.XXXXXX)" cargo test --offline --manifest-path src-tauri/Cargo.toml --lib zhishu:: --quiet` | 204 项通过，无失败或忽略（取消登录历史清理后移除对应旧测试） |
+| `cargo clippy --offline --manifest-path src-tauri/Cargo.toml -- -D warnings` | 通过 |
+| `git diff --check` | 通过 |
+| 旧接口/清理状态扫描 | 自有源码与测试中 `/api/v1`、`/v1/models`、`credentialsCleared`、旧清理函数无匹配；未恢复客户端 Key 创建/撤销 |
+
+新增回归验证：同平台不同账号及同 ID 不同平台分别保存；清理只删目标账号且其他文件字节不变；旧 v2 迁移保持 0600；迁移写入失败保留旧文件并可重试；损坏/归属不明旧文件保留并报告；过时身份不清理不退出；部分删除保留计数；本机凭据与服务端退出同时失败仍丢弃内存会话；登录页保留账号记录、平台地址和记住密码，不调用删除入口；确认取消无副作用；普通退出不调用清理；清理结果跨门禁弹窗展示、可关闭且关闭后不留常驻内容；清理期间迟到目录响应不重建缓存；切换账号关闭旧详情；供应商同步失败/兼容性警告仅浮动提示，目录自身失败仍可见且可重试。
+
+首轮前端新增测试发现两个当前 Vitest 不支持的 matcher 和一个详情按钮名称匹配错误，修正测试后全部通过，无遗留测试失败。测试使用临时配置目录、内存数据库、模拟凭据库及本机 HTTP 模拟响应，没有操作真实平台账号、真实密码或真实 CLI 配置。
+
+本轮未执行全仓前端、全部 Rust 库/独立集成测试、桌面实机视觉验收、真实系统 keyring、Windows/Linux 运行及真实 CLI 调用；未打安装包、发布或推送。安全保留项、自建供应商、配置修改记录和恢复备份可能保留凭据；归属无法确认或系统凭据库清理失败时显示未完成，不宣称安全擦除。重新登录后的既有自动同步可能重新生成目录和托管供应商。
+
+用户反馈修订：清理结果改为可关闭弹窗；保留登录记录、服务器地址与记住密码，后端不调用历史/密码删除函数，移除未发布报告的 loginHistory 字段并同步契约和五语文案。前端回归仍为 236 项，后端为 204 项。本次测试曾因地址标签误写为“服务器地址”失败，按实际“平台后端地址”翻译键修正后全量智枢前端回归通过。既有已删除的登录记录不做推测恢复，需用户重新填写登录。
+
+## 清理弹窗视觉修订（2026-10-31）
+
+用户反馈确认框正文贴边、结果框过长。此次仅调整自有 `PlatformAccountCleanup`、`PlatformProviderDeletionResult`、五语文案及已有用例：统一正文边距与账号卡片，缩短主要说明，保留范围补充说明可展开，结果显示汇总与状态行、逐应用明细默认折叠，正文独立滚动，标题/关闭按钮/底部操作固定。复用上游 Dialog 和主题 token，未改通用 Dialog 或后端清理行为；L0/L1，ADR-0005 与补丁登记已更新。
+
+已执行：`pnpm typecheck`、`pnpm format:check`、`pnpm build:renderer`、`git diff --check` 均通过；`pnpm test:unit tests/zhishu/components/PlatformLogin.test.tsx tests/zhishu/components/PlatformCatalogPage.test.tsx` 共 61 项通过。构建保留既有浏览器数据过旧、duration 类歧义、混合导入和大 chunk 警告。
+
+通过 agent-browser 对实际 React 组件进行模拟数据视觉检查：1200×800 下确认框、成功结果与部分失败结果；亮/暗主题；13 个应用明细展开；640×480 下结果弹窗高度为 432px、关闭按钮处于视口内；360×600 下无横向溢出且关闭可见。模拟数据无真实账号/Key，不访问平台，不执行真实清理；临时预览代码及服务器、专用浏览器已清理。截图保存在本机 `/tmp/zhishu-cleanup-confirm-final.png`、`/tmp/zhishu-cleanup-result-final.png` 等临时路径。
+
+本次未重跑 Rust 或全仓测试，未进行 Tauri 原生 WebView/真实账号清理验收，未提交或发布。前节后端验证记录仍是该功能最近一次执行结果。
+
+## 全应用供应商删除结果弹窗（2026-10-31）
+
+平台基础数据页的一键删除结果/错误由正文常驻展示改为自有 `PlatformProviderDeletionDialog`：显示当前账号、删除/保留计数、失败提示与默认折叠的逐应用明细，固定关闭操作；关闭重置本次 mutation 结果，后续删除可重新显示。该入口关闭重复 toast，应用页菜单沿用原有 toast。复用既有删除 IPC、身份隔离、局部缓存失效和通用 Dialog，L0 自有组件/Hook + L1 五语翻译；补丁登记与基础数据文档已同步，未改后端或上游核心。
+
+已执行：`pnpm test:unit tests/zhishu/components/PlatformCatalogPage.test.tsx tests/zhishu/hooks/usePlatformProviderDeletion.test.tsx` 32 项通过；`pnpm typecheck`、`pnpm format:check`、`pnpm build:renderer`、`git diff --check` 通过，构建既有警告保留。测试覆盖弹窗不属于目录正文、关闭清除结果、错误关闭后重试、部分失败明细、退出/账号切换后的迟到响应隔离，以及应用级通知兼容。初轮测试补齐了新翻译资源、异步 mutation reset 等待和重复状态文本查询，最终无失败。
+
+使用 agent-browser 对实际组件的模拟 13 应用结果检查：桌面视口摘要及默认折叠明细、640×480 展开后的关闭按钮可见、关闭后结果消失。截图 `/tmp/zhishu-provider-deletion-result.png`；临时预览代码/服务器和专用浏览器已清理。没有连接真实平台或执行实际删除，未重跑后端或全仓测试，未进行原生 WebView 验收，未提交或发布。
+
+## 平台详情 UI 与滚轮修复（2026-10-31）
+
+自有 `PlatformCatalogDetails` 调整为固定标题/页签、独立正文滚动的 600px 响应式抽屉；概览分卡展示基本信息、额度周期用量及显式 Key 入口。新增自有 `PlatformCatalogModels`，支持名称/ID 本地筛选、匹配数量、空态及展开参数。保留白名单字段和未知值语义，切换到模型页签卸载 Key 明文状态，不触发同步或 Key 请求。复用 Sheet/Tabs/Collapsible/Input/主题 token，无后端契约或存储变化；L0 自有展示及测试 + L1 五语文案，补丁登记与功能文档已同步。
+
+用户反馈概览鼠标滚轮失效：内部 SheetBody 的 `scroll-stable` 强制 `overflow-y: scroll`，配合 `overscroll-contain` 截断滚动向父级传递。改为普通内容 div，仅外层页签面板负责滚动；未改通用 Sheet 或全局 CSS。
+
+已执行：`pnpm typecheck`、`pnpm format:check`、`pnpm build:renderer` 通过；`pnpm test:unit tests/zhishu/components/PlatformCatalogPage.test.tsx` 25 项通过，覆盖模型名/ID 筛选、大小写和空白、空结果/清空筛选，以及切换页签清除已显示 Key、无额外 Key/同步调用。构建保留既有浏览器数据库过旧、duration 类歧义、混合导入与大 chunk 警告。
+
+浏览器使用本机临时预览加载实际组件和模拟数据，检查亮/暗主题及窄视口。agent-browser 的低层 wheel 命令在本次会话落到了遮罩，因此改用同一专用 Chromium 会话的 CDP `Input.dispatchMouseEvent`，明确指定内容坐标发送真实 wheel 输入。复现旧嵌套样式时正文滚动位置保持 0；修复后 360×640 概览向下至 228px、1280×700 至 168px，API Key 卡片底部可达；模型列表向下至 350px；反向滚轮回到 0，背景保持 0。1280×900 概览全部容纳，无须滚动。截图 `/tmp/zhishu-details-overview-fixed.png`；预览源码、服务器和专用浏览器已清理。
+
+没有操作真实平台、Keyring 或 CLI 配置，未执行原生 Tauri WebView、Windows/Linux 实机验收；本轮未重跑 Rust 或全仓测试。未提交、推送或发布。原有未提交改动和用户 `out/` 保留。

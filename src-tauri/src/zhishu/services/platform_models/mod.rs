@@ -2,10 +2,10 @@
 //! 认证、分组 Key 和原生配置写入留在 Rust；本地同步只处理当前账户拥有的供应商。
 use crate::zhishu::integrations::ccswitch::platform_models as adapter;
 use crate::zhishu::integrations::ccswitch::providers::Providers as ProviderService;
-mod base_data;
+pub(crate) mod base_data;
 mod catalog;
 mod connection;
-mod delete;
+pub(crate) mod delete;
 mod sync_report;
 
 pub(crate) use crate::zhishu::services::platform_auth::{error as fail, PlatformAuthError};
@@ -61,53 +61,6 @@ fn local_error<T>(result: Result<T, impl std::fmt::Display>) -> Result<T, Platfo
     })
 }
 
-// 保留显式凭证清理能力；退出登录不再调用。
-#[allow(dead_code)]
-pub(crate) fn clear_account_credentials(
-    state: &AppState,
-    origin: &str,
-    user_id: i64,
-) -> Result<(), PlatformAuthError> {
-    let mut failed = false;
-    for agent in adapter::AGENTS {
-        let result: Result<(), PlatformAuthError> = (|| {
-            let app = adapter::app(agent)?;
-            let providers = local_error(state.db.get_all_providers(agent))?;
-            for mut provider in providers.into_values() {
-                let Some(managed) = provider
-                    .meta
-                    .as_ref()
-                    .and_then(|meta| meta.platform_managed.as_ref())
-                else {
-                    // 显式清理仅处理平台托管项，用户自建供应商保持不变。
-                    continue;
-                };
-                if managed.origin != origin || managed.user_id != user_id {
-                    // 其他平台或账号的托管供应商不属于本次清理范围。
-                    continue;
-                }
-                let (_, key) = provider.resolve_usage_credentials(&app);
-                if key.is_empty() || key == "PLATFORM_LOGIN_REQUIRED" {
-                    continue;
-                }
-                redact_credential(&mut provider.settings_config, &key);
-                local_error(ProviderService::update(state, app.clone(), None, provider))?;
-            }
-            Ok(())
-        })();
-        failed |= result.is_err();
-    }
-    if failed {
-        Err(fail("LOGOUT_CLEANUP", "部分工具的托管凭证未能清除"))
-    } else {
-        Ok(())
-    }
-}
-
-fn redact_credential(value: &mut Value, key: &str) {
-    replace_credential(value, key, "PLATFORM_LOGIN_REQUIRED");
-}
-
 fn replace_credential(value: &mut Value, from: &str, to: &str) -> bool {
     match value {
         Value::String(text) if text.contains(from) => {
@@ -150,14 +103,6 @@ struct DesiredProvider {
     provider: Provider,
 }
 
-// 保留显式目录凭证清理能力及旧快照兼容；退出登录不再调用。
-#[allow(dead_code)]
-pub(crate) fn clear_cached_catalog_credentials(
-    handle: &tauri::AppHandle,
-) -> Result<(), PlatformAuthError> {
-    base_data::CatalogStore::for_app(handle)?.clear_credentials()
-}
-
 /// 第一阶段：联网拉取平台基础数据并保存设备快照，不修改工具供应商。
 #[tauri::command]
 pub async fn platform_sync_catalog(
@@ -178,7 +123,7 @@ pub async fn platform_sync_catalog(
     Ok(cached.summary())
 }
 
-/// 只读当前账户的本机摘要，不发 HTTP 请求，也不泄露目录中的 Key。
+/// 读取当前账户本机摘要，按需迁移旧单文件 v2；不发 HTTP，也不泄露目录 Key。
 #[tauri::command]
 pub async fn platform_get_catalog(
     handle: tauri::AppHandle,
@@ -293,12 +238,6 @@ fn sync_account_providers(
     let cached = store
         .read(origin, user_id)?
         .ok_or_else(|| fail("CATALOG_REQUIRED", "请先同步当前账号的平台基础数据"))?;
-    if cached.credentials_cleared() {
-        return Err(fail(
-            "CATALOG_CREDENTIALS_REQUIRED",
-            "请先同步平台基础数据恢复凭证",
-        ));
-    }
     let before = sync_report::observe(state, apps, origin, user_id)?;
     let mut summary = sync_cached_providers(state, apps, &cached.discovery);
     let mut updated = 0;
@@ -511,7 +450,7 @@ fn sync_agent_providers(
         }
     }
 
-    // 只协调当前平台账户的托管行；其他账户、自建项、失败分组和订阅项保持原有保护规则。
+    // 只协调当前平台账户的托管行；保留其他账户、自建项及失败或额度不可用的分组。
     let to_delete: Vec<_> = existing
         .values()
         .filter_map(|provider| {
@@ -782,14 +721,13 @@ mod tests {
 
     #[test]
     #[serial_test::serial]
-    fn logout_preserves_all_agent_keys_and_explicit_cleanup_keeps_other_accounts() {
+    fn logout_preserves_all_agent_keys_provider_rows_and_native_files() {
         let _home = SyncTestHome::new();
         use std::sync::Arc;
         fn model(agent: &str, name: &str) -> AgentModel {
             serde_json::from_value(json!({"id":"entry","agent":agent,"model":name,"name":"Verified","protocol":match agent {"claude"|"claude-desktop"=>"anthropic","gemini"=>"gemini","workbuddy"=>"chat",_=>"responses"},"category":"recommended","available":true,"supportsTools":true,"supportsStreaming":true,"contextWindow":32000,"maxOutputTokens":4096})).unwrap()
         }
         let store = AppState::new(Arc::new(crate::database::Database::memory().unwrap()));
-        let mut provider_ids = std::collections::HashMap::new();
         for agent in adapter::AGENTS {
             let app = adapter::app(agent).unwrap();
             let m = model(
@@ -811,7 +749,6 @@ mod tests {
             )
             .unwrap();
             let id = p.id.clone();
-            provider_ids.insert(*agent, id.clone());
             ProviderService::add_without_switching(&store, app.clone(), p).unwrap();
             ProviderService::switch(&store, app.clone(), &id).unwrap();
             adapter::select_default(&app, &id, &m.model).unwrap();
@@ -858,38 +795,6 @@ mod tests {
                 path.display()
             );
         }
-
-        // Explicit cleanup remains available independently of logout.
-        clear_account_credentials(&store, "https://example.test", 1).unwrap();
-        for agent in adapter::AGENTS {
-            let app = adapter::app(agent).unwrap();
-            let p = store
-                .db
-                .get_provider_by_id(provider_ids.get(agent).unwrap(), agent)
-                .unwrap()
-                .unwrap();
-            let (_, key) = p.resolve_usage_credentials(&app);
-            assert_eq!(
-                key,
-                if *agent == "pi" {
-                    "secret-model-key"
-                } else {
-                    "PLATFORM_LOGIN_REQUIRED"
-                },
-                "{agent}"
-            );
-            if *agent != "pi" {
-                for path in sync_report::paths(&app).unwrap() {
-                    if let Some(bytes) = crate::live::engine::read_current(&path).unwrap() {
-                        assert!(
-                            !String::from_utf8_lossy(&bytes).contains("secret-model-key"),
-                            "{agent}: {}",
-                            path.display()
-                        );
-                    }
-                }
-            }
-        }
     }
 
     fn deletion_provider(agent: &str, id: &str, origin: &str, user_id: i64) -> Provider {
@@ -918,6 +823,7 @@ mod tests {
         base_data::CatalogStore::for_test(catalog_path.clone())
             .save(test_discovery(Vec::new()))
             .unwrap();
+        let catalog_path = base_data::CatalogStore::for_test(catalog_path).account_path(origin, 1);
         let catalog_before = std::fs::read(&catalog_path).unwrap();
         for agent in adapter::AGENTS {
             for (id, base, user) in [
@@ -1055,6 +961,7 @@ mod tests {
         base_data::CatalogStore::for_test(catalog_path.clone())
             .save(test_discovery(Vec::new()))
             .unwrap();
+        let catalog_path = base_data::CatalogStore::for_test(catalog_path).account_path(origin, 1);
         let catalog_before = std::fs::read(&catalog_path).unwrap();
 
         let result = delete::delete_all_for_identity(&auth, &state, origin, 1).unwrap();
@@ -1357,7 +1264,7 @@ mod tests {
                         key: format!("key-{}", group.id),
                         key_id: group.id,
                         platform: group.platform.clone(),
-                        key_name: format!("zhishu-ccs-{}-{}", group.platform, group.id),
+                        key_name: format!("zhishu-client-{}", group.id),
                     },
                     models: models.clone(),
                     catalog_error: None,
@@ -1578,6 +1485,7 @@ mod tests {
         ]);
         store.save(discovery).unwrap();
         let restarted = base_data::CatalogStore::for_test(path.clone());
+        let path = store.account_path("https://platform.test", 1);
         let cached = restarted.read("https://platform.test", 1).unwrap().unwrap();
         assert_eq!(cached.discovery.catalogs[0].credential.key, "key-42");
         let summary = serde_json::to_value(cached.summary()).unwrap();
@@ -1585,7 +1493,7 @@ mod tests {
         assert_eq!(summary["userId"], 1);
         assert_eq!(summary["groups"][0]["models"][0]["id"], "claude-sonnet-5");
         assert_eq!(summary["groups"][0]["keyId"], 42);
-        assert_eq!(summary["groups"][0]["keyName"], "zhishu-ccs-anthropic-42");
+        assert_eq!(summary["groups"][0]["keyName"], "zhishu-client-42");
         assert!(!summary.to_string().contains("key-42"));
         assert_eq!(
             restarted.group_key("https://platform.test", 1, 42).unwrap(),
@@ -1610,24 +1518,26 @@ mod tests {
                 0o600
             );
         }
-        // Explicit cleanup invalidates even corrupted data without parsing credentials.
-        std::fs::write(&path, b"broken snapshot with key-42").unwrap();
-        assert!(restarted.read("https://platform.test", 1).is_err());
-        restarted.clear_credentials().unwrap();
-        assert_eq!(std::fs::read_to_string(path).unwrap(), "null");
-        assert!(restarted
-            .read("https://platform.test", 1)
-            .unwrap()
-            .is_none());
-        assert!(restarted.group_key("https://platform.test", 1, 42).is_err());
+        // Missing credential content is corruption, not a separate lifecycle state.
+        let mut incomplete: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        incomplete["discovery"]["catalogs"][0]["credential"]["key"] = json!(" ");
+        for corrupted in [
+            serde_json::to_vec(&incomplete).unwrap(),
+            b"broken snapshot with key-42".to_vec(),
+        ] {
+            std::fs::write(&path, &corrupted).unwrap();
+            assert!(restarted.read("https://platform.test", 1).is_err());
+            assert!(restarted.group_key("https://platform.test", 1, 42).is_err());
+            assert_eq!(std::fs::read(&path).unwrap(), corrupted);
+        }
     }
 
     #[tokio::test]
-    async fn logout_preserves_catalog_keys_and_explicit_cleanup_retains_metadata() {
+    async fn logout_preserves_catalog_and_relogin_requires_the_same_account() {
         let temp = tempfile::tempdir().unwrap();
         let path = temp.path().join("catalog.json");
         let store = base_data::CatalogStore::for_test(path.clone());
-        let mut discovery = test_discovery(vec![
+        let discovery = test_discovery(vec![
             crate::zhishu::services::platform_auth::AvailableGroup {
                 id: 42,
                 name: "Retained group".into(),
@@ -1636,23 +1546,8 @@ mod tests {
                 subscription_type: "standard".into(),
             },
         ]);
-        discovery.catalogs[0].models[0]["echoedCredential"] = json!("key-42");
-        discovery
-            .warnings
-            .push("Credential key-42 must not survive explicit cleanup".into());
-        let before = serde_json::to_value(store.save(discovery).unwrap().summary()).unwrap();
-        // Existing v1 snapshots do not have the new lifecycle flag.
-        let mut legacy: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-        legacy
-            .as_object_mut()
-            .unwrap()
-            .remove("credentials_cleared");
-        std::fs::write(&path, serde_json::to_vec(&legacy).unwrap()).unwrap();
-        assert!(!store
-            .read("https://platform.test", 1)
-            .unwrap()
-            .unwrap()
-            .credentials_cleared());
+        store.save(discovery).unwrap();
+        let path = store.account_path("https://platform.test", 1);
         let before_logout = std::fs::read(&path).unwrap();
         let auth = PlatformAuthState::for_test("https://platform.test".into(), 1);
         auth.logout().await.unwrap();
@@ -1674,102 +1569,7 @@ mod tests {
             other.with_local_identity(|origin, user_id| store.group_key(origin, user_id, 42)).await,
             Err(err) if err.code == "CATALOG_REQUIRED"
         ));
-        // Retain compatibility with snapshots explicitly cleared by older versions.
-        store.clear_credentials().unwrap();
-        // Reopening the file models a new login / process with an empty query cache.
-        let restarted = base_data::CatalogStore::for_test(path.clone());
-        let retained = restarted.read("https://platform.test", 1).unwrap().unwrap();
-        let after = serde_json::to_value(retained.summary()).unwrap();
-        assert_eq!(after["syncedAt"], before["syncedAt"]);
-        assert_eq!(after["groups"][0]["name"], "Retained group");
-        assert_eq!(after["groups"][0]["models"][0]["id"], "claude-sonnet-5");
-        assert_eq!(after["groups"][0]["models"][0]["contextWindow"], 32000);
-        assert_eq!(after["groups"][0]["keyId"], 42);
-        assert_eq!(after["groups"][0]["keyName"], "zhishu-ccs-anthropic-42");
-        assert_eq!(after["groups"][0]["keyAvailable"], false);
-        assert_eq!(after["credentialsCleared"], true);
-        assert!(retained.discovery.catalogs[0].credential.key.is_empty());
-        assert!(!std::fs::read_to_string(&path).unwrap().contains("key-42"));
-        assert!(restarted
-            .group_key("https://platform.test", 1, 42)
-            .unwrap()
-            .is_none());
-        assert!(restarted
-            .read("https://platform.test", 2)
-            .unwrap()
-            .is_none());
-        assert!(restarted.read("https://other.test", 1).unwrap().is_none());
-        // Explicit cleanup is idempotent and does not trigger a new synchronization.
-        restarted.clear_credentials().unwrap();
-        assert_eq!(
-            serde_json::to_value(
-                restarted
-                    .read("https://platform.test", 1)
-                    .unwrap()
-                    .unwrap()
-                    .summary()
-            )
-            .unwrap(),
-            after
-        );
-    }
-
-    #[test]
-    #[serial_test::serial]
-    fn provider_sync_waits_for_credentials_to_be_restored_after_legacy_cleanup() {
-        use crate::{app_config::AppType, database::Database};
-        use std::sync::Arc;
-        let home = SyncTestHome::new();
-        let state = AppState::new(Arc::new(Database::memory().unwrap()));
-        let store = base_data::CatalogStore::for_test(home._temp.path().join("catalog.json"));
-        let discovery = test_discovery(vec![
-            crate::zhishu::services::platform_auth::AvailableGroup {
-                id: 42,
-                name: "Retained group".into(),
-                platform: "anthropic".into(),
-                status: "active".into(),
-                subscription_type: "standard".into(),
-            },
-        ]);
-        store.save(discovery.clone()).unwrap();
-        let sync = || {
-            sync_account_providers(
-                &state,
-                &[AppType::Claude],
-                &store,
-                "https://platform.test",
-                1,
-            )
-        };
-        assert_eq!(sync().unwrap().added, 1);
-        clear_account_credentials(&state, "https://platform.test", 1).unwrap();
-        store.clear_credentials().unwrap();
-        let redacted = state
-            .db
-            .get_all_providers("claude")
-            .unwrap()
-            .into_values()
-            .next()
-            .unwrap();
-        assert_eq!(
-            redacted.resolve_usage_credentials(&AppType::Claude).1,
-            "PLATFORM_LOGIN_REQUIRED"
-        );
-        assert!(matches!(sync(), Err(err) if err.code == "CATALOG_CREDENTIALS_REQUIRED"));
-        assert_eq!(
-            state.db.get_all_providers("claude").unwrap()[&redacted.id].settings_config,
-            redacted.settings_config
-        );
-        let restored = serde_json::to_value(store.save(discovery).unwrap().summary()).unwrap();
-        assert_eq!(restored["credentialsCleared"], false);
-        assert_eq!(restored["groups"][0]["keyAvailable"], true);
-        assert_eq!(sync().unwrap().skipped, 1);
-        assert_eq!(
-            state.db.get_all_providers("claude").unwrap()[&redacted.id]
-                .resolve_usage_credentials(&AppType::Claude)
-                .1,
-            "key-42"
-        );
+        assert_eq!(std::fs::read(&path).unwrap(), before_logout);
     }
 
     #[test]
@@ -1793,6 +1593,7 @@ mod tests {
         assert!(matches!(sync(), Err(err) if err.code == "CATALOG_REQUIRED"));
         std::fs::write(&path, b"invalid json").unwrap();
         assert!(matches!(sync(), Err(err) if err.code == "CATALOG_STORE"));
+        std::fs::remove_file(&path).unwrap();
         let mut discovery = test_discovery(Vec::new());
         discovery.account.user.id = 2;
         store.save(discovery).unwrap();
@@ -2012,7 +1813,6 @@ mod tests {
         customized.settings_config["customSetting"] = json!("keep");
         state.db.save_provider("claude", &customized).unwrap();
 
-        clear_account_credentials(&state, "https://platform.test", 1).unwrap();
         let (added, removed, skipped, _) = sync_agent_providers(&state, &app, &discovery).unwrap();
         assert_eq!((added, removed, skipped), (0, 0, 1));
         let restored = state.db.get_provider_by_id(&id, "claude").unwrap().unwrap();
@@ -2597,7 +2397,7 @@ mod tests {
             json!({
                 "id": "model-b",
                 "display_name": "Model B",
-                "api_format": "openai_chat",
+                "supported_endpoint_types": ["openai_chat"],
                 "supports_tools": true,
                 "supports_streaming": true
             }),
@@ -3179,7 +2979,7 @@ mod tests {
             77,
             "anthropic",
             "Other account",
-            "zhishu-ccs-anthropic-77",
+            "zhishu-client-77",
         )
         .unwrap();
         let id = provider.id.clone();

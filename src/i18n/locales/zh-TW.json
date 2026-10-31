@@ -1,5 +1,6 @@
 {
   "platformCatalog": {
+    "accountIsolation": "基礎資料依平台位址與使用者 ID 分別儲存在本機，此處僅顯示目前登入帳號的資料。",
     "deleteAllHint": "刪除目前帳號在所有 Agent 應用程式中的平台供應商（含未顯示的應用程式），保留平台基礎資料和伺服器端 Key。",
     "deleteAllResult": "所有 Agent 應用程式刪除結果",
     "deleteResultApp": "Agent 應用程式",
@@ -24,7 +25,6 @@
     "nativeChangedCount": "{{count}} 個原生設定檔變更",
     "noNativeChangesShort": "未修改原生設定檔",
     "syncCompleted": "供應商清單：新增 {{added}}，更新 {{updated}}，刪除 {{removed}}；{{fileState}}。詳情見設定修改記錄。",
-    "credentialsCleared": "基礎資料已保留，憑證已清除。同步平台基礎資料後可恢復使用。",
     "group": "群組",
     "actions": "操作",
     "groupStatus": "群組狀態",
@@ -5321,5 +5321,48 @@
     "daily": "每日",
     "weekly": "每週",
     "monthly": "每月"
+  },
+  "platformCleanup": {
+    "working": "正在清除本機帳號資料並登出…",
+    "signingOut": "正在登出…",
+    "action": "登出並清除此帳號本機資料",
+    "title": "清理資料並登出？",
+    "scope": "移除此帳號的平台基礎資料及所有應用程式中的平台供應商，並登出。",
+    "retained": "保留登入帳號記錄、伺服器位址和已記住密碼。",
+    "partialHint": "無法安全刪除的供應商會保留，並在結果中說明。",
+    "confirm": "清理並登出",
+    "result": "帳號清理結果",
+    "complete": "已登出，本機平台資料已清理。",
+    "partial": "已登出，部分資料未能清理。",
+    "providers": "平台供應商",
+    "catalog": "平台基礎資料",
+    "session": "本機登入狀態",
+    "serverLogout": "平台工作階段登出",
+    "done": "已完成",
+    "failed": "未完成",
+    "retryHint": "請查看未完成項目。需要重試時，重新登入此帳號，處理提示的問題後再次清理。",
+    "scopeDetails": "查看清理範圍說明",
+    "dismiss": "關閉視窗",
+    "providerCounts": "刪除 {{removed}} · 保留 {{skipped}}",
+    "retainedDetails": "保留登入帳號記錄、伺服器位址及已記住密碼；其他帳號、自建供應商、授權中心帳號、設定修改記錄及復原備份也會保留。不刪除伺服器共用 API Key，保留項目仍可能含有憑證。"
+  },
+  "platformDeletion": {
+    "result": "供應商刪除結果",
+    "failed": "刪除未完成，可關閉後重試。",
+    "partial": "部分供應商未能刪除，請展開明細查看。",
+    "retained": "平台基礎資料與伺服器 API Key 均保留，之後可重新同步供應商。"
+  },
+  "platformDetails": {
+    "description": "查看本機儲存的分組資訊與模型能力",
+    "tabs": "分組詳情內容",
+    "overview": "分組概覽",
+    "groupInfo": "基本資訊",
+    "expires": "到期",
+    "period": "週期",
+    "used": "已用 / USD",
+    "limit": "上限 / USD",
+    "search": "搜尋模型名稱或 ID",
+    "modelCount": "顯示 {{shown}} / {{total}} 個模型",
+    "noMatches": "沒有符合的模型，請嘗試其他名稱或 ID。"
   }
 }

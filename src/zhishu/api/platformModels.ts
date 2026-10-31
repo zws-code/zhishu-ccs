@@ -40,7 +40,6 @@ export interface PlatformCatalog {
   baseUrl: string;
   userId: number;
   syncedAt: number;
-  credentialsCleared?: boolean;
   groups: PlatformCatalogGroup[];
   warnings: string[];
 }

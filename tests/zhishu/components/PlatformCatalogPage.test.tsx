@@ -7,6 +7,8 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import i18n from "i18next";
+import zh from "@/i18n/locales/zh.json";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PlatformCatalogPage } from "@/zhishu/models/components/PlatformCatalogPage";
@@ -59,7 +61,10 @@ const snapshot: PlatformCatalog = {
       subscriptionType: "standard",
       status: "active",
       keyId: 123,
-      keyName: "zhishu-ccs-anthropic-42",
+      keyName: "zhishu-client-42",
+      keyAvailable: true,
+      quota: { available: true, reasons: [] },
+      subscriptions: [],
       failed: false,
       error: null,
       models: [{ id: "claude-test", name: "Test model" }],
@@ -108,6 +113,20 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  i18n.addResourceBundle(
+    "zh",
+    "translation",
+    {
+      platformDeletion: zh.platformDeletion,
+      platformDetails: zh.platformDetails,
+      clientQuota: zh.clientQuota,
+      platformCatalog: { deleteCompleted: zh.platformCatalog.deleteCompleted },
+      platformCleanup: zh.platformCleanup,
+      common: zh.common,
+    },
+    true,
+    true,
+  );
   vi.clearAllMocks();
   auth.signedIn = true;
   auth.catalogSyncing = false;
@@ -132,8 +151,8 @@ beforeEach(() => {
 });
 
 describe("shared platform base data", () => {
-  it.each([null, { ...snapshot, credentialsCleared: true }])(
-    "deletes across all apps without requiring usable catalog credentials (%j)",
+  it.each([null, { ...snapshot, groups: [] }])(
+    "deletes across all apps without requiring catalog groups (%j)",
     async (catalog) => {
       vi.mocked(platformModelsApi.catalog).mockResolvedValue(catalog);
       const { client, invalidate } = renderPage();
@@ -145,7 +164,16 @@ describe("shared platform base data", () => {
       );
       expect(platformModelsApi.deleteProviders).not.toHaveBeenCalled();
       fireEvent.click(button);
-      await screen.findByRole("table", { name: "所有 Agent 应用删除结果" });
+      const resultDialog = await screen.findByRole("dialog", {
+        name: "供应商删除结果",
+      });
+      expect(document.getElementById("main-content")).not.toContainElement(
+        resultDialog,
+      );
+      const details = within(resultDialog)
+        .getByText("所有 Agent 应用删除结果")
+        .closest("details");
+      expect(details).not.toHaveAttribute("open");
       expect(platformModelsApi.deleteProviders).toHaveBeenCalledWith(
         null,
         "https://platform.test",
@@ -168,8 +196,21 @@ describe("shared platform base data", () => {
       expect(
         client.getQueryData(platformCatalogKeys.account(snapshot.baseUrl, 1)),
       ).toEqual(catalog);
-      expect(toast.success).toHaveBeenCalledWith(
+      expect(within(resultDialog).getAllByRole("status")[0]).toHaveTextContent(
         "已删除 3 个平台供应商，保留 0 个",
+      );
+      expect(toast.success).not.toHaveBeenCalled();
+      fireEvent.click(
+        within(resultDialog).getByRole("button", { name: "关闭" }),
+      );
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
+      expect(
+        screen.queryByText("所有 Agent 应用删除结果"),
+      ).not.toBeInTheDocument();
+      expect(document.getElementById("main-content")).not.toHaveTextContent(
+        "已删除",
       );
     },
   );
@@ -201,7 +242,16 @@ describe("shared platform base data", () => {
     });
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: "一键删除平台供应商" }));
-    const table = await screen.findByRole("table", {
+    const resultDialog = await screen.findByRole("dialog", {
+      name: "供应商删除结果",
+    });
+    expect(
+      within(resultDialog).getByText("部分供应商未能删除，请展开明细查看。"),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      within(resultDialog).getByText("所有 Agent 应用删除结果"),
+    );
+    const table = within(resultDialog).getByRole("table", {
       name: "所有 Agent 应用删除结果",
     });
     expect(within(table).getByText("当前供应商没有备用项")).toBeInTheDocument();
@@ -209,10 +259,7 @@ describe("shared platform base data", () => {
     expect(
       within(table).getByRole("row", { name: /WorkBuddy/ }),
     ).toHaveTextContent("已删除 2 个平台供应商，保留 0 个");
-    expect(toast.warning).toHaveBeenCalledWith(
-      "已删除 2 个平台供应商，保留 1 个",
-      expect.any(Object),
-    );
+    expect(toast.warning).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
   });
 
@@ -241,6 +288,10 @@ describe("shared platform base data", () => {
     fireEvent.click(pending);
     expect(platformModelsApi.deleteProviders).toHaveBeenCalledTimes(1);
     await act(async () => finish(deletionSummary));
+    const resultDialog = await screen.findByRole("dialog", {
+      name: "供应商删除结果",
+    });
+    fireEvent.click(within(resultDialog).getByRole("button", { name: "关闭" }));
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: "一键删除平台供应商" }),
@@ -310,8 +361,16 @@ describe("shared platform base data", () => {
     expect(alert).toHaveTextContent("无法完成平台请求，请稍后重试");
     expect(screen.queryByText("secret-token")).not.toBeInTheDocument();
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["providers"] });
+    const errorDialog = screen.getByRole("dialog", { name: "供应商删除结果" });
+    expect(errorDialog).toContainElement(alert);
+    expect(document.getElementById("main-content")).not.toContainElement(alert);
+    expect(toast.error).not.toHaveBeenCalled();
+    fireEvent.click(within(errorDialog).getByRole("button", { name: "关闭" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "一键删除平台供应商" }));
-    await screen.findByRole("table", { name: "所有 Agent 应用删除结果" });
+    await screen.findByRole("dialog", { name: "供应商删除结果" });
     expect(platformModelsApi.deleteProviders).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
@@ -358,6 +417,9 @@ describe("shared platform base data", () => {
       screen.queryByRole("table", { name: "所有 Agent 应用删除结果" }),
     ).not.toBeInTheDocument();
     expect(toast.success).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("dialog", { name: "供应商删除结果" }),
+    ).not.toBeInTheDocument();
   });
 
   it("syncs all apps from local data without fetching platform data or usage", async () => {
@@ -385,13 +447,9 @@ describe("shared platform base data", () => {
     });
   });
 
-  it("disables all-app sync until local credentials are available", async () => {
-    vi.mocked(platformModelsApi.catalog).mockResolvedValue({
-      ...snapshot,
-      credentialsCleared: true,
-    });
+  it("disables all-app sync until a local catalog is available", async () => {
     renderPage();
-    await screen.findByText("Shared group");
+    await screen.findByText("尚无当前账号的基础数据，请先点击上方按钮同步。");
     expect(
       screen.getByRole("button", { name: "全部同步平台供应商" }),
     ).toBeDisabled();
@@ -539,20 +597,20 @@ describe("shared platform base data", () => {
     const trigger = await screen.findByRole("button", {
       name: "查看 Shared group 的详情",
     });
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
     await user.click(trigger);
     const drawer = await screen.findByRole("dialog", { name: "Shared group" });
     expect(within(drawer).getByText("42")).toBeInTheDocument();
     expect(within(drawer).getByText("按量计费")).toBeInTheDocument();
     expect(within(drawer).getByText("123")).toBeInTheDocument();
-    expect(
-      within(drawer).getByText("zhishu-ccs-anthropic-42"),
-    ).toBeInTheDocument();
+    expect(within(drawer).getByText("zhishu-client-42")).toBeInTheDocument();
     expect(within(drawer).queryByText("Test model")).not.toBeInTheDocument();
-    const expandCatalog = within(drawer).getByRole("button", {
-      name: "展开模型目录",
+    const expandCatalog = within(drawer).getByRole("tab", {
+      name: /模型目录/,
     });
-    expect(expandCatalog).toHaveAttribute("aria-expanded", "false");
+    expect(expandCatalog).toHaveAttribute("aria-selected", "false");
     await user.click(expandCatalog);
     expect(within(drawer).getByText("Test model")).toBeInTheDocument();
     expect(within(drawer).getByText("claude-test")).toBeInTheDocument();
@@ -573,9 +631,7 @@ describe("shared platform base data", () => {
     expect(platformModelsApi.catalogKey).not.toHaveBeenCalled();
     await user.click(expandModel);
     expect(within(drawer).queryByText("128,000")).not.toBeInTheDocument();
-    await user.click(
-      within(drawer).getByRole("button", { name: "收起模型目录" }),
-    );
+    await user.click(within(drawer).getByRole("tab", { name: "分组概览" }));
     expect(within(drawer).queryByText("Test model")).not.toBeInTheDocument();
     await user.keyboard("{Escape}");
     await waitFor(() =>
@@ -592,8 +648,8 @@ describe("shared platform base data", () => {
     });
     fireEvent.click(trigger);
     const drawer = await screen.findByRole("dialog");
-    fireEvent.click(
-      within(drawer).getByRole("button", { name: "展开模型目录" }),
+    await userEvent.click(
+      within(drawer).getByRole("tab", { name: /模型目录/ }),
     );
     fireEvent.click(
       within(drawer).getByRole("button", { name: "Test model 的模型参数" }),
@@ -649,6 +705,13 @@ describe("shared platform base data", () => {
       within(drawer).getByRole("button", { name: "显示 API Key" }),
     );
     await within(drawer).findByText("test-only-group-secret");
+    const keyReads = vi.mocked(platformModelsApi.catalogKey).mock.calls.length;
+    await user.click(within(drawer).getByRole("tab", { name: /模型目录/ }));
+    await user.click(within(drawer).getByRole("tab", { name: "分组概览" }));
+    expect(
+      within(drawer).queryByText("test-only-group-secret"),
+    ).not.toBeInTheDocument();
+    expect(platformModelsApi.catalogKey).toHaveBeenCalledTimes(keyReads);
     await user.keyboard("{Escape}");
     await waitFor(() =>
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
@@ -664,34 +727,33 @@ describe("shared platform base data", () => {
     expect(platformModelsApi.syncCatalog).not.toHaveBeenCalled();
   });
 
-  it("keeps logged-out account metadata visible and requires a platform sync to restore keys", async () => {
+  it("shows a key-missing group and enables key access after a successful access sync", async () => {
     vi.mocked(platformModelsApi.catalog).mockResolvedValue({
       ...snapshot,
-      credentialsCleared: true,
-      groups: [{ ...snapshot.groups[0], keyAvailable: false }],
+      groups: [
+        {
+          ...snapshot.groups[0],
+          keyAvailable: false,
+          quota: { available: false, reasons: ["key_missing"] },
+          credential: null,
+        },
+      ],
     });
     renderPage();
     await screen.findByText("Shared group");
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "基础数据已保留，凭证已清除",
-    );
     const user = userEvent.setup();
     await user.click(
       screen.getByRole("button", { name: "查看 Shared group 的详情" }),
     );
     const drawer = await screen.findByRole("dialog");
-    expect(
-      within(drawer).getByText("zhishu-ccs-anthropic-42"),
-    ).toBeInTheDocument();
+    expect(within(drawer).getByText("zhishu-client-42")).toBeInTheDocument();
     expect(
       within(drawer).queryByRole("button", { name: "显示 API Key" }),
     ).not.toBeInTheDocument();
     expect(
       within(drawer).queryByRole("button", { name: "复制 API Key" }),
     ).not.toBeInTheDocument();
-    await user.click(
-      within(drawer).getByRole("button", { name: "展开模型目录" }),
-    );
+    await user.click(within(drawer).getByRole("tab", { name: /模型目录/ }));
     expect(within(drawer).getByText("Test model")).toBeInTheDocument();
     expect(platformModelsApi.catalogKey).not.toHaveBeenCalled();
     await user.keyboard("{Escape}");
@@ -700,11 +762,6 @@ describe("shared platform base data", () => {
     );
     await user.click(screen.getByRole("button", { name: "同步平台基础数据" }));
     await waitFor(() => expect(toast.success).toHaveBeenCalled());
-    expect(
-      screen.queryByText(
-        "基础数据已保留，凭证已清除。同步平台基础数据后可恢复使用。",
-      ),
-    ).not.toBeInTheDocument();
     await user.click(
       screen.getByRole("button", { name: "查看 Shared group 的详情" }),
     );
@@ -713,6 +770,49 @@ describe("shared platform base data", () => {
         name: "显示 API Key",
       }),
     ).toBeEnabled();
+  });
+
+  it("filters local models by name or ID without reading keys or syncing", async () => {
+    vi.mocked(platformModelsApi.catalog).mockResolvedValue({
+      ...snapshot,
+      groups: [
+        {
+          ...snapshot.groups[0],
+          models: [
+            { id: "claude-test", name: "Test model" },
+            { id: "gpt-test", name: "Second model" },
+          ],
+        },
+      ],
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole("button", { name: "查看 Shared group 的详情" }),
+    );
+    const drawer = await screen.findByRole("dialog");
+    await user.click(within(drawer).getByRole("tab", { name: /模型目录/ }));
+    const search = within(drawer).getByRole("searchbox", {
+      name: zh.platformDetails.search,
+    });
+    fireEvent.change(search, { target: { value: " CLAUDE-TEST " } });
+    expect(within(drawer).getByText("Test model")).toBeInTheDocument();
+    expect(within(drawer).queryByText("Second model")).not.toBeInTheDocument();
+    expect(within(drawer).getByRole("status")).toHaveTextContent(
+      "显示 1 / 2 个模型",
+    );
+    fireEvent.change(search, { target: { value: "second" } });
+    expect(within(drawer).getByText("Second model")).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "missing" } });
+    expect(
+      within(drawer).getByText(zh.platformDetails.noMatches),
+    ).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "" } });
+    expect(within(drawer).getByText("Test model")).toBeInTheDocument();
+    expect(within(drawer).getByText("Second model")).toBeInTheDocument();
+    expect(platformModelsApi.catalogKey).not.toHaveBeenCalled();
+    expect(platformModelsApi.syncCatalog).not.toHaveBeenCalled();
+    expect(platformModelsApi.sync).not.toHaveBeenCalled();
   });
 
   it("copies a masked key without revealing it and handles unavailable keys", async () => {
@@ -742,4 +842,32 @@ describe("shared platform base data", () => {
     );
     await waitFor(() => expect(toast.warning).toHaveBeenCalled());
   });
+});
+
+it("shows explicit platform and account attribution and resets open details on account change", async () => {
+  vi.mocked(platformModelsApi.catalog).mockResolvedValue(snapshot);
+  const { client, rerender } = renderPage();
+  await screen.findByText("Shared group");
+  expect(screen.getByText("one@test.com · ID 1")).toBeInTheDocument();
+  expect(screen.getByText("https://platform.test")).toBeInTheDocument();
+  fireEvent.click(
+    screen.getAllByRole("button", { name: "查看 Shared group 的详情" })[0],
+  );
+  await screen.findByRole("dialog");
+  auth.account = {
+    baseUrl: "https://other.test",
+    user: { id: 2, email: "two@test.com" },
+  };
+  vi.mocked(platformModelsApi.catalog).mockResolvedValue(null);
+  rerender(
+    <QueryClientProvider client={client}>
+      <PlatformCatalogPage />
+    </QueryClientProvider>,
+  );
+  await screen.findByText("two@test.com · ID 2");
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+  expect(screen.queryByText("Shared group")).not.toBeInTheDocument();
+  expect(screen.queryByText("one@test.com · ID 1")).not.toBeInTheDocument();
 });

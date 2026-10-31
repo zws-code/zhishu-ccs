@@ -40,44 +40,53 @@ pub(crate) fn delete_all_for_identity(
         if origin != base_url || current_user_id != user_id {
             return Err(super::fail("UNAUTHORIZED", "登录状态已改变，请重新操作"));
         }
-        let mut summary = PlatformDeleteSummary::default();
-        for agent in super::adapter::AGENTS {
-            let app = super::adapter::app(agent)?;
-            match delete_account_providers(state, &app, origin, current_user_id) {
-                Ok(result) => {
-                    summary.removed += result.removed;
-                    summary.skipped += result.skipped;
-                    summary.native_files_changed += result.native_files_changed;
-                    summary.warnings.extend(
-                        result
-                            .warnings
-                            .iter()
-                            .map(|warning| format!("{agent}：{warning}")),
-                    );
-                    summary.apps.push(PlatformDeleteAppResult {
-                        agent: (*agent).into(),
-                        removed: result.removed,
-                        skipped: result.skipped,
-                        warnings: result.warnings,
-                        native_files_changed: result.native_files_changed,
-                        error: None,
-                    });
-                }
-                Err(error) => {
-                    summary.warnings.push(format!("{agent}：{}", error.message));
-                    summary.apps.push(PlatformDeleteAppResult {
-                        agent: (*agent).into(),
-                        removed: 0,
-                        skipped: 0,
-                        warnings: Vec::new(),
-                        native_files_changed: 0,
-                        error: Some(error),
-                    });
-                }
+        delete_all_account_providers(state, origin, current_user_id)
+    })
+}
+
+/// 调用方已持有平台操作锁并验证身份；用于清理退出，避免重复获取认证锁。
+pub(crate) fn delete_all_account_providers(
+    state: &AppState,
+    origin: &str,
+    user_id: i64,
+) -> Result<PlatformDeleteSummary, PlatformAuthError> {
+    let mut summary = PlatformDeleteSummary::default();
+    for agent in super::adapter::AGENTS {
+        let app = super::adapter::app(agent)?;
+        match delete_account_providers(state, &app, origin, user_id) {
+            Ok(result) => {
+                summary.removed += result.removed;
+                summary.skipped += result.skipped;
+                summary.native_files_changed += result.native_files_changed;
+                summary.warnings.extend(
+                    result
+                        .warnings
+                        .iter()
+                        .map(|warning| format!("{agent}：{warning}")),
+                );
+                summary.apps.push(PlatformDeleteAppResult {
+                    agent: (*agent).into(),
+                    removed: result.removed,
+                    skipped: result.skipped,
+                    warnings: result.warnings,
+                    native_files_changed: result.native_files_changed,
+                    error: None,
+                });
+            }
+            Err(error) => {
+                summary.warnings.push(format!("{agent}：{}", error.message));
+                summary.apps.push(PlatformDeleteAppResult {
+                    agent: (*agent).into(),
+                    removed: 0,
+                    skipped: 0,
+                    warnings: Vec::new(),
+                    native_files_changed: 0,
+                    error: Some(error),
+                });
             }
         }
-        Ok(summary)
-    })
+    }
+    Ok(summary)
 }
 
 pub(crate) fn delete_for_identity(

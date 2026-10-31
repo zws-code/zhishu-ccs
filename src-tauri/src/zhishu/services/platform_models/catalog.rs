@@ -1,4 +1,4 @@
-//! 将模型 Key 授权的模型目录转换为各工具可用的模型，统一协议、能力和参数兼容规则。
+//! 将客户端 /access 授权的模型目录转换为各工具可用的模型，保留未报告的能力和参数。
 use super::AgentModel;
 use serde_json::Value;
 use std::collections::HashSet;
@@ -49,16 +49,15 @@ pub(crate) fn strings(value: Option<&Value>) -> Vec<String> {
     result
 }
 
-pub(crate) fn positive(model: &Value, paths: &[&str]) -> u64 {
-    paths
-        .iter()
-        .filter_map(|path| model.pointer(path))
-        .filter_map(|value| {
+pub(crate) fn positive(model: &Value, field: &str) -> u64 {
+    model
+        .get(field)
+        .and_then(|value| {
             value
                 .as_u64()
                 .or_else(|| value.as_str().and_then(|text| text.parse().ok()))
         })
-        .find(|value| *value > 0)
+        .filter(|value| *value > 0)
         .unwrap_or(0)
 }
 
@@ -98,13 +97,6 @@ pub(crate) fn agent_models(platform: &str, models: &[Value], agents: &[&str]) ->
         {
             continue;
         }
-        if model
-            .get("mode")
-            .and_then(Value::as_str)
-            .is_some_and(|mode| !matches!(mode, "" | "chat" | "responses"))
-        {
-            continue;
-        }
         let mut protocols: Vec<_> = if let Some(endpoints) = model
             .get("supported_endpoint_types")
             .or_else(|| model.get("supported_endpoints"))
@@ -115,8 +107,6 @@ pub(crate) fn agent_models(platform: &str, models: &[Value], agents: &[&str]) ->
                 .filter_map(Value::as_str)
                 .filter_map(protocol)
                 .collect()
-        } else if let Some(format) = model.get("api_format").and_then(Value::as_str) {
-            protocol(format).into_iter().collect()
         } else {
             group_protocol(platform).into_iter().collect()
         };
@@ -128,42 +118,22 @@ pub(crate) fn agent_models(platform: &str, models: &[Value], agents: &[&str]) ->
             && is_composite_gemini_model(id)
             && !protocols.contains(&"gemini")
         {
-            // Composite routing resolves built-in Gemini model names even when
-            // /models omits per-model endpoint metadata.
+            // Local CLI routing policy for composite groups with no explicit endpoints;
+            // it does not add model IDs or change the saved server metadata.
             protocols.push("gemini");
         }
-        let context = positive(
-            model,
-            &[
-                "/context_window",
-                "/contextWindow",
-                "/max_input_tokens",
-                "/limit/context",
-            ],
-        );
-        let output = positive(
-            model,
-            &["/max_output_tokens", "/maxOutputTokens", "/limit/output"],
-        );
-        let reasoning_levels = strings(
-            model
-                .get("supported_reasoning_levels")
-                .or_else(|| model.get("reasoningLevels")),
-        );
+        let context = positive(model, "context_window");
+        let output = positive(model, "max_output_tokens");
+        let reasoning_levels = strings(model.get("supported_reasoning_levels"));
         let default_reasoning_level = model
             .get("default_reasoning_level")
-            .or_else(|| model.get("defaultReasoningLevel"))
             .and_then(Value::as_str)
             .filter(|level| {
                 reasoning_levels.is_empty()
                     || reasoning_levels.iter().any(|supported| supported == level)
             })
             .map(str::to_owned);
-        let input_modalities = strings(
-            model
-                .get("input_modalities")
-                .or_else(|| model.pointer("/modalities/input")),
-        );
+        let input_modalities = strings(model.get("input_modalities"));
         for &agent in agents {
             let preferred = match agent {
                 "claude" | "claude-desktop" => "anthropic",
@@ -216,7 +186,6 @@ pub(crate) fn agent_models(platform: &str, models: &[Value], agents: &[&str]) ->
                 model: id.into(),
                 name: model
                     .get("display_name")
-                    .or_else(|| model.get("name"))
                     .and_then(Value::as_str)
                     .filter(|s| !s.trim().is_empty())
                     .unwrap_or(id)
@@ -269,8 +238,8 @@ mod tests {
             json!({"id":"shared","supported_endpoint_types":["responses","messages","chat"],
                 "context_window":128000,"supported_reasoning_levels":["low","high"]}),
             json!({"id":"gemini-native","supported_endpoint_types":["gemini"]}),
-            json!({"id":"shared","api_format":"responses"}),
-            json!({"id":"embedding","mode":"embedding"}),
+            json!({"id":"shared","supported_endpoints":["responses"]}),
+            json!({"id":"embedding","supported_endpoint_types":["embeddings"]}),
         ];
         let all = super::agent_models("composite", &catalog, adapter::AGENTS);
         for &agent in adapter::AGENTS {
@@ -290,7 +259,7 @@ mod tests {
         let models = agent_models(
             "composite",
             vec![json!({
-                "id":"public-alias", "api_format":"openai_chat",
+                "id":"public-alias", "supported_endpoints":["openai_chat"],
                 "context_window":"1000000", "max_output_tokens":64000,
                 "supported_reasoning_levels":[{"effort":"low"},{"effort":"high"},{"effort":"max"},{"effort":"high"}],
                 "default_reasoning_level":"high", "input_modalities":["text","image"],
@@ -309,19 +278,19 @@ mod tests {
         let models = agent_models(
             "openai",
             vec![json!({
-                "id":"nested", "context_window":null,"limit":{"context":32000,"output":4096},
+                "id":"partial-limits", "context_window":null,"max_output_tokens":4096,
                 "supported_reasoning_levels":["none"],"default_reasoning_level":"high"
             })],
         );
         let model = models.iter().find(|model| model.agent == "codex").unwrap();
-        assert_eq!(model.context_window, 32000);
+        assert_eq!(model.context_window, 0);
         assert_eq!(model.max_output_tokens, 4096);
         assert_eq!(model.default_reasoning_level, None);
         assert_eq!(model.reasoning, Some(false));
     }
 
     #[test]
-    fn uses_key_authorized_ids_without_a_separate_catalog() {
+    fn uses_access_authorized_ids_without_a_separate_catalog() {
         let models = agent_models(
             "openai",
             vec![json!({"id":"custom-model"}), json!({"id":"custom-model"})],
@@ -443,7 +412,7 @@ mod tests {
             "composite",
             vec![
                 json!({"id":"native-gemini","supported_endpoint_types":["gemini"],"context_window":32000,"max_output_tokens":4096}),
-                json!({"id":"embedding","mode":"embedding"}),
+                json!({"id":"embedding","supported_endpoint_types":["embeddings"]}),
                 json!({"id":"no-tools","supports_function_calling":false}),
                 json!({"id":"non-streaming","supports_streaming":false}),
                 json!({"id":"image","supported_endpoint_types":["images"]}),
