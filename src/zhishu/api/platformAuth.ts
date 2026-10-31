@@ -7,8 +7,24 @@ export interface PlatformAccount {
     email: string;
     username: string;
     role: string;
+    status?: string;
     balance: number;
   };
+}
+export interface PlatformClientConfig {
+  schema_version: number;
+  site_name: string;
+  api_base_url: string;
+  login_methods: string[];
+  totp_enabled: boolean;
+  registration_enabled: boolean;
+  password_reset_enabled: boolean;
+  register_url: string | null;
+  password_reset_url: string | null;
+  subscriptions_url: string | null;
+  turnstile_enabled: boolean;
+  tencent_captcha_enabled: boolean;
+  aliyun_captcha_enabled: boolean;
 }
 export interface SavedPlatformLogin {
   id: string;
@@ -27,6 +43,8 @@ export type PlatformLoginResult =
 
 /** 平台登录 IPC：access/refresh token 留在 Rust；保存密码只在用户选择历史账号时显式读取。 */
 export const platformAuthApi = {
+  config: (baseUrl: string) =>
+    invoke<PlatformClientConfig>("platform_get_client_config", { baseUrl }),
   account: (active = true) =>
     invoke<PlatformAccount | null>("platform_get_account", { active }),
   history: () => invoke<SavedPlatformLogin[]>("platform_login_history"),

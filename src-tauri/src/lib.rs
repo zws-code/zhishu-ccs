@@ -1580,6 +1580,7 @@ pub fn run() {
             zhishu::commands::platform_saved_password,
             zhishu::commands::platform_forget_password,
             zhishu::commands::platform_remove_login,
+            zhishu::commands::platform_get_client_config,
             zhishu::commands::platform_login,
             zhishu::commands::platform_login_2fa,
             zhishu::commands::platform_get_account,

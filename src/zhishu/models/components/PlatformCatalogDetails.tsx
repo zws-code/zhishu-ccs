@@ -1,3 +1,4 @@
+import { PlatformQuotaStatus } from "./PlatformQuotaStatus";
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -85,6 +86,27 @@ export function PlatformCatalogDetails({
             </div>
           ))}
         </dl>
+        <section className="space-y-2 border-t border-border pt-4">
+          <h3 className="text-section">{t("clientQuota.title")}</h3>
+          <PlatformQuotaStatus quota={group.quota} />
+          {group.subscriptions?.map((subscription) => (
+            <div key={subscription.id} className="text-caption text-fg-2">
+              <p>
+                #{subscription.id} · {subscription.status} ·{" "}
+                {subscription.expires_at}
+              </p>
+              {(["daily", "weekly", "monthly"] as const).map((period) => {
+                const window = subscription[period];
+                return (
+                  <p key={period}>
+                    {t(`clientQuota.${period}`)}: {window.used_usd} /{" "}
+                    {window.limit_usd ?? t("clientQuota.noLimit")} USD
+                  </p>
+                );
+              })}
+            </div>
+          ))}
+        </section>
         {group.error && (
           <p role="status" className="text-body text-danger">
             {group.error}

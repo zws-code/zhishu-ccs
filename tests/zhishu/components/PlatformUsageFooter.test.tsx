@@ -45,7 +45,9 @@ const mocks = vi.hoisted(() => ({
     logout: vi.fn(),
   },
   usage: {
-    data: [] as unknown[],
+    data: undefined as
+      | import("@/zhishu/api/platformUsage").PlatformUsageSummary
+      | undefined,
     isFetching: false,
     isError: false,
     error: null as unknown,
@@ -54,6 +56,11 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
+vi.mock("@/zhishu/auth/useClientConfig", () => ({
+  useClientConfig: () => ({
+    data: { subscriptions_url: "https://portal.example.com/subscriptions" },
+  }),
+}));
 vi.mock("@/lib/api/index", () => ({
   settingsApi: { openExternal: mocks.openExternal },
 }));
@@ -99,102 +106,149 @@ function renderFooter(groupId: number, subscriptionType?: string) {
   );
 }
 
-describe("PlatformUsageFooter", () => {
+function window(limit: number | null = null, used = 0) {
+  return {
+    limit_usd: limit,
+    used_usd: used,
+    remaining_usd: limit == null ? null : limit - used,
+    resets_at: null,
+  };
+}
+function subscription(id = 7, active = true) {
+  return {
+    id,
+    group_id: 14,
+    status: active ? "active" : "expired",
+    active,
+    starts_at: "2026-01-01T00:00:00Z",
+    expires_at: active ? "2099-01-01T00:00:00Z" : "2000-01-01T00:00:00Z",
+    daily: window(),
+    weekly: window(),
+    monthly: window(),
+  };
+}
+function group(subscriptionType = "subscription") {
+  return {
+    id: 14,
+    name: "月度订阅",
+    platform: "openai",
+    status: "active",
+    subscription_type: subscriptionType,
+    quota: { available: true, reasons: [] as string[] },
+    subscriptions: subscriptionType === "subscription" ? [subscription()] : [],
+    credential: null,
+  };
+}
+function setGroups(
+  groups: import("@/zhishu/api/platformUsage").PlatformUsageGroup[],
+) {
+  mocks.usage.data = {
+    baseUrl: mocks.auth.account.baseUrl,
+    userId: 1,
+    syncedAt: 1,
+    balance: 12.5,
+    groups,
+  };
+}
+
+describe("PlatformUsageFooter dedicated client summary", () => {
   beforeEach(() => {
-    mocks.usage.data = [];
+    setGroups([]);
     mocks.usage.isFetching = false;
     mocks.usage.isError = false;
     mocks.usage.error = null;
-    mocks.usage.refetch.mockClear();
-    mocks.auth.refresh.mockClear();
     mocks.openExternal.mockReset().mockResolvedValue(undefined);
     mocks.toastError.mockClear();
   });
-
   afterEach(() => vi.unstubAllEnvs());
 
-  it("shows daily, weekly, and monthly quota for a subscription group", () => {
-    mocks.usage.data = [
-      {
-        subscriptionId: 7,
-        groupId: 14,
-        groupName: "lite订阅",
-        groupPlatform: "composite",
-        expiresAt: "2099-11-01T12:00:00Z",
-        expiresInDays: 9,
-        unlimited: false,
-        daily: {
-          limitUsd: 10,
-          usedUsd: 2.5,
-          remainingUsd: 7.5,
-          percentage: 25,
-          resetsAt: "2099-10-24T00:00:00Z",
-        },
-        weekly: {
-          limitUsd: 50,
-          usedUsd: 25,
-          remainingUsd: 25,
-          percentage: 50,
-          resetsAt: "2099-10-30T00:00:00Z",
-        },
-        monthly: {
-          limitUsd: 100,
-          usedUsd: 20,
-          remainingUsd: 80,
-          percentage: 20,
-          resetsAt: "2099-11-01T00:00:00Z",
-        },
-      },
-    ];
-
+  it("shows all limited subscription windows", () => {
+    const row = group();
+    row.subscriptions[0].daily = window(10, 2.5);
+    row.subscriptions[0].weekly = window(50, 25);
+    row.subscriptions[0].monthly = window(100, 20);
+    setGroups([row]);
     const { container } = renderFooter(14);
-    expect(container.textContent).toContain("每日");
-    expect(container.textContent).toContain("每周");
-    expect(container.textContent).toContain("每月");
+    for (const text of ["每日", "每周", "每月"])
+      expect(container.textContent).toContain(text);
   });
-
-  it("renders an unlimited subscription without inventing a percentage", () => {
-    mocks.usage.data = [
-      {
-        subscriptionId: 8,
-        groupId: 15,
-        groupName: "unlimited",
-        groupPlatform: "composite",
-        expiresAt: "2099-11-01T12:00:00Z",
-        expiresInDays: 9,
-        unlimited: true,
-      },
-    ];
-
-    renderFooter(15);
+  it("uses null limits as unlimited only for active, available subscriptions", () => {
+    setGroups([group()]);
+    renderFooter(14);
     expect(screen.getByText("不限量")).toBeInTheDocument();
   });
-
-  it("shows account balance when no provider is selected", () => {
-    const { container } = renderFooter(99);
-    expect(container.textContent).toContain("余额");
+  it("uses the read-only summary balance for an available standard group", () => {
+    setGroups([group("standard")]);
+    const { container } = renderFooter(14);
     expect(container.textContent).toContain("12.50 USD");
   });
-
-  it("never shows the current account quota on another account's provider", () => {
-    mocks.usage.data = [
-      {
-        subscriptionId: 7,
-        groupId: 14,
-        groupName: "lite订阅",
-        groupPlatform: "composite",
-        expiresAt: "2099-11-01T12:00:00Z",
-        expiresInDays: 9,
-        unlimited: false,
-        daily: {
-          limitUsd: 10,
-          usedUsd: 2.5,
-          remainingUsd: 7.5,
-          percentage: 25,
-          resetsAt: "2099-10-24T00:00:00Z",
-        },
-      },
-    ];
+  it("does not infer wallet billing from a missing group", () => {
+    const { container } = renderFooter(14);
+    expect(container.textContent).toContain("暂不可用");
+    expect(container.textContent).not.toContain("12.50");
+  });
+  it.each([
+    "key_missing",
+    "key_expired",
+    "key_disabled",
+    "key_quota_exhausted",
+    "key_rate_limit_exhausted",
+    "balance_insufficient",
+    "subscription_expired",
+    "subscription_suspended",
+    "subscription_quota_exhausted",
+  ])("shows %s without unlimited or wallet fallback", (reason) => {
+    const row = group();
+    row.quota = { available: false, reasons: [reason] };
+    setGroups([row]);
+    const { container } = renderFooter(14);
+    expect(container.textContent).toContain(
+      zh.clientQuota[reason as keyof typeof zh.clientQuota],
+    );
+    expect(container.textContent).not.toContain("不限量");
+    expect(container.textContent).not.toContain("12.50");
+  });
+  it("does not let an expired subscription override another active subscription", () => {
+    const row = group();
+    row.subscriptions = [subscription(1, false), subscription(2, true)];
+    setGroups([row]);
+    renderFooter(14);
+    expect(screen.getByText("不限量")).toBeInTheDocument();
+  });
+  it("retains multiple active subscriptions instead of collapsing by group", () => {
+    const row = group();
+    row.subscriptions.push(subscription(2));
+    setGroups([row]);
+    renderFooter(14);
+    expect(screen.getAllByText("不限量")).toHaveLength(2);
+  });
+  it("opens the server-provided renewal page", async () => {
+    const row = group();
+    row.quota = { available: false, reasons: ["subscription_expired"] };
+    setGroups([row]);
+    renderFooter(14);
+    fireEvent.click(screen.getByRole("button", { name: "续费订阅" }));
+    await waitFor(() =>
+      expect(mocks.openExternal).toHaveBeenCalledWith(
+        "https://portal.example.com/subscriptions",
+      ),
+    );
+  });
+  it("reports read failures without showing stale unlimited quota", () => {
+    setGroups([group()]);
+    mocks.usage.isError = true;
+    mocks.usage.error = { code: "NETWORK", message: "无法连接平台" };
+    const { container } = renderFooter(14);
+    expect(container.textContent).toContain(zh.quota.failed);
+    expect(container.textContent).not.toContain("不限量");
+  });
+  it("rejects a late response for a different account", () => {
+    setGroups([group()]);
+    mocks.usage.data!.userId = 2;
+    const { container } = renderFooter(14);
+    expect(container.textContent).not.toContain("不限量");
+  });
+  it("never shows quota for another account's provider", () => {
     const foreign = provider(14);
     foreign.meta!.platformManaged!.userId = 2;
     const { container } = render(
@@ -204,100 +258,7 @@ describe("PlatformUsageFooter", () => {
     );
     expect(container).toBeEmptyDOMElement();
   });
-
-  it("keeps an expired subscription visible and opens its renewal page", async () => {
-    vi.stubEnv("VITE_PLATFORM_WEB_URL", "https://portal.example.com/");
-    mocks.usage.data = [
-      {
-        subscriptionId: 7,
-        groupId: 14,
-        groupName: "月度订阅",
-        groupPlatform: "anthropic",
-        expiresAt: "2000-01-01T00:00:00Z",
-        expiresInDays: 0,
-        unlimited: false,
-        status: "expired",
-      },
-    ];
-    const { container } = renderFooter(14, "subscription");
-    expect(container.textContent).toContain(zh.quota.planExpired);
-    expect(container.textContent).not.toContain("余额");
-    fireEvent.click(screen.getByRole("button", { name: "续费订阅" }));
-    await waitFor(() =>
-      expect(mocks.openExternal).toHaveBeenCalledWith(
-        "https://portal.example.com/subscriptions",
-      ),
-    );
-  });
-
-  it("shows suspended subscriptions as unavailable instead of unlimited or balance-billed", () => {
-    mocks.usage.data = [
-      {
-        subscriptionId: 8,
-        groupId: 14,
-        groupName: "月度订阅",
-        groupPlatform: "anthropic",
-        expiresAt: "2099-01-01T00:00:00Z",
-        expiresInDays: 9,
-        unlimited: false,
-        status: "suspended",
-      },
-    ];
-    const { container } = renderFooter(14, "subscription");
-    expect(container.textContent).toContain("订阅暂不可用");
-    expect(container.textContent).not.toContain("不限量");
-    expect(container.textContent).not.toContain("余额");
-    expect(
-      screen.getByRole("button", { name: "管理订阅" }),
-    ).toBeInTheDocument();
-  });
-
-  it("does not infer balance billing when a known subscription is absent from the response", () => {
-    const { container } = renderFooter(14, "subscription");
-    expect(container.textContent).toContain("订阅暂不可用");
-    expect(container.textContent).not.toContain("余额");
-  });
-
-  it("keeps subscription identity when fetching quota fails", () => {
-    mocks.usage.isError = true;
-    mocks.usage.error = { code: "NETWORK", message: "private-server-detail" };
-    const { container } = renderFooter(14, "subscription");
-    expect(container.textContent).toContain(zh.quota.failed);
-    expect(container.textContent).not.toContain("余额");
-    expect(
-      screen.getByRole("button", { name: "管理订阅" }),
-    ).toBeInTheDocument();
-  });
-
-  it("shows an exhausted subscription quota without falling back to account balance", () => {
-    mocks.usage.data = [
-      {
-        subscriptionId: 7,
-        groupId: 14,
-        groupName: "月度订阅",
-        groupPlatform: "anthropic",
-        expiresAt: "2099-01-01T00:00:00Z",
-        expiresInDays: 9,
-        unlimited: false,
-        status: "active",
-        daily: {
-          limitUsd: 10,
-          usedUsd: 10,
-          remainingUsd: 0,
-          percentage: 100,
-          resetsAt: "2099-01-01T00:00:00Z",
-        },
-      },
-    ];
-    const { container } = renderFooter(14, "subscription");
-    expect(container.textContent).toContain("用完");
-    expect(container.textContent).not.toContain("余额");
-    expect(
-      screen.getByRole("button", { name: "管理订阅" }),
-    ).toBeInTheDocument();
-  });
-
-  it("reports a renewal-page failure without exposing arbitrary errors", async () => {
+  it("reports webpage failures without arbitrary error details", async () => {
     mocks.openExternal.mockRejectedValue(new Error("private-server-detail"));
     renderFooter(14, "subscription");
     fireEvent.click(screen.getByRole("button", { name: "管理订阅" }));

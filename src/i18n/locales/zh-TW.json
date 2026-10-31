@@ -5303,5 +5303,23 @@
       "providerMissing": "此 Oh My Pi 供應商已不在儲存的清單中。",
       "legacyModelsJson": "Oh My Pi 目錄裡仍是舊的 models.json，omp 會在下次啟動時將它遷移為 models.yml。請先執行一次 omp，再回來新增供應商。"
     }
+  },
+  "clientQuota": {
+    "noLimit": "未設視窗上限",
+    "title": "額度狀態",
+    "available": "可用",
+    "unavailable": "暫不可用",
+    "key_missing": "缺少專用 Key",
+    "key_expired": "Key 已過期",
+    "key_quota_exhausted": "Key 額度已耗盡",
+    "key_disabled": "Key 已停用",
+    "key_rate_limit_exhausted": "Key 週期額度已耗盡",
+    "balance_insufficient": "帳戶餘額不足",
+    "subscription_expired": "訂閱已過期",
+    "subscription_suspended": "訂閱已暫停",
+    "subscription_quota_exhausted": "訂閱額度已耗盡",
+    "daily": "每日",
+    "weekly": "每週",
+    "monthly": "每月"
   }
 }

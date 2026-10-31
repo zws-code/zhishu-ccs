@@ -1,3 +1,4 @@
+pub(crate) mod client_api;
 pub(crate) mod dsh_state;
 pub(crate) mod platform_auth;
 pub(crate) mod platform_http_log;

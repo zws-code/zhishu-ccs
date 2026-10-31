@@ -21,13 +21,12 @@ import { Label } from "@/components/ui/label";
 import { settingsApi } from "@/lib/api/index";
 import { DRAG_REGION_ATTR, DRAG_REGION_STYLE, isMac } from "@/lib/platform";
 import { WindowControls } from "@/components/shell/WindowControls";
+import { useClientConfig } from "@/zhishu/auth/useClientConfig";
 import logo from "@/zhishu/assets/logo.png";
 
 // Vite 根目录是 src/，可选的部署环境配置相应放在 src/.env.local。
 const DEFAULT_API =
   import.meta.env.VITE_PLATFORM_API_URL || "http://127.0.0.1:3000";
-const WEBSITE =
-  import.meta.env.VITE_PLATFORM_WEB_URL || "http://127.0.0.1:3081";
 
 /** 平台登录门禁：恢复期间等待验证，恢复失败提供重试入口，通过认证后才挂载工具界面。 */
 export function PlatformAuthGate({ children }: { children: ReactNode }) {
@@ -111,6 +110,7 @@ export function PlatformLogin() {
   const auth = usePlatformAuth();
   const { t } = useTranslation();
   const [baseUrl, setBaseUrl] = useState(DEFAULT_API);
+  const config = useClientConfig(baseUrl);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -246,9 +246,9 @@ export function PlatformLogin() {
       setBusy(false);
     }
   };
-  const openWebsite = async (path: string) => {
+  const openWebsite = async (url: string) => {
     try {
-      await settingsApi.openExternal(`${WEBSITE.replace(/\/$/, "")}${path}`);
+      await settingsApi.openExternal(url);
     } catch (cause) {
       setError(platformAuthError(cause));
     }
@@ -275,7 +275,9 @@ export function PlatformLogin() {
             className="h-20 w-20 shrink-0 object-contain dark:invert"
           />
         </div>
-        <h1 className="text-2xl font-semibold">{t("platformAuth.title")}</h1>
+        <h1 className="text-2xl font-semibold">
+          {config.data?.site_name || t("platformAuth.title")}
+        </h1>
         <p className="mb-7 mt-2 text-body text-fg-2">
           {t("platformAuth.subtitle")}
         </p>
@@ -439,20 +441,27 @@ export function PlatformLogin() {
           )}
         </form>
         <div className="mt-3 flex justify-between">
-          <Button
-            variant="link"
-            disabled={disabled}
-            onClick={() => void openWebsite("/register")}
-          >
-            {t("platformAuth.register")}
-          </Button>
-          <Button
-            variant="link"
-            disabled={disabled}
-            onClick={() => void openWebsite("/forgot-password")}
-          >
-            {t("platformAuth.forgot")}
-          </Button>
+          {config.data?.registration_enabled && config.data.register_url && (
+            <Button
+              variant="link"
+              disabled={disabled}
+              onClick={() => void openWebsite(config.data!.register_url!)}
+            >
+              {t("platformAuth.register")}
+            </Button>
+          )}
+          {config.data?.password_reset_enabled &&
+            config.data.password_reset_url && (
+              <Button
+                variant="link"
+                disabled={disabled}
+                onClick={() =>
+                  void openWebsite(config.data!.password_reset_url!)
+                }
+              >
+                {t("platformAuth.forgot")}
+              </Button>
+            )}
         </div>
         <p className="mt-5 text-caption text-fg-3">
           {t("platformAuth.sessionHint")}

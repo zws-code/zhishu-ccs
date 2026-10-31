@@ -323,3 +323,15 @@ L3 的统一依据见 [ADR-0002](adr/ADR-0002-structure-and-history.md)，数据
 发布准备补充复核 ZS-003（L1）：`.github/workflows/release.yml` 的 COS SDK 契约测试发现目录由 `scripts` 改为实际的 `scripts/zhishu`；自有恢复工作流同步修正。原命令实测执行 0 项测试，固定工作流入口必须直接修正，新增模块不能改变 unittest 的发现目录。未改变构建、签名、上传策略及权限。
 
 2026-10-30 加速恢复补充：仅修改自有 `scripts/zhishu/resume-release.mjs` 与回归，L1；支持在完整 payload 保存成功后取消的正式运行，仍核对原 tag/SHA、唯一未过期产物及后续签名/哈希。没有新增上游文件补丁；本次用户授权见 [0.0.2 发布记录](RELEASE-0.0.2.md)。
+
+## 2026-10-31 客户端专用 API
+
+依据：[ADR-0004](adr/ADR-0004-client-api-only.md)。自有旧平台请求、Key 生命周期及网络模型发现已删除，复用上游 Provider 与配置引擎。
+
+| ID | 上游文件 | 原因 | 为什么不能仅新增/包装 | 级别 | 对应测试 | 最后复核 |
+|---|---|---|---|---|---|---|
+| CLIENT-20261031-01 | `src-tauri/src/lib.rs` | 注册只读客户端 config IPC | Tauri 固定注册表必须挂载命令 | L1 | auth IPC / config / typecheck | 2026-10-31 |
+| CLIENT-20261031-02 | `src-tauri/src/provider.rs`、`src/types.ts` | 平台元数据新增可选 connectionBaseUrl，保留生成网关地址用于增量刷新 | 共享序列化类型须保留新字段，外部包装不能保证数据库往返 | L2 | gateway / Provider 同步 / typecheck | 2026-10-31 |
+| CLIENT-20261031-03 | `src/i18n/locales/{zh,zh-TW,en,ja,tr}.json` | 新额度状态和原因文案 | 现有 i18n 通过共享字典读取 | L1 | PlatformUsageFooter / PlatformCatalogPage | 2026-10-31 |
+
+其余实现均在 `src/zhishu/`、`src-tauri/src/zhishu/` 和对应测试、文档内。不修改上游 DAO、代理、配置写入/恢复引擎，不引入依赖。

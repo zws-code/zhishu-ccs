@@ -120,7 +120,11 @@ pub(crate) fn agent_models(platform: &str, models: &[Value], agents: &[&str]) ->
         } else {
             group_protocol(platform).into_iter().collect()
         };
-        if platform == "composite"
+        if model
+            .get("supported_endpoint_types")
+            .or_else(|| model.get("supported_endpoints"))
+            .is_none()
+            && platform == "composite"
             && is_composite_gemini_model(id)
             && !protocols.contains(&"gemini")
         {
@@ -150,7 +154,10 @@ pub(crate) fn agent_models(platform: &str, models: &[Value], agents: &[&str]) ->
             .get("default_reasoning_level")
             .or_else(|| model.get("defaultReasoningLevel"))
             .and_then(Value::as_str)
-            .filter(|level| reasoning_levels.iter().any(|supported| supported == level))
+            .filter(|level| {
+                reasoning_levels.is_empty()
+                    || reasoning_levels.iter().any(|supported| supported == level)
+            })
             .map(str::to_owned);
         let input_modalities = strings(
             model
@@ -222,8 +229,11 @@ pub(crate) fn agent_models(platform: &str, models: &[Value], agents: &[&str]) ->
                 protocol: protocol.into(),
                 category: "available".into(),
                 available: true,
-                supports_tools: true,
-                supports_streaming: true,
+                supports_tools: model
+                    .get("supports_tools")
+                    .or_else(|| model.get("supports_function_calling"))
+                    .and_then(Value::as_bool),
+                supports_streaming: model.get("supports_streaming").and_then(Value::as_bool),
                 context_window: context,
                 max_output_tokens: output,
                 reasoning_levels: reasoning_levels.clone(),
@@ -460,5 +470,18 @@ mod tests {
             models.iter().find(|m| m.agent == "codex").unwrap().protocol,
             "responses"
         );
+    }
+    #[test]
+    fn unknown_capabilities_remain_unknown_in_adapter_inputs() {
+        let models = agent_models(
+            "openai",
+            vec![json!({"id":"alias","default_reasoning_level":"high"})],
+        );
+        let model = models.iter().find(|model| model.agent == "codex").unwrap();
+        assert_eq!(model.supports_tools, None);
+        assert_eq!(model.supports_streaming, None);
+        assert_eq!(model.context_window, 0);
+        assert!(model.reasoning_levels.is_empty());
+        assert_eq!(model.default_reasoning_level.as_deref(), Some("high"));
     }
 }

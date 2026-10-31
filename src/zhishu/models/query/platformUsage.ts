@@ -27,7 +27,17 @@ export function usePlatformSubscriptionUsage() {
       account?.baseUrl ?? "",
       account?.user.id ?? 0,
     ),
-    queryFn: platformUsageApi.subscriptions,
+    queryFn: async ({ signal }) => {
+      const summary = await platformUsageApi.subscriptions();
+      if (
+        signal.aborted ||
+        summary.baseUrl !== account?.baseUrl ||
+        summary.userId !== account?.user.id
+      ) {
+        throw { code: "UNAUTHORIZED", message: "登录状态已改变，请重新查询" };
+      }
+      return summary;
+    },
     enabled: Boolean(account),
     staleTime: REFETCH_INTERVAL,
     refetchInterval: REFETCH_INTERVAL,

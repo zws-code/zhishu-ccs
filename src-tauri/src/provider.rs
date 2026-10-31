@@ -691,6 +691,9 @@ pub fn parse_custom_user_agent(
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlatformManagedProvider {
+    /// Last generated gateway root, distinct from the authenticated platform origin.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection_base_url: Option<String>,
     pub origin: String,
     pub user_id: i64,
     pub entry_id: String,

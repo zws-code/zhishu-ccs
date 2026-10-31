@@ -19,6 +19,7 @@
 
 ## 文档
 
+- [客户端专用接口接入契约与实施记录](client-api-integration.md)
 - [强制开发规范](SECONDARY_DEVELOPMENT_STANDARD.md)
 - [实际基线与限制](BASELINE.md)
 - [上游补丁登记](UPSTREAM_PATCHES.md)

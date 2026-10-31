@@ -34,8 +34,8 @@ pub struct AgentModel {
     pub category: String,
     #[serde(default)]
     pub available: bool,
-    pub supports_tools: bool,
-    pub supports_streaming: bool,
+    pub supports_tools: Option<bool>,
+    pub supports_streaming: Option<bool>,
     #[serde(default)]
     pub context_window: u64,
     #[serde(default)]
@@ -147,7 +147,6 @@ pub struct PlatformSyncSummary {
 
 struct DesiredProvider {
     group_id: i64,
-    catalog_available: bool,
     provider: Provider,
 }
 
@@ -176,21 +175,7 @@ pub async fn platform_sync_catalog(
             store.save(discovery.clone())
         })
         .await?;
-    let mut summary = cached.summary();
-    // 撤销旧 Key 只属于平台阶段；检查所有工具的引用，避免误删尚未本地同步的工具凭据。
-    match obsolete_keys_to_remove(handle.state::<AppState>().inner(), &discovery) {
-        Ok(ids) => match auth
-            .delete_obsolete_group_keys(&discovery.account, &ids)
-            .await
-        {
-            Ok(warnings) => summary.warnings.extend(warnings),
-            Err(err) => summary.warnings.push(err.message),
-        },
-        Err(err) => summary
-            .warnings
-            .push(format!("旧分组专用 Key 未清理：{}", err.message)),
-    }
-    Ok(summary)
+    Ok(cached.summary())
 }
 
 /// 只读当前账户的本机摘要，不发 HTTP 请求，也不泄露目录中的 Key。
@@ -369,43 +354,6 @@ fn sync_cached_providers(
     summary
 }
 
-fn obsolete_keys_to_remove(
-    state: &AppState,
-    discovery: &GroupDiscovery,
-) -> Result<Vec<i64>, PlatformAuthError> {
-    if discovery.obsolete_keys.is_empty() {
-        return Ok(Vec::new());
-    }
-    let mut retained = HashSet::new();
-    for app in crate::app_config::AppType::all() {
-        for provider in local_error(state.db.get_all_providers(app.as_str()))?.into_values() {
-            let managed = provider
-                .meta
-                .as_ref()
-                .and_then(|meta| meta.platform_managed.as_ref());
-            let (_, credential) = provider.resolve_usage_credentials(&app);
-            for key in &discovery.obsolete_keys {
-                let referenced = managed.is_some_and(|managed| {
-                    managed.origin == discovery.account.base_url
-                        && (managed.key_id == key.id
-                            || (managed.user_id == discovery.account.user.id
-                                && managed.group_id == key.group_id))
-                });
-                // A manually added provider may also reuse a dedicated key.
-                if referenced || (!credential.is_empty() && credential == key.key) {
-                    retained.insert(key.id);
-                }
-            }
-        }
-    }
-    Ok(discovery
-        .obsolete_keys
-        .iter()
-        .filter(|key| !retained.contains(&key.id))
-        .map(|key| key.id)
-        .collect())
-}
-
 fn sync_agent_providers(
     state: &AppState,
     app: &crate::app_config::AppType,
@@ -436,11 +384,24 @@ fn sync_agent_providers(
     }
     let mut failed_group_ids = discovery.failed_group_ids.clone();
     let mut warnings = Vec::new();
+    // 无凭证不等于目录失败，更不能将未知 Key 写入工具配置。
+    for group in &discovery.groups {
+        if !discovery
+            .catalogs
+            .iter()
+            .any(|catalog| catalog.group.id == group.id)
+            && failed_group_ids.insert(group.id)
+        {
+            warnings.push(format!(
+                "分组 {} 未提供专用凭证，已保留本地供应商，请重新同步平台基础数据",
+                group.id
+            ));
+        }
+    }
     let mut desired = HashMap::<String, DesiredProvider>::new();
 
     for catalog in &discovery.catalogs {
-        let mut models =
-            catalog::agent_models(&catalog.credential.platform, &catalog.models, &[agent]);
+        let models = catalog::agent_models(&catalog.credential.platform, &catalog.models, &[agent]);
         if agent == "workbuddy" && models.is_empty() && !catalog.models.is_empty() {
             failed_group_ids.insert(catalog.group.id);
             warnings.push(format!(
@@ -457,30 +418,16 @@ fn sync_agent_providers(
             ));
             continue;
         }
+        if catalog.catalog_error.is_some() {
+            failed_group_ids.insert(catalog.group.id);
+            warnings.push(format!(
+                "分组 {} 的模型目录暂不可用，已保留本地供应商",
+                catalog.group.id
+            ));
+            continue;
+        }
         if models.is_empty() {
-            let Some(catalog_error) = catalog.catalog_error.as_ref() else {
-                continue;
-            };
-            if agent == "workbuddy" {
-                failed_group_ids.insert(catalog.group.id);
-                warnings.push(format!(
-                    "分组 {} 的模型目录暂时不可用，已保留 WorkBuddy 本地供应商：{}",
-                    catalog.group.name, catalog_error
-                ));
-                continue;
-            }
-            if !fallback_target_matches(agent, &catalog.group.platform) {
-                continue;
-            }
-            if let Some(fallback) = fallback_agent_model(agent, &catalog.group.platform, &live)? {
-                models.push(fallback);
-            } else {
-                warnings.push(format!(
-                    "分组 {} 的模型目录暂时不可用，且没有可沿用的现有模型：{}",
-                    catalog.group.name, catalog_error
-                ));
-                continue;
-            }
+            continue;
         }
         let model = match connection::select_model(agent, &models, &live) {
             Ok(model) => model,
@@ -493,7 +440,7 @@ fn sync_agent_providers(
                 continue;
             }
         };
-        let mut provider = match adapter::service_provider(
+        let mut provider = match adapter::service_provider_with_connection(
             model,
             &discovery.account.base_url,
             discovery.account.user.id,
@@ -504,6 +451,7 @@ fn sync_agent_providers(
             &catalog.group.platform,
             &catalog.group.name,
             &catalog.credential.key_name,
+            catalog.connection.as_ref(),
         ) {
             Ok(provider) => provider,
             Err(err) => {
@@ -541,7 +489,6 @@ fn sync_agent_providers(
             id,
             DesiredProvider {
                 group_id: catalog.group.id,
-                catalog_available: catalog.catalog_error.is_none(),
                 provider,
             },
         );
@@ -580,14 +527,14 @@ fn sync_agent_providers(
             let group_failed = managed
                 .group_id
                 .is_some_and(|group_id| failed_group_ids.contains(&group_id));
-            let subscription = managed.subscription_type.as_deref() == Some("subscription")
-                || managed
-                    .group_id
-                    .is_some_and(|id| discovery.subscription_group_ids.contains(&id));
-            if subscription || group_failed || desired.contains_key(&provider.id) {
+            let quota_unavailable = managed
+                .group_id
+                .and_then(|id| discovery.details.get(&id))
+                .is_some_and(|details| !details.quota.available);
+            if quota_unavailable || group_failed || desired.contains_key(&provider.id) {
                 return None;
             }
-            // 上面的条件已排除订阅、失败分组和仍需保留的行，其余当前账户托管项可删除。
+            // 成功且可用的空模型目录/撤销授权可以协调本地项；失败或额度不足不能冒充下线。
             Some(provider.clone())
         })
         .collect();
@@ -645,6 +592,24 @@ fn sync_agent_providers(
                         refreshed.created_at = provider.created_at;
                     }
                 }
+                let previous_base = provider
+                    .meta
+                    .as_ref()
+                    .and_then(|meta| meta.platform_managed.as_ref())
+                    .and_then(|managed| managed.connection_base_url.as_deref())
+                    .unwrap_or(&discovery.account.base_url);
+                let next_base = desired
+                    .provider
+                    .meta
+                    .as_ref()
+                    .and_then(|meta| meta.platform_managed.as_ref())
+                    .and_then(|managed| managed.connection_base_url.as_deref())
+                    .unwrap_or(&discovery.account.base_url);
+                changed |= adapter::refresh_connection_base(
+                    &mut refreshed.settings_config,
+                    previous_base,
+                    next_base,
+                );
                 if refreshed.name != desired.provider.name {
                     refreshed.name = desired.provider.name.clone();
                     changed = true;
@@ -653,12 +618,12 @@ fn sync_agent_providers(
                     &mut refreshed.settings_config,
                     &desired.provider.settings_config,
                     app,
-                    &discovery.account.base_url,
+                    next_base,
                 );
                 changed |= adapter::repair_protocol_base_url(
                     &mut refreshed.settings_config,
                     app,
-                    &discovery.account.base_url,
+                    next_base,
                     provider
                         .meta
                         .as_ref()
@@ -669,9 +634,7 @@ fn sync_agent_providers(
                         .as_ref()
                         .and_then(|meta| meta.api_format.as_deref()),
                 );
-                if desired.catalog_available {
-                    changed |= connection::refresh_catalog(&mut refreshed, &desired.provider, app);
-                }
+                changed |= connection::refresh_catalog(&mut refreshed, &desired.provider, app);
                 if let (Some(managed), Some(desired)) = (
                     refreshed
                         .meta
@@ -683,12 +646,14 @@ fn sync_agent_providers(
                         .as_ref()
                         .and_then(|meta| meta.platform_managed.as_ref()),
                 ) {
-                    changed |= managed.key_id != desired.key_id
+                    changed |= managed.connection_base_url != desired.connection_base_url
+                        || managed.key_id != desired.key_id
                         || managed.key_name != desired.key_name
                         || managed.group_id != desired.group_id
                         || managed.group_platform != desired.group_platform
                         || managed.group_name != desired.group_name
                         || managed.subscription_type != desired.subscription_type;
+                    managed.connection_base_url = desired.connection_base_url.clone();
                     managed.key_id = desired.key_id;
                     managed.key_name = desired.key_name.clone();
                     managed.group_id = desired.group_id;
@@ -708,70 +673,6 @@ fn sync_agent_providers(
         warnings.push(format!("服务供应商 {id} 未能加入列表"));
     }
     Ok((added, removed, skipped, warnings))
-}
-
-fn fallback_agent_model(
-    agent: &str,
-    group_platform: &str,
-    live: &Value,
-) -> Result<Option<AgentModel>, PlatformAuthError> {
-    if !fallback_target_matches(agent, group_platform) {
-        return Ok(None);
-    }
-    let Some(model) = connection::current_model(agent, live)? else {
-        return Ok(None);
-    };
-    let model = model.trim();
-    if model.is_empty() {
-        return Ok(None);
-    }
-    let protocol = match agent {
-        "claude" => "anthropic",
-        "claude-desktop" => match group_platform {
-            "anthropic" => "anthropic",
-            "gemini" => "gemini",
-            _ => "responses",
-        },
-        "deepseek-harness" => match group_platform {
-            "anthropic" => "anthropic",
-            _ => "responses",
-        },
-        "gemini" => "gemini",
-        _ => "responses",
-    };
-    Ok(Some(AgentModel {
-        id: model.into(),
-        agent: agent.into(),
-        model: model.into(),
-        name: model.into(),
-        description: String::new(),
-        protocol: protocol.into(),
-        category: "available".into(),
-        available: true,
-        supports_tools: true,
-        supports_streaming: true,
-        context_window: 0,
-        max_output_tokens: 0,
-        reasoning_levels: Vec::new(),
-        default_reasoning_level: None,
-        reasoning: None,
-        input_modalities: Vec::new(),
-        supports_parallel_tool_calls: None,
-        pricing: None,
-    }))
-}
-
-fn fallback_target_matches(agent: &str, group_platform: &str) -> bool {
-    match group_platform {
-        "anthropic" => matches!(agent, "claude" | "claude-desktop" | "deepseek-harness"),
-        "openai" | "deepseek" => matches!(agent, "codex" | "deepseek-harness" | "claude-desktop"),
-        "gemini" => agent == "gemini",
-        "composite" => matches!(
-            agent,
-            "claude" | "claude-desktop" | "codex" | "deepseek-harness"
-        ),
-        _ => false,
-    }
 }
 
 fn delete_managed_provider(
@@ -1434,6 +1335,7 @@ mod tests {
                 email: "test@example.com".into(),
                 username: "test".into(),
                 role: "user".into(),
+                status: "active".into(),
                 balance: 1.0,
             },
         };
@@ -1459,6 +1361,7 @@ mod tests {
                     },
                     models: models.clone(),
                     catalog_error: None,
+                    connection: None,
                 },
             )
             .collect();
@@ -1467,12 +1370,30 @@ mod tests {
             .filter(|group| group.subscription_type == "subscription")
             .map(|group| group.id)
             .collect();
+        let details = groups
+            .iter()
+            .map(|group| {
+                (
+                    group.id,
+                    super::super::client_api::GroupDetails {
+                        quota: super::super::client_api::ClientQuota {
+                            available: true,
+                            reasons: Vec::new(),
+                        },
+                        subscriptions: Vec::new(),
+                        credential: None,
+                        is_exclusive: false,
+                    },
+                )
+            })
+            .collect();
         GroupDiscovery {
             account,
             groups,
             catalogs,
             failed_group_ids: HashSet::new(),
-            obsolete_keys: Vec::new(),
+            synced_at: 1793433600000,
+            details,
             subscription_group_ids,
             warnings: Vec::new(),
         }
@@ -1932,137 +1853,6 @@ mod tests {
 
     #[test]
     #[serial_test::serial]
-    fn obsolete_keys_wait_for_all_tools_and_preserve_manual_credentials() {
-        use crate::database::Database;
-        use std::sync::Arc;
-
-        let _home = SyncTestHome::new();
-        let state = AppState::new(Arc::new(Database::memory().unwrap()));
-        let app = crate::app_config::AppType::Claude;
-        // This simulates a previously synchronized group that no longer matches
-        // the prefix. Discovery has already filtered it out on the next sync.
-        let group = crate::zhishu::services::platform_auth::AvailableGroup {
-            id: 43,
-            name: "原有分组".into(),
-            platform: "anthropic".into(),
-            status: "active".into(),
-            subscription_type: "standard".into(),
-        };
-        let old = test_discovery(vec![group]);
-        sync_agent_providers(&state, &app, &old).unwrap();
-        let old_id =
-            adapter::service_provider_id("claude", 43, "anthropic", "https://platform.test", 1);
-        let old_provider = state
-            .db
-            .get_provider_by_id(&old_id, "claude")
-            .unwrap()
-            .unwrap();
-        let mut next = test_discovery(Vec::new());
-        next.obsolete_keys.push(
-            serde_json::from_value(json!({
-                "id":43, "key":"key-43", "name":"zhishu-ccs-anthropic-43", "group_id":43
-            }))
-            .unwrap(),
-        );
-
-        // The same key can be referenced by a different tool or account row.
-        let mut other_tool = old_provider.clone();
-        other_tool.id = "other-tool".into();
-        state.db.save_provider("codex", &other_tool).unwrap();
-        let local = Provider::with_id(
-            "manual".into(),
-            "Manual".into(),
-            json!({"env":{"ANTHROPIC_API_KEY":"manual-key"}}),
-            None,
-        );
-        state.db.save_provider("claude", &local).unwrap();
-        let mut other_account = old_provider.clone();
-        other_account.id = "other-account".into();
-        let managed = other_account
-            .meta
-            .as_mut()
-            .unwrap()
-            .platform_managed
-            .as_mut()
-            .unwrap();
-        managed.user_id = 2;
-        managed.key_id = 99;
-        other_account.settings_config = json!({"env":{"ANTHROPIC_API_KEY":"other-key"}});
-        state.db.save_provider("claude", &other_account).unwrap();
-
-        let (_, removed, _, warnings) = sync_agent_providers(&state, &app, &next).unwrap();
-        assert_eq!(removed, 1);
-        assert!(warnings.is_empty());
-        assert!(state
-            .db
-            .get_provider_by_id("manual", "claude")
-            .unwrap()
-            .is_some());
-        assert!(state
-            .db
-            .get_provider_by_id("other-account", "claude")
-            .unwrap()
-            .is_some());
-        assert!(obsolete_keys_to_remove(&state, &next).unwrap().is_empty());
-        state.db.delete_provider("codex", "other-tool").unwrap();
-        assert_eq!(obsolete_keys_to_remove(&state, &next).unwrap(), vec![43]);
-
-        // A manual provider reusing the old key also keeps it alive.
-        let mut manual_shared = local.clone();
-        manual_shared.settings_config = json!({"env":{"ANTHROPIC_API_KEY":"key-43"}});
-        state.db.save_provider("claude", &manual_shared).unwrap();
-        assert!(obsolete_keys_to_remove(&state, &next).unwrap().is_empty());
-        state.db.delete_provider("claude", "manual").unwrap();
-        assert_eq!(obsolete_keys_to_remove(&state, &next).unwrap(), vec![43]);
-
-        // Manual rows in apps without platform sync support still count.
-        manual_shared.settings_config = json!({"env":{"GEMINI_API_KEY":"key-43"}});
-        state.db.save_provider("agy", &manual_shared).unwrap();
-        assert!(obsolete_keys_to_remove(&state, &next).unwrap().is_empty());
-    }
-
-    #[test]
-    #[serial_test::serial]
-    fn obsolete_keys_survive_when_the_current_provider_cannot_be_deleted() {
-        use crate::database::Database;
-        use std::sync::Arc;
-
-        let _home = SyncTestHome::new();
-        let state = AppState::new(Arc::new(Database::memory().unwrap()));
-        let app = crate::app_config::AppType::Claude;
-        let old = test_discovery(vec![
-            crate::zhishu::services::platform_auth::AvailableGroup {
-                id: 43,
-                name: "原有分组".into(),
-                platform: "anthropic".into(),
-                status: "active".into(),
-                subscription_type: "standard".into(),
-            },
-        ]);
-        sync_agent_providers(&state, &app, &old).unwrap();
-        let id =
-            adapter::service_provider_id("claude", 43, "anthropic", "https://platform.test", 1);
-        ProviderService::switch(&state, app.clone(), &id).unwrap();
-        let mut next = test_discovery(Vec::new());
-        next.obsolete_keys.push(
-            serde_json::from_value(json!({
-                "id":43, "key":"key-43", "name":"zhishu-ccs-anthropic-43", "group_id":43
-            }))
-            .unwrap(),
-        );
-        let (_, removed, _, warnings) = sync_agent_providers(&state, &app, &next).unwrap();
-        assert_eq!(removed, 0);
-        assert!(!warnings.is_empty());
-        assert!(state
-            .db
-            .get_provider_by_id(&id, "claude")
-            .unwrap()
-            .is_some());
-        assert!(obsolete_keys_to_remove(&state, &next).unwrap().is_empty());
-    }
-
-    #[test]
-    #[serial_test::serial]
     fn subscription_sync_keeps_expired_and_exhausted_rows_and_migrates_legacy_metadata() {
         use crate::database::Database;
         use std::sync::Arc;
@@ -2126,8 +1916,12 @@ mod tests {
             .unwrap()
             .user_id = 2;
         state.db.save_provider("claude", &other_account).unwrap();
-        let mut expired = test_discovery(Vec::new());
-        expired.subscription_group_ids.insert(14);
+        let mut expired = active.clone();
+        expired.catalogs[0].models.clear();
+        expired.details.get_mut(&14).unwrap().quota = super::super::client_api::ClientQuota {
+            available: false,
+            reasons: vec!["subscription_expired".into()],
+        };
         let (_, removed, _, warnings) = sync_agent_providers(&state, &app, &expired).unwrap();
         assert_eq!(removed, 0);
         assert!(warnings.is_empty());
@@ -2162,10 +1956,6 @@ mod tests {
             manual.settings_config
         );
 
-        // Even a later empty history cannot delete a known subscription row.
-        let (_, removed, _, _) =
-            sync_agent_providers(&state, &app, &test_discovery(Vec::new())).unwrap();
-        assert_eq!(removed, 0);
         let mut exhausted = active;
         exhausted.catalogs.clear();
         exhausted.failed_group_ids.insert(14);
@@ -2180,6 +1970,15 @@ mod tests {
                 .settings_config,
             original
         );
+        // A successful access snapshot with no group means authorization was withdrawn.
+        let (_, removed, _, _) =
+            sync_agent_providers(&state, &app, &test_discovery(Vec::new())).unwrap();
+        assert_eq!(removed, 1);
+        assert!(state
+            .db
+            .get_provider_by_id(&id, "claude")
+            .unwrap()
+            .is_none());
     }
 
     #[test]
@@ -3417,39 +3216,8 @@ mod tests {
     }
 
     #[test]
-    fn unavailable_catalog_falls_back_only_for_directly_mapped_agents() {
-        let codex = fallback_agent_model(
-            "codex",
-            "composite",
-            &json!({"config":"model = 'gpt-5.6-sol'"}),
-        )
-        .unwrap()
-        .unwrap();
-        assert_eq!(codex.model, "gpt-5.6-sol");
-        assert_eq!(codex.protocol, "responses");
-
-        let claude =
-            fallback_agent_model("claude", "composite", &json!({"model":"claude-sonnet-5"}))
-                .unwrap()
-                .unwrap();
-        assert_eq!(claude.model, "claude-sonnet-5");
-        assert_eq!(claude.protocol, "anthropic");
-
-        assert!(fallback_agent_model("gemini", "composite", &json!({}))
-            .unwrap()
-            .is_none());
-        assert!(fallback_agent_model(
-            "codex",
-            "anthropic",
-            &json!({"config":"model = 'gpt-5.6-sol'"})
-        )
-        .unwrap()
-        .is_none());
-    }
-
-    #[test]
     #[serial_test::serial]
-    fn provider_sync_adds_composite_provider_from_existing_model_when_models_are_forbidden() {
+    fn failed_catalog_never_borrows_an_unauthorized_existing_model() {
         use crate::database::Database;
         use std::sync::Arc;
 
@@ -3474,11 +3242,36 @@ mod tests {
 
         let (added, removed, skipped, warnings) =
             sync_agent_providers(&state, &app, &discovery).unwrap();
-        assert_eq!((added, removed, skipped), (1, 0, 0));
-        assert!(warnings.is_empty());
-        let id = adapter::service_provider_id("codex", 42, "composite", "https://platform.test", 1);
-        let provider = state.db.get_provider_by_id(&id, "codex").unwrap().unwrap();
-        let config = provider.settings_config["config"].as_str().unwrap();
-        assert!(config.contains("gpt-5.6-sol"));
+        assert_eq!((added, removed, skipped), (0, 0, 0));
+        assert!(!warnings.is_empty());
+        assert!(state.db.get_all_providers("codex").unwrap().is_empty());
+        assert_eq!(
+            std::fs::read_to_string(codex_dir.join("config.toml")).unwrap(),
+            "model = \"gpt-5.6-sol\"\n"
+        );
+    }
+    #[test]
+    #[serial_test::serial]
+    fn available_empty_model_catalog_removes_subscription_row_but_quota_failure_retains_it() {
+        let _home = SyncTestHome::new();
+        let state = AppState::new(std::sync::Arc::new(
+            crate::database::Database::memory().unwrap(),
+        ));
+        let app = crate::app_config::AppType::Claude;
+        let mut discovery = test_discovery(vec![
+            crate::zhishu::services::platform_auth::AvailableGroup {
+                id: 42,
+                name: "subscription".into(),
+                platform: "anthropic".into(),
+                status: "active".into(),
+                subscription_type: "subscription".into(),
+            },
+        ]);
+        assert_eq!(sync_agent_providers(&state, &app, &discovery).unwrap().0, 1);
+        discovery.catalogs[0].models.clear();
+        discovery.details.get_mut(&42).unwrap().quota.available = false;
+        assert_eq!(sync_agent_providers(&state, &app, &discovery).unwrap().1, 0);
+        discovery.details.get_mut(&42).unwrap().quota.available = true;
+        assert_eq!(sync_agent_providers(&state, &app, &discovery).unwrap().1, 1);
     }
 }

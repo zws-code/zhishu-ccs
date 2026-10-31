@@ -1,10 +1,14 @@
 //! 平台登录、二次验证、账户恢复以及带认证的分组与额度请求。
 //! access token 和二次验证临时令牌仅驻内存，refresh token 交给系统凭据库保存；
 //! 「记住密码」由独立的 platform_login_history 管理，不参与会话恢复。
+use super::client_api::{
+    self, ClientAccess, ClientAccount, ClientConfig, ClientConnection, ClientUsage, GroupDetails,
+    PlatformUsageSummary,
+};
 use reqwest::{Client, Method, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 use tauri::{Manager, State};
 use tokio::sync::Mutex;
@@ -32,7 +36,10 @@ pub struct PlatformUser {
     pub(crate) email: String,
     #[serde(default)]
     pub(crate) username: String,
+    #[serde(default)]
     pub(crate) role: String,
+    #[serde(default)]
+    pub(crate) status: String,
     pub(crate) balance: f64,
 }
 
@@ -41,36 +48,6 @@ pub struct PlatformUser {
 pub struct PlatformAccount {
     pub(crate) base_url: String,
     pub(crate) user: PlatformUser,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PlatformUsageWindow {
-    pub limit_usd: f64,
-    pub used_usd: f64,
-    pub remaining_usd: f64,
-    pub percentage: f64,
-    pub resets_at: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PlatformSubscriptionUsage {
-    pub subscription_id: i64,
-    pub group_id: i64,
-    pub group_name: String,
-    pub group_platform: String,
-    pub expires_at: String,
-    pub expires_in_days: i64,
-    pub unlimited: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub daily: Option<PlatformUsageWindow>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub weekly: Option<PlatformUsageWindow>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub monthly: Option<PlatformUsageWindow>,
 }
 
 #[derive(Deserialize)]
@@ -106,6 +83,8 @@ pub(crate) struct GroupCatalog {
     pub credential: GroupCredential,
     pub models: Vec<Value>,
     pub catalog_error: Option<String>,
+    #[serde(default)]
+    pub connection: Option<ClientConnection>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -114,99 +93,12 @@ pub(crate) struct GroupDiscovery {
     pub groups: Vec<AvailableGroup>,
     pub catalogs: Vec<GroupCatalog>,
     pub failed_group_ids: HashSet<i64>,
-    #[serde(skip)]
-    pub obsolete_keys: Vec<ApiKeyRecord>,
+    #[serde(default)]
+    pub synced_at: i64,
+    #[serde(default)]
+    pub details: HashMap<i64, GroupDetails>,
     pub subscription_group_ids: HashSet<i64>,
     pub warnings: Vec<String>,
-}
-
-#[derive(Clone, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) struct ApiKeyRecord {
-    pub id: i64,
-    pub key: String,
-    name: String,
-    pub group_id: Option<i64>,
-    #[serde(default)]
-    status: String,
-    #[serde(default)]
-    quota: f64,
-    #[serde(default)]
-    quota_used: f64,
-    #[serde(default)]
-    expires_at: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct Paginated<T> {
-    items: Vec<T>,
-    #[serde(default)]
-    total: i64,
-    #[serde(default)]
-    pages: i64,
-}
-
-#[derive(Deserialize)]
-struct SubscriptionRecord {
-    id: i64,
-    group_id: i64,
-    expires_at: String,
-    status: String,
-    #[serde(default)]
-    group: Option<SubscriptionUsageGroup>,
-}
-
-#[derive(Deserialize)]
-struct SubscriptionUsageItem {
-    subscription: SubscriptionUsageIdentity,
-    progress: SubscriptionUsageProgress,
-}
-
-#[derive(Deserialize)]
-struct SubscriptionUsageIdentity {
-    group_id: i64,
-    #[serde(default)]
-    group: Option<SubscriptionUsageGroup>,
-}
-
-#[derive(Deserialize)]
-struct SubscriptionUsageGroup {
-    #[serde(default)]
-    name: String,
-    #[serde(default)]
-    platform: String,
-    #[serde(default)]
-    daily_limit_usd: Option<f64>,
-    #[serde(default)]
-    weekly_limit_usd: Option<f64>,
-    #[serde(default)]
-    monthly_limit_usd: Option<f64>,
-}
-
-#[derive(Deserialize)]
-struct SubscriptionUsageProgress {
-    id: i64,
-    #[serde(default)]
-    group_name: String,
-    expires_at: String,
-    #[serde(default)]
-    expires_in_days: i64,
-    #[serde(default)]
-    daily: Option<UsageWindowProgress>,
-    #[serde(default)]
-    weekly: Option<UsageWindowProgress>,
-    #[serde(default)]
-    monthly: Option<UsageWindowProgress>,
-}
-
-#[derive(Deserialize)]
-struct UsageWindowProgress {
-    limit_usd: f64,
-    used_usd: f64,
-    remaining_usd: f64,
-    percentage: f64,
-    #[serde(default)]
-    resets_at: Option<String>,
 }
 
 struct Session {
@@ -268,7 +160,10 @@ fn normalize_base_url(input: &str) -> Result<String, PlatformAuthError> {
     url.set_query(None);
     url.set_fragment(None);
     let path = url.path().trim_end_matches('/');
-    let path = path.strip_suffix("/api/v1").unwrap_or(path).to_string();
+    let path = path
+        .strip_suffix(client_api::PREFIX)
+        .unwrap_or(path)
+        .to_string();
     url.set_path(&path);
     Ok(url.to_string().trim_end_matches('/').to_string())
 }
@@ -290,7 +185,19 @@ async fn request<T: DeserializeOwned>(
     body: Option<Value>,
     token: Option<&str>,
 ) -> Result<T, PlatformAuthError> {
-    let mut builder = client.request(method, format!("{base}/api/v1{path}"));
+    // Closed allowlist: new code cannot accidentally resurrect panel/model endpoints.
+    let allowed = matches!(
+        (method.as_str(), path),
+        ("GET", "/config" | "/account" | "/usage/summary")
+            | (
+                "POST",
+                "/auth/login" | "/auth/login/2fa" | "/auth/refresh" | "/auth/logout" | "/access"
+            )
+    );
+    if !allowed {
+        return Err(error("CLIENT_API_ONLY", "仅允许客户端专用接口"));
+    }
+    let mut builder = client.request(method, format!("{base}{}{path}", client_api::PREFIX));
     if let Some(body) = body {
         builder = builder.json(&body);
     }
@@ -303,21 +210,6 @@ async fn request<T: DeserializeOwned>(
     let status = response.status;
     // 平台错误只返回受控文案，禁止回显可能包含凭据的服务端原文或 reqwest 异常。
     if !status.is_success() {
-        if path.starts_with("/keys") && status != StatusCode::UNAUTHORIZED {
-            let (code, message) = match status {
-                StatusCode::FORBIDDEN => {
-                    ("KEY_FORBIDDEN", "平台拒绝管理该分组的 CC Switch 专用 Key")
-                }
-                StatusCode::TOO_MANY_REQUESTS => {
-                    ("RATE_LIMIT", "专用 Key 操作过于频繁，请稍后重试")
-                }
-                StatusCode::BAD_REQUEST => {
-                    ("KEY_REQUEST", "专用 Key 参数无效，请检查分组权限后重试")
-                }
-                _ => ("KEY_REQUEST", "无法完成分组专用 Key 操作，请稍后重试"),
-            };
-            return Err(error(code, message));
-        }
         let (code, message) = match status {
             StatusCode::UNAUTHORIZED => ("UNAUTHORIZED", "登录凭证无效或已过期，请重新登录"),
             StatusCode::FORBIDDEN => ("FORBIDDEN", "账户暂不可用或平台禁止本次登录"),
@@ -355,35 +247,48 @@ async fn finish_login(
     if tokens.access_token.is_empty() {
         return Err(error("INVALID_RESPONSE", "登录响应缺少凭证"));
     }
-    let user = request(
+    let user: ClientAccount = request(
         client,
         &base_url,
         Method::GET,
-        "/auth/me",
+        "/account",
         None,
         Some(&tokens.access_token),
     )
     .await?;
     let account = PlatformAccount {
         base_url: base_url.clone(),
-        user,
+        user: user.into_user()?,
     };
     // 发布新会话前先失效旧账户；新凭据持久化失败时保留本次登录，并返回明确警告。
     let (persistence, persistence_warning) = if let Some(store) = &state.store {
         store.clear().await?;
-        match store
-            .create(
-                base_url.clone(),
-                account.user.id,
-                tokens.refresh_token.clone(),
+        if tokens.refresh_token.is_empty() {
+            (
+                None,
+                Some("平台未提供刷新令牌，本次登录无法自动续期".into()),
             )
-            .await
-        {
-            Ok(record) => (Some((store.clone(), record)), None),
-            Err(err) => (None, Some(err.message)),
+        } else {
+            match store
+                .create(
+                    base_url.clone(),
+                    account.user.id,
+                    tokens.refresh_token.clone(),
+                )
+                .await
+            {
+                Ok(record) => (Some((store.clone(), record)), None),
+                Err(err) => (None, Some(err.message)),
+            }
         }
     } else {
-        (None, None)
+        (
+            None,
+            tokens
+                .refresh_token
+                .is_empty()
+                .then(|| "平台未提供刷新令牌，本次登录无法自动续期".into()),
+        )
     };
     let session = Session {
         persistence,
@@ -483,15 +388,17 @@ async fn login(
     let client = client()?;
     let mut state = state.lock().await;
     state.pending = None;
-    let settings: Value =
-        request(&client, &base, Method::GET, "/settings/public", None, None).await?;
-    if [
-        "turnstile_enabled",
-        "tencent_captcha_enabled",
-        "aliyun_captcha_enabled",
-    ]
-    .iter()
-    .any(|key| settings.get(key).and_then(Value::as_bool) == Some(true))
+    let settings = client_config(&client, &base).await?;
+    if !settings
+        .login_methods
+        .iter()
+        .any(|method| method == "password")
+    {
+        return Err(error("LOGIN_UNSUPPORTED", "平台未启用邮箱密码登录"));
+    }
+    if settings.turnstile_enabled
+        || settings.tencent_captcha_enabled
+        || settings.aliyun_captcha_enabled
     {
         return Err(error(
             "CAPTCHA_REQUIRED",
@@ -600,150 +507,67 @@ pub async fn platform_get_account(
     get_account_with_activity(&state.0, active).await
 }
 
-fn usage_window(progress: UsageWindowProgress) -> PlatformUsageWindow {
-    PlatformUsageWindow {
-        limit_usd: progress.limit_usd.max(0.0),
-        used_usd: progress.used_usd.max(0.0),
-        remaining_usd: progress.remaining_usd.max(0.0),
-        percentage: progress.percentage.clamp(0.0, 100.0),
-        resets_at: progress.resets_at,
-    }
-}
-
-fn window_from_limit(limit: Option<f64>) -> Option<PlatformUsageWindow> {
-    limit
-        .filter(|limit| *limit > 0.0)
-        .map(|limit| PlatformUsageWindow {
-            limit_usd: limit,
-            used_usd: 0.0,
-            remaining_usd: limit,
-            percentage: 0.0,
-            resets_at: None,
-        })
-}
-
-// 首次使用前可能没有窗口进度，此时沿用分组已报告的限额；不猜测未报告的额度。
-fn map_subscription_usage(item: SubscriptionUsageItem) -> PlatformSubscriptionUsage {
-    let group = item.subscription.group;
-    let fallback_name = group
-        .as_ref()
-        .map(|group| group.name.clone())
-        .unwrap_or_default();
-    let group_platform = group
-        .as_ref()
-        .map(|group| group.platform.clone())
-        .unwrap_or_default();
-    let daily_limit = group.as_ref().and_then(|group| group.daily_limit_usd);
-    let weekly_limit = group.as_ref().and_then(|group| group.weekly_limit_usd);
-    let monthly_limit = group.as_ref().and_then(|group| group.monthly_limit_usd);
-    let group_name = if item.progress.group_name.trim().is_empty() {
-        fallback_name
-    } else {
-        item.progress.group_name
-    };
-    let daily = item
-        .progress
-        .daily
-        .map(usage_window)
-        .or_else(|| window_from_limit(daily_limit));
-    let weekly = item
-        .progress
-        .weekly
-        .map(usage_window)
-        .or_else(|| window_from_limit(weekly_limit));
-    let monthly = item
-        .progress
-        .monthly
-        .map(usage_window)
-        .or_else(|| window_from_limit(monthly_limit));
-    PlatformSubscriptionUsage {
-        subscription_id: item.progress.id,
-        group_id: item.subscription.group_id,
-        group_name,
-        group_platform,
-        expires_at: item.progress.expires_at,
-        expires_in_days: item.progress.expires_in_days.max(0),
-        unlimited: daily.is_none() && weekly.is_none() && monthly.is_none(),
-        status: None,
-        daily,
-        weekly,
-        monthly,
-    }
-}
-
-/// 在 Rust 内完成订阅额度请求与认证，避免网页 access token 随供应商配置进入前端或落盘。
+/// 只读额度快照；不保存目录，不申请 Key，不请求模型接口。
 #[tauri::command]
 pub async fn platform_get_subscription_usage(
     state: State<'_, PlatformAuthState>,
-) -> Result<Vec<PlatformSubscriptionUsage>, PlatformAuthError> {
+) -> Result<PlatformUsageSummary, PlatformAuthError> {
     subscription_usage(&state.0).await
 }
 
 async fn subscription_usage(
     state: &Mutex<AuthState>,
-) -> Result<Vec<PlatformSubscriptionUsage>, PlatformAuthError> {
+) -> Result<PlatformUsageSummary, PlatformAuthError> {
     let mut auth = state.lock().await;
     let session = auth
         .session
         .as_mut()
+        .filter(|s| !idle_expired(s.last_used_at, now()))
         .ok_or_else(|| error("UNAUTHORIZED", "请先登录平台"))?;
-    let client = client()?;
-    let items: Vec<SubscriptionUsageItem> =
-        match get_authenticated(&client, session, "/subscriptions/progress").await {
-            Ok(items) => items,
-            Err(err) if err.code == "UNAUTHORIZED" => {
-                invalidate_session(&mut auth).await;
-                return Err(err);
-            }
-            Err(err) => return Err(err),
-        };
-    // 进度接口只包含活跃订阅，因此还需合并完整记录，保留过期和暂停状态。
-    // 缺少进度不能显示为不限量，也不能将订阅误当成钱包计费。
-    let records: Vec<SubscriptionRecord> =
-        match get_authenticated(&client, session, "/subscriptions").await {
-            Ok(records) => records,
-            Err(err) if err.code == "UNAUTHORIZED" => {
-                invalidate_session(&mut auth).await;
-                return Err(err);
-            }
-            Err(err) => return Err(err),
-        };
-    let mut usage: Vec<_> = items.into_iter().map(map_subscription_usage).collect();
-    for record in records {
-        if let Some(item) = usage
-            .iter_mut()
-            .find(|item| item.group_id == record.group_id)
-        {
-            item.status = Some(record.status);
-            item.expires_at = record.expires_at;
-            continue;
+    let data: ClientUsage = match get_authenticated(&client()?, session, "/usage/summary").await {
+        Ok(data) => data,
+        Err(err) if matches!(err.code, "UNAUTHORIZED" | "FORBIDDEN") => {
+            invalidate_session(&mut auth).await;
+            return Err(err);
         }
-        let group = record.group;
-        usage.push(PlatformSubscriptionUsage {
-            subscription_id: record.id,
-            group_id: record.group_id,
-            group_name: group
-                .as_ref()
-                .map(|group| group.name.clone())
-                .unwrap_or_default(),
-            group_platform: group
-                .as_ref()
-                .map(|group| group.platform.clone())
-                .unwrap_or_default(),
-            expires_at: record.expires_at,
-            expires_in_days: 0,
-            unlimited: false,
-            status: Some(if record.status == "active" {
-                "unavailable".into()
-            } else {
-                record.status
-            }),
-            daily: None,
-            weekly: None,
-            monthly: None,
-        });
+        Err(err) => return Err(err),
+    };
+    let synced_at = client_api::snapshot_time(data.schema_version, &data.synced_at)?;
+    if data.account.id != session.user_id || data.account.status != "active" {
+        invalidate_session(&mut auth).await;
+        return Err(error("UNAUTHORIZED", "登录状态已改变，请重新登录"));
     }
-    Ok(usage)
+    let mut group_ids = HashSet::new();
+    if data.groups.iter().any(|group| {
+        group.id <= 0
+            || !group_ids.insert(group.id)
+            || group
+                .subscriptions
+                .iter()
+                .any(|sub| sub.group_id != group.id)
+    }) {
+        return Err(client_api::invalid_response());
+    }
+    Ok(PlatformUsageSummary {
+        base_url: session.base_url.clone(),
+        user_id: session.user_id,
+        synced_at,
+        balance: data.account.balance_usd,
+        groups: data.groups,
+    })
+}
+
+async fn client_config(client: &Client, base: &str) -> Result<ClientConfig, PlatformAuthError> {
+    request::<ClientConfig>(client, base, Method::GET, "/config", None, None)
+        .await?
+        .validate(base)
+}
+
+#[tauri::command]
+pub async fn platform_get_client_config(
+    base_url: String,
+) -> Result<ClientConfig, PlatformAuthError> {
+    client_config(&client()?, &normalize_base_url(&base_url)?).await
 }
 
 async fn refresh_session_tokens(
@@ -837,6 +661,7 @@ async fn invalidate_session(state: &mut AuthState) {
     }
 }
 
+#[cfg(test)]
 async fn get_account(
     state: &Mutex<AuthState>,
 ) -> Result<Option<PlatformAccount>, PlatformAuthError> {
@@ -882,7 +707,7 @@ async fn get_account_with_activity(
         session.last_used_at = now();
     }
     let client = client()?;
-    let user = match get_authenticated::<PlatformUser>(&client, session, "/auth/me").await {
+    let user = match get_authenticated::<ClientAccount>(&client, session, "/account").await {
         Ok(user) => user,
         Err(err) if matches!(err.code, "UNAUTHORIZED" | "FORBIDDEN") => {
             invalidate_session(&mut state).await;
@@ -890,13 +715,13 @@ async fn get_account_with_activity(
         }
         Err(err) => return Err(err),
     };
-    if user.id != session.user_id {
+    if user.id != session.user_id || user.status != "active" {
         invalidate_session(&mut state).await;
         return Ok(None);
     }
     Ok(Some(PlatformAccount {
         base_url: session.base_url.clone(),
-        user,
+        user: user.into_user()?,
     }))
 }
 
@@ -932,185 +757,6 @@ async fn logout(state: &Mutex<AuthState>) -> Result<(), PlatformAuthError> {
     cleared
 }
 
-async fn key_models(
-    client: &Client,
-    base: &str,
-    key: &str,
-) -> Result<Vec<Value>, PlatformAuthError> {
-    let response = send_json(client.get(format!("{base}/v1/models")).bearer_auth(key))
-        .await
-        .map_err(|_| error("NETWORK", "无法获取模型列表，请检查网络后重试"))?;
-    let status = response.status;
-    if !status.is_success() {
-        return Err(match status.as_u16() {
-            401 => error("MODEL_AUTH", "模型授权已失效，请重新登录"),
-            402 => error(
-                "INSUFFICIENT_BALANCE",
-                "账户余额或模型额度不足，请充值后重试",
-            ),
-            403 => error(
-                "MODEL_FORBIDDEN",
-                "专用 Key 无权访问模型，请检查平台分组权限或账户额度",
-            ),
-            429 => error("RATE_LIMIT", "请求过于频繁，请稍后重试"),
-            _ => error("MODEL_LIST", "无法获取平台模型列表，请刷新后重试"),
-        });
-    }
-    let response: Value = response
-        .body
-        .map_err(|_| error("INVALID_RESPONSE", "模型列表响应格式无效"))?;
-    response
-        .get("data")
-        .and_then(Value::as_array)
-        .cloned()
-        .ok_or_else(|| error("INVALID_RESPONSE", "模型列表响应缺少数据"))
-}
-
-const SYNC_GROUP_PREFIX: &str = "智枢router-ccs-";
-
-fn is_obsolete_group_key(key: &ApiKeyRecord, allowed_group_ids: &HashSet<i64>) -> bool {
-    let Some(group_id) = key.group_id.filter(|id| *id > 0) else {
-        return false;
-    };
-    // Only the exact per-group naming convention belongs to CC Switch.
-    // Ordinary user keys, including similarly named ones, are never revoked.
-    let dedicated = key.name.strip_prefix("zhishu-ccs-").is_some_and(|name| {
-        name.strip_suffix(&format!("-{group_id}"))
-            .is_some_and(|platform| !platform.is_empty() && !platform.contains(char::is_whitespace))
-    });
-    dedicated && !allowed_group_ids.contains(&group_id)
-}
-
-fn group_key_name(group: &AvailableGroup) -> String {
-    format!("zhishu-ccs-{}-{}", group.platform.trim(), group.id)
-}
-
-async fn group_key_models(
-    client: &Client,
-    base: &str,
-    key: &str,
-) -> Result<Vec<Value>, PlatformAuthError> {
-    let mut models = key_models(client, base, key).await?;
-    if models.is_empty() {
-        return Ok(models);
-    }
-    // The ordinary list controls membership; the Codex manifest supplies group-
-    // specific capabilities, including metadata for public model aliases.
-    let manifest = async {
-        let response = send_json(
-            client
-                .get(format!("{base}/v1/models"))
-                .query(&[(
-                    "client_version",
-                    crate::proxy::providers::codex_oauth_auth::CODEX_OAUTH_CLIENT_VERSION,
-                )])
-                .bearer_auth(key)
-                .timeout(Duration::from_secs(10)),
-        )
-        .await
-        .map_err(|_| error("NETWORK", "无法获取模型能力清单"))?;
-        if !response.status.is_success() {
-            return Err(error("MODEL_LIST", "无法获取模型能力清单"));
-        }
-        response
-            .body
-            .map_err(|_| error("INVALID_RESPONSE", "模型能力清单响应格式无效"))
-    }
-    .await;
-    if let Ok(manifest) = manifest {
-        if let Some(entries) = manifest
-            .get("models")
-            .or_else(|| manifest.get("data"))
-            .and_then(Value::as_array)
-        {
-            for model in &mut models {
-                let Some(id) = model.get("id").and_then(Value::as_str) else {
-                    continue;
-                };
-                let Some(entry) = entries.iter().find(|entry| {
-                    entry
-                        .get("slug")
-                        .or_else(|| entry.get("id"))
-                        .and_then(Value::as_str)
-                        == Some(id)
-                }) else {
-                    continue;
-                };
-                for field in [
-                    "display_name",
-                    "description",
-                    "context_window",
-                    "max_output_tokens",
-                    "supported_reasoning_levels",
-                    "default_reasoning_level",
-                    "reasoning",
-                    "input_modalities",
-                    "supports_parallel_tool_calls",
-                ] {
-                    if let Some(value) = entry.get(field).filter(|value| !value.is_null()) {
-                        model[field] = value.clone();
-                    }
-                }
-            }
-        }
-    }
-    Ok(models)
-}
-
-fn key_is_exhausted(key: &ApiKeyRecord) -> bool {
-    key.status == "quota_exhausted" || (key.quota > 0.0 && key.quota_used >= key.quota)
-}
-
-fn key_is_usable(key: &ApiKeyRecord) -> bool {
-    let expired = key.expires_at.as_deref().is_some_and(|value| {
-        chrono::DateTime::parse_from_rfc3339(value)
-            .is_ok_and(|expires_at| expires_at < chrono::Utc::now())
-    });
-    key.status == "active" && !key_is_exhausted(key) && !expired
-}
-
-async fn list_user_keys(
-    client: &Client,
-    base: &str,
-    access_token: &str,
-) -> Result<Vec<ApiKeyRecord>, PlatformAuthError> {
-    let mut keys = Vec::new();
-    for page in 1..=100 {
-        let path = format!("/keys?page={page}&page_size=100&sort_by=created_at&sort_order=desc");
-        let result: Paginated<ApiKeyRecord> =
-            request(client, base, Method::GET, &path, None, Some(access_token)).await?;
-        let count = result.items.len();
-        keys.extend(result.items);
-        if count == 0
-            || (result.pages > 0 && page >= result.pages)
-            || (result.pages == 0 && count < 100)
-        {
-            break;
-        }
-        if result.total > 0 && keys.len() as i64 >= result.total {
-            break;
-        }
-    }
-    Ok(keys)
-}
-
-async fn create_group_key(
-    client: &Client,
-    base: &str,
-    access_token: &str,
-    group: &AvailableGroup,
-) -> Result<ApiKeyRecord, PlatformAuthError> {
-    request(
-        client,
-        base,
-        Method::POST,
-        "/keys",
-        Some(json!({"name": group_key_name(group), "group_id": group.id})),
-        Some(access_token),
-    )
-    .await
-}
-
 impl PlatformAuthState {
     pub(crate) async fn logout(&self) -> Result<(), PlatformAuthError> {
         let _operation = crate::zhishu::services::platform_models::APPLY_LOCK
@@ -1138,7 +784,7 @@ impl PlatformAuthState {
         }))
     }
 
-    /// 持有会话锁校验本机身份；不刷新令牌、不请求 /auth/me，使已登录用户断网时仍能本地同步。
+    /// 持有会话锁校验本机身份；不刷新令牌、不请求 /account，使已登录用户断网时仍能本地同步。
     pub(crate) async fn with_local_identity<T>(
         &self,
         action: impl FnOnce(&str, i64) -> Result<T, PlatformAuthError>,
@@ -1168,235 +814,37 @@ impl PlatformAuthState {
         action(&session.base_url, session.user_id)
     }
 
-    /// 平台阶段获取分组、订阅、分页 Key 和模型目录，复用专用 Key 并保留失败分组信息。
+    /// 唯一凭证入口。会话锁覆盖请求和身份验证，APPLY_LOCK 覆盖保存阶段。
     pub(crate) async fn discover_group_catalogs(
         &self,
     ) -> Result<GroupDiscovery, PlatformAuthError> {
-        let account = get_account(&self.0)
-            .await?
-            .ok_or_else(|| error("UNAUTHORIZED", "请先登录平台"))?;
-        let (base_url, access_token) = {
-            let state = self.0.lock().await;
-            let session = state
-                .session
-                .as_ref()
-                .filter(|s| s.base_url == account.base_url && s.user_id == account.user.id)
-                .ok_or_else(|| error("UNAUTHORIZED", "登录状态已改变，请重试"))?;
-            (
-                session.base_url.clone(),
-                session.tokens.access_token.clone(),
-            )
-        };
-
-        let client = client()?;
-        let groups: Vec<AvailableGroup> = request(
-            &client,
-            &base_url,
-            Method::GET,
-            "/groups/available",
-            None,
-            Some(&access_token),
-        )
-        .await?;
-        // The available-group list omits expired subscriptions. Fetch the
-        // account's complete subscription history before making any key changes.
-        // A failed read aborts discovery so an outage cannot trigger cleanup.
-        let subscriptions: Vec<SubscriptionRecord> = request(
-            &client,
-            &base_url,
-            Method::GET,
-            "/subscriptions",
-            None,
-            Some(&access_token),
-        )
-        .await?;
-        let subscription_group_ids: HashSet<_> = subscriptions
-            .iter()
-            .map(|sub| sub.group_id)
-            .chain(
-                groups
-                    .iter()
-                    .filter(|group| group.subscription_type == "subscription")
-                    .map(|group| group.id),
-            )
-            .collect();
-        let allowed_group_ids: HashSet<_> = groups
-            .iter()
-            .filter(|group| {
-                group.subscription_type == "subscription"
-                    || group.name.starts_with(SYNC_GROUP_PREFIX)
-            })
-            .map(|group| group.id)
-            .chain(subscription_group_ids.iter().copied())
-            .collect();
-        let groups: Vec<_> = groups
-            .into_iter()
-            .filter(|group| {
-                group.subscription_type == "subscription"
-                    || group.name.starts_with(SYNC_GROUP_PREFIX)
-            })
-            .filter(|g| g.status.is_empty() || g.status == "active")
-            .collect();
-        let keys = list_user_keys(&client, &base_url, &access_token).await?;
-        let obsolete_keys = keys
-            .iter()
-            .filter(|key| is_obsolete_group_key(key, &allowed_group_ids))
-            .cloned()
-            .collect();
-
-        let mut catalogs = Vec::new();
-        let mut failed_group_ids = HashSet::new();
-        let mut warnings = Vec::new();
-        for group in &groups {
-            let key_name = group_key_name(group);
-            if group.platform.trim().is_empty() {
-                failed_group_ids.insert(group.id);
-                warnings.push(format!("分组 {} 缺少平台类型，已跳过", group.name));
-                continue;
-            }
-            let group_keys: Vec<_> = keys
-                .iter()
-                .filter(|key| key.name == key_name && key.group_id == Some(group.id))
-                .collect();
-            let mut key = group_keys
-                .iter()
-                .copied()
-                .find(|key| key_is_usable(key))
-                .cloned();
-            if key.is_none() && group_keys.iter().any(|key| key_is_exhausted(key)) {
-                failed_group_ids.insert(group.id);
-                warnings.push(format!(
-                    "分组 {} 的 CC Switch 专用 Key 额度已耗尽，已保留本地供应商",
-                    group.name
-                ));
-                continue;
-            }
-            if key.is_none() {
-                match create_group_key(&client, &base_url, &access_token, group).await {
-                    Ok(created) => key = Some(created),
-                    Err(err) if err.code == "UNAUTHORIZED" => return Err(err),
-                    Err(err) => {
-                        failed_group_ids.insert(group.id);
-                        warnings.push(format!(
-                            "无法为分组 {} 创建 CC Switch 专用 Key：{}",
-                            group.name, err.message
-                        ));
-                        continue;
-                    }
-                }
-            }
-            let Some(mut key) = key else {
-                failed_group_ids.insert(group.id);
-                continue;
-            };
-            let (models, catalog_error) = match group_key_models(&client, &base_url, &key.key).await
-            {
-                Ok(models) => (models, None),
-                Err(err) if err.code == "MODEL_AUTH" => {
-                    // A revoked key can still be listed briefly. Recreate it once and retry.
-                    match create_group_key(&client, &base_url, &access_token, group).await {
-                        Ok(created) => {
-                            // Keep the replacement even if model discovery is temporarily down;
-                            // fallback providers must never receive the already rejected key.
-                            key = created;
-                            match group_key_models(&client, &base_url, &key.key).await {
-                                Ok(models) => (models, None),
-                                Err(err) if err.code == "UNAUTHORIZED" => return Err(err),
-                                Err(err) if err.code == "MODEL_AUTH" => {
-                                    failed_group_ids.insert(group.id);
-                                    warnings.push(format!(
-                                        "分组 {} 的新 Key 授权失败，已保留本地供应商：{}",
-                                        group.name, err.message
-                                    ));
-                                    continue;
-                                }
-                                Err(err) => {
-                                    failed_group_ids.insert(group.id);
-                                    (Vec::new(), Some(err.message))
-                                }
-                            }
-                        }
-                        Err(err) if err.code == "UNAUTHORIZED" => return Err(err),
-                        Err(err) => {
-                            failed_group_ids.insert(group.id);
-                            warnings.push(format!(
-                                "无法替换分组 {} 的失效 Key，已保留本地供应商：{}",
-                                group.name, err.message
-                            ));
-                            continue;
-                        }
-                    }
-                }
-                Err(err) if err.code == "UNAUTHORIZED" => return Err(err),
-                Err(err) => {
-                    failed_group_ids.insert(group.id);
-                    (Vec::new(), Some(err.message))
-                }
-            };
-            catalogs.push(GroupCatalog {
-                group: group.clone(),
-                credential: GroupCredential {
-                    key: key.key,
-                    key_id: key.id,
-                    platform: group.platform.clone(),
-                    key_name,
-                },
-                models,
-                catalog_error,
-            });
-        }
-
-        Ok(GroupDiscovery {
-            account,
-            groups,
-            catalogs,
-            failed_group_ids,
-            obsolete_keys,
-            subscription_group_ids,
-            warnings,
-        })
-    }
-
-    pub(crate) async fn delete_obsolete_group_keys(
-        &self,
-        account: &PlatformAccount,
-        key_ids: &[i64],
-    ) -> Result<Vec<String>, PlatformAuthError> {
-        if key_ids.is_empty() {
-            return Ok(Vec::new());
-        }
-        // Hold the session lock through revocation so an account change cannot
-        // send a previous account's deletion list with a different user's JWT.
-        let mut state = self.0.lock().await;
-        let session = state
+        let mut auth = self.0.lock().await;
+        let session = auth
             .session
             .as_mut()
-            .filter(|session| {
-                session.base_url == account.base_url && session.user_id == account.user.id
-            })
-            .ok_or_else(|| {
-                error(
-                    "UNAUTHORIZED",
-                    "登录状态已改变，旧分组专用 Key 未清理，请重新同步",
-                )
-            })?;
-        let client = client()?;
-        let mut warnings = Vec::new();
-        for id in key_ids {
-            let result: Result<Value, _> =
-                request_authenticated(&client, session, Method::DELETE, &format!("/keys/{id}"))
-                    .await;
-            if let Err(err) = result {
-                warnings.push(format!(
-                    "旧分组专用 Key {id} 未能删除，请重新同步：{}",
-                    err.message
-                ));
-                if err.code == "UNAUTHORIZED" {
-                    break;
+            .filter(|s| !idle_expired(s.last_used_at, now()))
+            .ok_or_else(|| error("UNAUTHORIZED", "请先登录平台"))?;
+        let data: ClientAccess =
+            match request_authenticated(&client()?, session, Method::POST, "/access").await {
+                Ok(data) => data,
+                Err(err) if matches!(err.code, "UNAUTHORIZED" | "FORBIDDEN") => {
+                    invalidate_session(&mut auth).await;
+                    return Err(err);
                 }
-            }
+                Err(err) => return Err(err),
+            };
+        let result = data.into_discovery(
+            &session.base_url,
+            session.user_id,
+            &[
+                session.tokens.access_token.clone(),
+                session.tokens.refresh_token.clone(),
+            ],
+        );
+        if result.as_ref().is_err_and(|err| err.code == "UNAUTHORIZED") {
+            invalidate_session(&mut auth).await;
         }
-        Ok(warnings)
+        result
     }
 }
 
@@ -1412,7 +860,7 @@ mod tests {
             "http://127.0.0.1:3000"
         );
         assert_eq!(
-            normalize_base_url("https://example.com/sub/api/v1/").unwrap(),
+            normalize_base_url("https://example.com/sub/api/zhishu/v1/client/").unwrap(),
             "https://example.com/sub"
         );
         assert_eq!(
@@ -1436,13 +884,15 @@ mod tests {
             "https://:pass@example.com",
             "https://example.com/?token=secret",
             "https://example.com/#login",
-            "https://user:pass@example.com/api/v1/?token=secret#login",
+            "https://user:pass@example.com/api/zhishu/v1/client/?token=secret#login",
         ] {
             assert_eq!(normalize_base_url(url).unwrap(), "https://example.com");
         }
         assert_eq!(
-            normalize_base_url("http://user:pass@example.com/sub/api/v1/?token=secret#login")
-                .unwrap(),
+            normalize_base_url(
+                "http://user:pass@example.com/sub/api/zhishu/v1/client/?token=secret#login"
+            )
+            .unwrap(),
             "http://example.com/sub"
         );
     }
@@ -1470,6 +920,7 @@ mod tests {
                 email: "user@example.com".into(),
                 username: "user".into(),
                 role: "user".into(),
+                status: "active".into(),
                 balance: 1.5,
             },
         };
@@ -1537,6 +988,13 @@ mod tests {
                         .to_ascii_lowercase()
                         .contains(&format!("authorization: bearer {auth}")));
                 }
+                if expected.starts_with("POST /api/zhishu/v1/client/access ") {
+                    let sent = request.split_once("\r\n\r\n").unwrap().1.trim();
+                    assert!(
+                        sent.is_empty() || sent == "{}",
+                        "access must not specify users, groups or key settings"
+                    );
+                }
                 let body = body.to_string();
                 write!(stream, "HTTP/1.1 {status} Test\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
             }
@@ -1544,8 +1002,17 @@ mod tests {
         (base, handle)
     }
 
+    fn config_response() -> Value {
+        json!({"code":0,"data":{
+            "schema_version":1,"site_name":"Test","api_base_url":"https://gateway.test",
+            "login_methods":["password"],"totp_enabled":true,"registration_enabled":true,
+            "password_reset_enabled":true,"register_url":"/register","password_reset_url":"/forgot-password",
+            "subscriptions_url":"/subscriptions","turnstile_enabled":false,"tencent_captcha_enabled":false,"aliyun_captcha_enabled":false
+        }})
+    }
+
     fn profile() -> Value {
-        json!({"code":0,"data":{"id":1,"email":"test@example.com","username":"test","role":"user","balance":2.0}})
+        json!({"code":0,"data":{"id":1,"email":"test@example.com","username":"test","status":"active","balance_usd":2.0}})
     }
 
     #[tokio::test]
@@ -1624,591 +1091,24 @@ mod tests {
         }))
     }
 
-    #[test]
-    fn subscription_group_limits_fill_windows_before_first_usage() {
-        let usage = map_subscription_usage(SubscriptionUsageItem {
-            subscription: SubscriptionUsageIdentity {
-                group_id: 42,
-                group: Some(SubscriptionUsageGroup {
-                    name: "lite".into(),
-                    platform: "composite".into(),
-                    daily_limit_usd: Some(10.0),
-                    weekly_limit_usd: Some(50.0),
-                    monthly_limit_usd: None,
-                }),
-            },
-            progress: SubscriptionUsageProgress {
-                id: 7,
-                group_name: "lite订阅".into(),
-                expires_at: "2026-11-01T12:00:00Z".into(),
-                expires_in_days: 9,
-                daily: None,
-                weekly: None,
-                monthly: None,
-            },
-        });
-        assert!(!usage.unlimited);
-        let daily = usage.daily.unwrap();
-        assert_eq!(daily.remaining_usd, 10.0);
-        assert_eq!(daily.percentage, 0.0);
-        assert!(daily.resets_at.is_none());
-        assert_eq!(usage.weekly.unwrap().limit_usd, 50.0);
-        assert!(usage.monthly.is_none());
-    }
-
-    #[tokio::test]
-    async fn subscription_usage_returns_group_windows_without_tokens() {
-        let (base, server) = mock_server(vec![
-            (
-                "GET /api/v1/subscriptions/progress |access-secret",
-                200,
-                json!({"code":0,"data":[{
-                    "subscription":{
-                        "group_id":42,
-                        "group":{"name":"fallback","platform":"composite"}
-                    },
-                    "progress":{
-                        "id":7,
-                        "group_name":"lite订阅",
-                        "expires_at":"2026-11-01T12:00:00Z",
-                        "expires_in_days":9,
-                        "daily":{
-                            "limit_usd":10.0,"used_usd":2.5,"remaining_usd":7.5,
-                            "percentage":25.0,"resets_at":"2026-10-24T00:00:00Z"
-                        },
-                        "weekly":null,
-                        "monthly":{
-                            "limit_usd":100.0,"used_usd":20.0,"remaining_usd":80.0,
-                            "percentage":20.0,"resets_at":"2026-11-01T00:00:00Z"
-                        }
-                    }
-                }]}),
-            ),
-            (
-                "GET /api/v1/subscriptions |access-secret",
-                200,
-                json!({"code":0,"data":[]}),
-            ),
-        ]);
-        let state = model_session(base);
-        let usage = subscription_usage(&state.0).await.unwrap();
-        assert_eq!(usage.len(), 1);
-        assert_eq!(usage[0].group_id, 42);
-        assert_eq!(usage[0].group_name, "lite订阅");
-        assert_eq!(usage[0].group_platform, "composite");
-        assert!(!usage[0].unlimited);
-        assert_eq!(usage[0].daily.as_ref().unwrap().remaining_usd, 7.5);
-        assert!(usage[0].weekly.is_none());
-        assert_eq!(usage[0].monthly.as_ref().unwrap().percentage, 20.0);
-        let serialized = serde_json::to_string(&usage).unwrap();
-        assert!(!serialized.contains("access-secret"));
-        assert!(!serialized.contains("refresh-secret"));
-        server.join().unwrap();
-    }
-
-    #[tokio::test]
-    async fn subscription_usage_refreshes_an_expired_access_token_once() {
-        let (base, server) = mock_server(vec![
-            (
-                "GET /api/v1/subscriptions/progress |access-secret",
-                401,
-                json!({}),
-            ),
-            (
-                "POST /api/v1/auth/refresh ",
-                200,
-                json!({"code":0,"data":{"access_token":"new-access","refresh_token":"new-refresh"}}),
-            ),
-            (
-                "GET /api/v1/subscriptions/progress |new-access",
-                200,
-                json!({"code":0,"data":[{
-                    "subscription":{"group_id":43,"group":{"name":"unlimited","platform":"composite"}},
-                    "progress":{
-                        "id":8,"group_name":"unlimited","expires_at":"2026-11-01T12:00:00Z",
-                        "expires_in_days":9,"daily":null,"weekly":null,"monthly":null
-                    }
-                }]}),
-            ),
-            (
-                "GET /api/v1/subscriptions |new-access",
-                200,
-                json!({"code":0,"data":[]}),
-            ),
-        ]);
-        let state = model_session(base);
-        let usage = subscription_usage(&state.0).await.unwrap();
-        assert_eq!(usage.len(), 1);
-        assert!(usage[0].unlimited);
-        let auth = state.0.lock().await;
-        let tokens = &auth.session.as_ref().unwrap().tokens;
-        assert_eq!(tokens.access_token, "new-access");
-        assert_eq!(tokens.refresh_token, "new-refresh");
-        drop(auth);
-        server.join().unwrap();
-    }
-
-    #[tokio::test]
-    async fn group_catalog_enriches_only_authorized_ids_with_the_group_key() {
-        let (base, server) = mock_server(vec![
-            (
-                "GET /v1/models |group-secret",
-                200,
-                json!({"data":[
-                    {"id":"public-alias","supported_endpoint_types":["responses"]},
-                    {"id":"basic-only"}
-                ]}),
-            ),
-            (
-                "GET /v1/models?client_version=|group-secret",
-                200,
-                json!({"models":[
-                    {"slug":"public-alias","context_window":1000000,
-                     "supported_reasoning_levels":[{"effort":"low"},{"effort":"high"},{"effort":"max"}],
-                     "default_reasoning_level":"high","input_modalities":["text","image"]},
-                    {"slug":"not-in-basic-list","context_window":32000}
-                ]}),
-            ),
-        ]);
-        let models = group_key_models(&client().unwrap(), &base, "group-secret")
-            .await
-            .unwrap();
-        assert_eq!(models.len(), 2);
-        assert_eq!(models[0]["id"], "public-alias");
-        assert_eq!(models[0]["context_window"], 1000000);
-        assert_eq!(models[0]["default_reasoning_level"], "high");
-        assert_eq!(models[0]["supported_endpoint_types"], json!(["responses"]));
-        assert_eq!(models[1], json!({"id":"basic-only"}));
-        server.join().unwrap();
-    }
-
-    #[test]
-    fn obsolete_group_keys_exclude_manual_mismatched_and_allowed_keys() {
-        for (name, group_id, obsolete) in [
-            ("zhishu-ccs-anthropic-43", Some(43), true),
-            ("zhishu-ccs-composite-43", Some(43), true),
-            ("zhishu-ccs-anthropic-42", Some(42), false),
-            ("manual-key", Some(43), false),
-            ("zhishu-ccs-anthropic-43-copy", Some(43), false),
-            ("zhishu-ccs-anthropic-44", Some(43), false),
-            ("zhishu-ccs--43", Some(43), false),
-            ("zhishu-ccs-anthropic-43", None, false),
-        ] {
-            let key: ApiKeyRecord = serde_json::from_value(json!({
-                "id": 90, "key": "secret", "name": name, "group_id": group_id
-            }))
-            .unwrap();
-            assert_eq!(
-                is_obsolete_group_key(&key, &HashSet::from([42])),
-                obsolete,
-                "{name}"
-            );
-        }
-    }
-
-    #[tokio::test]
-    async fn obsolete_key_cleanup_refreshes_auth_and_reports_partial_failure() {
-        let (base, server) = mock_server(vec![
-            (
-                "DELETE /api/v1/keys/90 |access-secret",
-                401,
-                json!({"error":"expired"}),
-            ),
-            (
-                "POST /api/v1/auth/refresh ",
-                200,
-                json!({"code":0,"data":{
-                    "access_token":"rotated-access", "refresh_token":"rotated-refresh"
-                }}),
-            ),
-            (
-                "DELETE /api/v1/keys/90 |rotated-access",
-                200,
-                json!({"code":0,"data":{}}),
-            ),
-            (
-                "DELETE /api/v1/keys/91 |rotated-access",
-                403,
-                json!({"error":"private-server-detail"}),
-            ),
-            (
-                "DELETE /api/v1/keys/92 |rotated-access",
-                200,
-                json!({"code":0,"data":{}}),
-            ),
-        ]);
-        let account = PlatformAccount {
-            base_url: base.clone(),
-            user: serde_json::from_value(profile()["data"].clone()).unwrap(),
-        };
-        let state = model_session(base);
-        let warnings = state
-            .delete_obsolete_group_keys(&account, &[90, 91, 92])
-            .await
-            .unwrap();
-        assert_eq!(warnings.len(), 1);
-        assert!(warnings[0].contains("91"));
-        assert!(!warnings[0].contains("private-server-detail"));
-        assert_eq!(
-            state
-                .0
-                .lock()
-                .await
-                .session
-                .as_ref()
-                .unwrap()
-                .tokens
-                .refresh_token,
-            "rotated-refresh"
-        );
-        server.join().unwrap();
-    }
-
-    #[tokio::test]
-    async fn obsolete_key_cleanup_rejects_a_different_account_before_sending_requests() {
-        let base = "http://127.0.0.1:1".to_string();
-        let mut account = PlatformAccount {
-            base_url: base.clone(),
-            user: serde_json::from_value(profile()["data"].clone()).unwrap(),
-        };
-        let state = model_session(base);
-        account.user.id = 2;
-        assert!(
-            matches!(state.delete_obsolete_group_keys(&account, &[90]).await,
-            Err(err) if err.code == "UNAUTHORIZED")
-        );
-        account.user.id = 1;
-        account.base_url = "http://127.0.0.1:2".into();
-        assert!(
-            matches!(state.delete_obsolete_group_keys(&account, &[90]).await,
-            Err(err) if err.code == "UNAUTHORIZED")
-        );
-    }
-
-    #[tokio::test]
-    async fn discovers_available_groups_and_creates_one_named_key_per_group() {
-        let (base, server) = mock_server(vec![
-            ("GET /api/v1/auth/me ", 200, profile()),
-            (
-                "GET /api/v1/groups/available |access-secret",
-                200,
-                json!({"code":0,"data":[
-                    {"id":42,"name":"智枢router-ccs-Claude 主力","platform":"anthropic","status":"active","subscription_type":"standard"},
-                    {"id":43,"name":"原有 Claude 分组","platform":"anthropic","status":"active"},
-                    {"id":44,"name":"其他-智枢router-ccs-Claude","platform":"anthropic","status":"active"},
-                    {"id":45,"name":"智枢router-ccs-暂停","platform":"anthropic","status":"inactive"}
-                ]}),
-            ),
-            ("GET /api/v1/subscriptions |access-secret", 200, json!({"code":0,"data":[]})),
-            (
-                "GET /api/v1/keys?page=1&page_size=100&sort_by=created_at&sort_order=desc |access-secret",
-                200,
-                json!({"code":0,"data":{"items":[
-                    {"id":90,"key":"old-secret","name":"zhishu-ccs-anthropic-43","group_id":43,"status":"active"},
-                    {"id":91,"key":"manual-secret","name":"manual-key","group_id":43,"status":"active"},
-                    {"id":92,"key":"inactive-secret","name":"zhishu-ccs-anthropic-45","group_id":45,"status":"active"}
-                ],"total":3,"page":1,"page_size":100,"pages":1}}),
-            ),
-            (
-                "POST /api/v1/keys |access-secret",
-                200,
-                json!({"code":0,"data":{
-                    "id":77,
-                    "key":"group-secret",
-                    "name":"zhishu-ccs-anthropic-42",
-                    "group_id":42,
-                    "status":"active",
-                    "quota":0,
-                    "quota_used":0
-                }}),
-            ),
-            (
-                "GET /v1/models |group-secret",
-                200,
-                json!({"data":[{"id":"claude-sonnet-5","supported_endpoint_types":["anthropic"]}]}),
-            ),
-            ("GET /v1/models?client_version=|group-secret", 200, json!({"models":[
-                {"slug":"claude-sonnet-5","context_window":1000000,
-                 "supported_reasoning_levels":[{"effort":"high"}],"default_reasoning_level":"high"}
-            ]})),
-        ]);
-        let state = model_session(base);
-        let discovery = state.discover_group_catalogs().await.unwrap();
-        assert_eq!(discovery.groups.len(), 1);
-        assert_eq!(discovery.groups[0].id, 42);
-        assert_eq!(
-            discovery
-                .obsolete_keys
-                .iter()
-                .map(|key| key.id)
-                .collect::<Vec<_>>(),
-            vec![90]
-        );
-        assert_eq!(discovery.catalogs.len(), 1);
-        assert_eq!(
-            discovery.catalogs[0].credential.key_name,
-            "zhishu-ccs-anthropic-42"
-        );
-        assert_eq!(discovery.catalogs[0].credential.key, "group-secret");
-        assert_eq!(discovery.catalogs[0].models[0]["context_window"], 1000000);
-        server.join().unwrap();
-    }
-
-    #[tokio::test]
-    async fn revoked_group_key_never_survives_a_failed_replacement() {
-        for (create_status, model_status) in [(200, 500), (200, 401), (500, 0)] {
-            let mut replies = vec![
-                ("GET /api/v1/auth/me ", 200, profile()),
-                ("GET /api/v1/groups/available |access-secret", 200, json!({"code":0,"data":[
-                    {"id":42,"name":"智枢router-ccs-Claude","platform":"anthropic","status":"active"}
-                ]})),
-                ("GET /api/v1/subscriptions |access-secret", 200, json!({"code":0,"data":[]})),
-                ("GET /api/v1/keys?page=1&page_size=100&sort_by=created_at&sort_order=desc |access-secret", 200,
-                    json!({"code":0,"data":{"items":[
-                        {"id":70,"key":"revoked-key","name":"zhishu-ccs-anthropic-42","group_id":42,"status":"active"}
-                    ],"pages":1}})),
-                ("GET /v1/models |revoked-key", 401, json!({})),
-                ("POST /api/v1/keys |access-secret", create_status, json!({"code":0,"data":{
-                    "id":71,"key":"replacement-key","name":"zhishu-ccs-anthropic-42","group_id":42,"status":"active"
-                }})),
-            ];
-            if create_status == 200 {
-                replies.push(("GET /v1/models |replacement-key", model_status, json!({})));
-            }
-            let (base, server) = mock_server(replies);
-            let discovery = model_session(base).discover_group_catalogs().await.unwrap();
-            server.join().unwrap();
-            assert!(discovery.failed_group_ids.contains(&42));
-            assert!(!serde_json::to_string(&discovery)
-                .unwrap()
-                .contains("revoked-key"));
-            if create_status == 200 && model_status == 500 {
-                assert_eq!(discovery.catalogs.len(), 1);
-                assert_eq!(discovery.catalogs[0].credential.key, "replacement-key");
-                assert_eq!(discovery.catalogs[0].credential.key_id, 71);
-                assert!(discovery.catalogs[0].catalog_error.is_some());
-            } else {
-                assert!(discovery.catalogs.is_empty());
-                assert!(!discovery.warnings.is_empty());
-            }
-        }
-    }
-
-    #[tokio::test]
-    async fn subscription_groups_ignore_prefix_and_expired_keys_are_not_obsolete() {
-        let (base, server) = mock_server(vec![
-            ("GET /api/v1/auth/me ", 200, profile()),
-            ("GET /api/v1/groups/available |access-secret", 200, json!({"code":0,"data":[
-                {"id":14,"name":"月度订阅","platform":"anthropic","status":"active","subscription_type":"subscription"},
-                {"id":43,"name":"普通分组","platform":"anthropic","status":"active","subscription_type":"standard"},
-                {"id":16,"name":"已改为按量的历史分组","platform":"anthropic","status":"active","subscription_type":"standard"}
-            ]})),
-            ("GET /api/v1/subscriptions |access-secret", 200, json!({"code":0,"data":[
-                {"id":7,"group_id":14,"expires_at":"2099-01-01T00:00:00Z","status":"active"},
-                {"id":8,"group_id":15,"expires_at":"2000-01-01T00:00:00Z","status":"expired"},
-                {"id":9,"group_id":16,"expires_at":"2000-01-01T00:00:00Z","status":"expired"}
-            ]})),
-            ("GET /api/v1/keys?page=1&page_size=100&sort_by=created_at&sort_order=desc |access-secret", 200,
-                json!({"code":0,"data":{"items":[
-                    {"id":70,"key":"subscription-key","name":"zhishu-ccs-anthropic-14","group_id":14,"status":"active"},
-                    {"id":80,"key":"expired-subscription-key","name":"zhishu-ccs-anthropic-15","group_id":15,"status":"active"},
-                    {"id":90,"key":"old-key","name":"zhishu-ccs-anthropic-43","group_id":43,"status":"active"}
-                ],"pages":1}})),
-            ("GET /v1/models |subscription-key", 200, json!({"data":[{"id":"claude-sonnet-5"}]})),
-            ("GET /v1/models?client_version=|subscription-key", 404, json!({})),
-        ]);
-        let discovery = model_session(base).discover_group_catalogs().await.unwrap();
-        assert_eq!(discovery.groups.len(), 1);
-        assert_eq!(discovery.groups[0].id, 14);
-        assert_eq!(discovery.groups[0].subscription_type, "subscription");
-        assert_eq!(discovery.catalogs.len(), 1);
-        assert_eq!(
-            discovery.subscription_group_ids,
-            HashSet::from([14, 15, 16])
-        );
-        assert_eq!(
-            discovery
-                .obsolete_keys
-                .iter()
-                .map(|key| key.id)
-                .collect::<Vec<_>>(),
-            vec![90]
-        );
-        server.join().unwrap();
-    }
-
-    #[tokio::test]
-    async fn exhausted_subscription_key_is_preserved_without_creating_a_replacement() {
-        let (base, server) = mock_server(vec![
-            ("GET /api/v1/auth/me ", 200, profile()),
-            ("GET /api/v1/groups/available |access-secret", 200, json!({"code":0,"data":[
-                {"id":14,"name":"月度订阅","platform":"anthropic","status":"active","subscription_type":"subscription"}
-            ]})),
-            ("GET /api/v1/subscriptions |access-secret", 200, json!({"code":0,"data":[]})),
-            ("GET /api/v1/keys?page=1&page_size=100&sort_by=created_at&sort_order=desc |access-secret", 200,
-                json!({"code":0,"data":{"items":[
-                    {"id":70,"key":"subscription-key","name":"zhishu-ccs-anthropic-14","group_id":14,"status":"quota_exhausted","quota":10,"quota_used":10}
-                ],"pages":1}})),
-        ]);
-        let discovery = model_session(base).discover_group_catalogs().await.unwrap();
-        assert!(discovery.obsolete_keys.is_empty());
-        assert!(discovery.catalogs.is_empty());
-        assert!(discovery.failed_group_ids.contains(&14));
-        assert_eq!(discovery.warnings.len(), 1);
-        server.join().unwrap();
-    }
-
-    #[tokio::test]
-    async fn failed_subscription_history_aborts_discovery_before_any_key_changes() {
-        let (base, server) = mock_server(vec![
-            ("GET /api/v1/auth/me ", 200, profile()),
-            (
-                "GET /api/v1/groups/available |access-secret",
-                200,
-                json!({"code":0,"data":[]}),
-            ),
-            (
-                "GET /api/v1/subscriptions |access-secret",
-                500,
-                json!({"error":"private"}),
-            ),
-        ]);
-        assert!(
-            matches!(model_session(base).discover_group_catalogs().await,
-            Err(err) if err.code == "SERVER")
-        );
-        server.join().unwrap();
-    }
-
-    #[tokio::test]
-    async fn subscription_usage_includes_expired_and_suspended_records_without_inventing_quota() {
-        let (base, server) = mock_server(vec![
-            (
-                "GET /api/v1/subscriptions/progress |access-secret",
-                200,
-                json!({"code":0,"data":[]}),
-            ),
-            (
-                "GET /api/v1/subscriptions |access-secret",
-                200,
-                json!({"code":0,"data":[
-                    {"id":7,"group_id":14,"expires_at":"2000-01-01T00:00:00Z","status":"expired", "group":{"name":"月度订阅","platform":"anthropic"}},
-                    {"id":8,"group_id":15,"expires_at":"2099-01-01T00:00:00Z","status":"suspended"},
-                    {"id":9,"group_id":16,"expires_at":"2099-01-01T00:00:00Z","status":"active"}
-                ]}),
-            ),
-        ]);
-        let usage = subscription_usage(&model_session(base).0).await.unwrap();
-        assert_eq!(usage.len(), 3);
-        assert_eq!(usage[0].status.as_deref(), Some("expired"));
-        assert_eq!(usage[0].group_name, "月度订阅");
-        assert_eq!(usage[1].status.as_deref(), Some("suspended"));
-        assert_eq!(usage[2].status.as_deref(), Some("unavailable"));
-        assert!(usage.iter().all(|item| !item.unlimited
-            && item.daily.is_none()
-            && item.weekly.is_none()
-            && item.monthly.is_none()));
-        server.join().unwrap();
-    }
-
-    #[tokio::test]
-    async fn reuses_an_existing_active_group_key_without_creating_another() {
-        let (base, server) = mock_server(vec![
-            ("GET /api/v1/auth/me ", 200, profile()),
-            (
-                "GET /api/v1/groups/available |access-secret",
-                200,
-                json!({"code":0,"data":[
-                    {"id":42,"name":"智枢router-ccs-Claude 主力","platform":"anthropic","status":"active","subscription_type":"standard"}
-                ]}),
-            ),
-            ("GET /api/v1/subscriptions |access-secret", 200, json!({"code":0,"data":[]})),
-            (
-                "GET /api/v1/keys?page=1&page_size=100&sort_by=created_at&sort_order=desc |access-secret",
-                200,
-                json!({"code":0,"data":{"items":[{
-                    "id":77,
-                    "key":"existing-group-secret",
-                    "name":"zhishu-ccs-anthropic-42",
-                    "group_id":42,
-                    "status":"active",
-                    "quota":0,
-                    "quota_used":0
-                }],"total":1,"page":1,"page_size":100,"pages":1}}),
-            ),
-            (
-                "GET /v1/models |existing-group-secret",
-                200,
-                json!({"data":[{"id":"claude-sonnet-5","supported_endpoint_types":["anthropic"]}]}),
-            ),
-            ("GET /v1/models?client_version=|existing-group-secret", 404, json!({"error":"unsupported"})),
-        ]);
-        let state = model_session(base);
-        let discovery = state.discover_group_catalogs().await.unwrap();
-        assert_eq!(
-            discovery.catalogs[0].credential.key,
-            "existing-group-secret"
-        );
-        assert_eq!(discovery.catalogs[0].models[0]["id"], "claude-sonnet-5");
-        assert!(discovery.catalogs[0].catalog_error.is_none());
-        server.join().unwrap();
-    }
-
-    #[tokio::test]
-    async fn model_forbidden_keeps_the_group_for_a_local_fallback_and_does_not_create_another_key()
-    {
-        let (base, server) = mock_server(vec![
-            ("GET /api/v1/auth/me ", 200, profile()),
-            (
-                "GET /api/v1/groups/available |access-secret",
-                200,
-                json!({"code":0,"data":[
-                    {"id":42,"name":"智枢router-ccs-混合分组","platform":"composite","status":"active","subscription_type":"standard"}
-                ]}),
-            ),
-            ("GET /api/v1/subscriptions |access-secret", 200, json!({"code":0,"data":[]})),
-            (
-                "GET /api/v1/keys?page=1&page_size=100&sort_by=created_at&sort_order=desc |access-secret",
-                200,
-                json!({"code":0,"data":{"items":[{
-                    "id":77,
-                    "key":"existing-group-secret",
-                    "name":"zhishu-ccs-composite-42",
-                    "group_id":42,
-                    "status":"active",
-                    "quota":0,
-                    "quota_used":0
-                }],"total":1,"page":1,"page_size":100,"pages":1}}),
-            ),
-            (
-                "GET /v1/models |existing-group-secret",
-                403,
-                json!({"error":"forbidden"}),
-            ),
-        ]);
-        let state = model_session(base);
-        let discovery = state.discover_group_catalogs().await.unwrap();
-        assert_eq!(discovery.catalogs.len(), 1);
-        assert!(discovery.catalogs[0].models.is_empty());
-        assert!(discovery.catalogs[0].catalog_error.is_some());
-        assert!(discovery.failed_group_ids.contains(&42));
-        server.join().unwrap();
-    }
-
     #[tokio::test]
     async fn login_uses_and_persists_only_the_normalized_platform_base_url() {
         let (base, server) = mock_server(vec![
             (
-                "GET /sub/api/v1/settings/public ",
+                "GET /sub/api/zhishu/v1/client/config ",
                 200,
-                json!({"code":0,"data":{}}),
+                config_response(),
             ),
             (
-                "POST /sub/api/v1/auth/login ",
+                "POST /sub/api/zhishu/v1/client/auth/login ",
                 200,
                 json!({"code":0,"data":{"access_token":"access-secret","refresh_token":"refresh-secret"}}),
             ),
-            ("GET /sub/api/v1/auth/me |access-secret", 200, profile()),
+            (
+                "GET /sub/api/zhishu/v1/client/account |access-secret",
+                200,
+                profile(),
+            ),
         ]);
         let expected_base = format!("{base}/sub");
         let (_dir, store, _vault) =
@@ -2219,7 +1119,10 @@ mod tests {
             store: Some(store.clone()),
             ..AuthState::default()
         });
-        let mut input = Url::parse(&format!("{base}/sub/api/v1/?token=url-secret#login")).unwrap();
+        let mut input = Url::parse(&format!(
+            "{base}/sub/api/zhishu/v1/client/?token=url-secret#login"
+        ))
+        .unwrap();
         input.set_username("url-user").unwrap();
         input.set_password(Some("url-password")).unwrap();
         let result = login(
@@ -2245,22 +1148,18 @@ mod tests {
     #[tokio::test]
     async fn login_keeps_pending_2fa_out_of_the_renderer() {
         let (base, server) = mock_server(vec![
+            ("GET /api/zhishu/v1/client/config ", 200, config_response()),
             (
-                "GET /api/v1/settings/public ",
-                200,
-                json!({"code":0,"data":{}}),
-            ),
-            (
-                "POST /api/v1/auth/login ",
+                "POST /api/zhishu/v1/client/auth/login ",
                 200,
                 json!({"code":0,"data":{"requires_2fa":true,"temp_token":"temporary-secret"}}),
             ),
             (
-                "POST /api/v1/auth/login/2fa ",
+                "POST /api/zhishu/v1/client/auth/login/2fa ",
                 200,
                 json!({"code":0,"data":{"access_token":"access-secret","refresh_token":"refresh-secret"}}),
             ),
-            ("GET /api/v1/auth/me ", 200, profile()),
+            ("GET /api/zhishu/v1/client/account ", 200, profile()),
         ]);
         let (_dir, store, _vault) =
             crate::zhishu::storage::platform_session::tests::saved_store(&base, now()).await;
@@ -2300,11 +1199,11 @@ mod tests {
             "tencent_captcha_enabled",
             "aliyun_captcha_enabled",
         ] {
-            let (base, server) = mock_server(vec![(
-                "GET /api/v1/settings/public ",
-                200,
-                json!({"code":0,"data":{key:true}}),
-            )]);
+            let (base, server) = mock_server(vec![("GET /api/zhishu/v1/client/config ", 200, {
+                let mut value = config_response();
+                value["data"][key] = json!(true);
+                value
+            })]);
             let state = Mutex::new(AuthState::default());
             let result = login(
                 &state,
@@ -2323,14 +1222,18 @@ mod tests {
     #[tokio::test]
     async fn keeps_rotated_refresh_token_when_profile_request_fails() {
         let (base, server) = mock_server(vec![
-            ("GET /api/v1/auth/me ", 401, json!({"message":"secret"})),
             (
-                "POST /api/v1/auth/refresh ",
+                "GET /api/zhishu/v1/client/account ",
+                401,
+                json!({"message":"secret"}),
+            ),
+            (
+                "POST /api/zhishu/v1/client/auth/refresh ",
                 200,
                 json!({"code":0,"data":{"access_token":"new-access","refresh_token":"new-refresh"}}),
             ),
-            ("GET /api/v1/auth/me ", 503, json!({})),
-            ("GET /api/v1/auth/me ", 200, profile()),
+            ("GET /api/zhishu/v1/client/account ", 503, json!({})),
+            ("GET /api/zhishu/v1/client/account ", 200, profile()),
         ]);
         let state = Mutex::new(AuthState {
             session: Some(Session {
@@ -2366,8 +1269,8 @@ mod tests {
     #[tokio::test]
     async fn invalid_refresh_returns_to_logged_out_state() {
         let (base, server) = mock_server(vec![
-            ("GET /api/v1/auth/me ", 401, json!({})),
-            ("POST /api/v1/auth/refresh ", 401, json!({})),
+            ("GET /api/zhishu/v1/client/account ", 401, json!({})),
+            ("POST /api/zhishu/v1/client/auth/refresh ", 401, json!({})),
         ]);
         let state = Mutex::new(AuthState {
             session: Some(Session {
@@ -2392,7 +1295,7 @@ mod tests {
     #[tokio::test]
     async fn logout_clears_local_tokens_even_if_revocation_fails() {
         let (base, server) = mock_server(vec![(
-            "POST /api/v1/auth/logout ",
+            "POST /api/zhishu/v1/client/auth/logout ",
             503,
             json!({"message":"secret"}),
         )]);
@@ -2420,17 +1323,25 @@ mod tests {
     async fn saved_refresh_restores_after_each_process_restart_and_rotates_in_the_vault() {
         let (base, server) = mock_server(vec![
             (
-                "POST /api/v1/auth/refresh ",
+                "POST /api/zhishu/v1/client/auth/refresh ",
                 200,
                 json!({"code":0,"data":{"access_token":"access-one","refresh_token":"refresh-one"}}),
             ),
-            ("GET /api/v1/auth/me |access-one", 200, profile()),
             (
-                "POST /api/v1/auth/refresh ",
+                "GET /api/zhishu/v1/client/account |access-one",
+                200,
+                profile(),
+            ),
+            (
+                "POST /api/zhishu/v1/client/auth/refresh ",
                 200,
                 json!({"code":0,"data":{"access_token":"access-two","refresh_token":"refresh-two"}}),
             ),
-            ("GET /api/v1/auth/me |access-two", 200, profile()),
+            (
+                "GET /api/zhishu/v1/client/account |access-two",
+                200,
+                profile(),
+            ),
         ]);
         let (_dir, store, _vault) =
             crate::zhishu::storage::platform_session::tests::saved_store(&base, now() - 100).await;
@@ -2456,14 +1367,14 @@ mod tests {
     #[tokio::test]
     async fn restore_retries_transient_failures_without_losing_rotated_tokens() {
         let (base, server) = mock_server(vec![
-            ("POST /api/v1/auth/refresh ", 503, json!({})),
+            ("POST /api/zhishu/v1/client/auth/refresh ", 503, json!({})),
             (
-                "POST /api/v1/auth/refresh ",
+                "POST /api/zhishu/v1/client/auth/refresh ",
                 200,
                 json!({"code":0,"data":{"access_token":"new-access","refresh_token":"new-refresh"}}),
             ),
-            ("GET /api/v1/auth/me ", 503, json!({})),
-            ("GET /api/v1/auth/me ", 200, profile()),
+            ("GET /api/zhishu/v1/client/account ", 503, json!({})),
+            ("GET /api/zhishu/v1/client/account ", 200, profile()),
         ]);
         let (_dir, store, _vault) =
             crate::zhishu::storage::platform_session::tests::saved_store(&base, now()).await;
@@ -2483,12 +1394,12 @@ mod tests {
     async fn background_account_checks_do_not_extend_inactivity_but_visible_use_does() {
         let (base, server) = mock_server(vec![
             (
-                "POST /api/v1/auth/refresh ",
+                "POST /api/zhishu/v1/client/auth/refresh ",
                 200,
                 json!({"code":0,"data":{"access_token":"access","refresh_token":"refresh"}}),
             ),
-            ("GET /api/v1/auth/me ", 200, profile()),
-            ("GET /api/v1/auth/me ", 200, profile()),
+            ("GET /api/zhishu/v1/client/account ", 200, profile()),
+            ("GET /api/zhishu/v1/client/account ", 200, profile()),
         ]);
         let previous = now() - 3600;
         let (_dir, store, _vault) =
@@ -2530,7 +1441,11 @@ mod tests {
 
     #[tokio::test]
     async fn revoked_saved_session_is_not_restored_again() {
-        let (base, server) = mock_server(vec![("POST /api/v1/auth/refresh ", 401, json!({}))]);
+        let (base, server) = mock_server(vec![(
+            "POST /api/zhishu/v1/client/auth/refresh ",
+            401,
+            json!({}),
+        )]);
         let (_dir, store, _vault) =
             crate::zhishu::storage::platform_session::tests::saved_store(&base, now()).await;
         let state = Mutex::new(AuthState {
@@ -2548,15 +1463,15 @@ mod tests {
         for status in [200, 503] {
             let (base, server) = mock_server(vec![
                 (
-                    "POST /api/v1/auth/refresh ",
+                    "POST /api/zhishu/v1/client/auth/refresh ",
                     200,
                     json!({"code":0,"data":{"access_token":"access","refresh_token":"refresh"}}),
                 ),
-                ("GET /api/v1/auth/me ", 200, profile()),
+                ("GET /api/zhishu/v1/client/account ", 200, profile()),
                 (
-                    "POST /api/v1/auth/logout ",
+                    "POST /api/zhishu/v1/client/auth/logout ",
                     status,
-                    json!({"code":0,"data":{}}),
+                    config_response(),
                 ),
             ]);
             let (_dir, store, _vault) =
@@ -2588,14 +1503,14 @@ mod tests {
     async fn account_identity_mismatch_clears_saved_credentials() {
         let (base, server) = mock_server(vec![
             (
-                "POST /api/v1/auth/refresh ",
+                "POST /api/zhishu/v1/client/auth/refresh ",
                 200,
                 json!({"code":0,"data":{"access_token":"access","refresh_token":"refresh"}}),
             ),
             (
-                "GET /api/v1/auth/me ",
+                "GET /api/zhishu/v1/client/account ",
                 200,
-                json!({"code":0,"data":{"id":2,"email":"other@example.com","role":"user","balance":0}}),
+                json!({"code":0,"data":{"id":2,"email":"other@example.com","status":"active","balance_usd":0}}),
             ),
         ]);
         let (_dir, store, _vault) =
@@ -2612,13 +1527,17 @@ mod tests {
     async fn locked_vault_after_rotation_retries_saving_the_new_token() {
         use std::sync::atomic::Ordering;
         let (base, server) = mock_server(vec![
-            ("GET /api/v1/auth/me ", 401, json!({})),
+            ("GET /api/zhishu/v1/client/account ", 401, json!({})),
             (
-                "POST /api/v1/auth/refresh ",
+                "POST /api/zhishu/v1/client/auth/refresh ",
                 200,
                 json!({"code":0,"data":{"access_token":"rotated-access","refresh_token":"rotated-refresh"}}),
             ),
-            ("GET /api/v1/auth/me |rotated-access", 200, profile()),
+            (
+                "GET /api/zhishu/v1/client/account |rotated-access",
+                200,
+                profile(),
+            ),
         ]);
         let (_dir, store, vault) =
             crate::zhishu::storage::platform_session::tests::saved_store(&base, now()).await;
@@ -2661,7 +1580,8 @@ mod tests {
     #[tokio::test]
     async fn login_succeeds_with_a_warning_when_the_session_vault_is_unavailable() {
         use std::sync::atomic::Ordering;
-        let (base, server) = mock_server(vec![("GET /api/v1/auth/me ", 200, profile())]);
+        let (base, server) =
+            mock_server(vec![("GET /api/zhishu/v1/client/account ", 200, profile())]);
         let (_dir, store, vault) =
             crate::zhishu::storage::platform_session::tests::saved_store(&base, now()).await;
         store.clear().await.unwrap();
@@ -2693,9 +1613,9 @@ mod tests {
     #[tokio::test]
     async fn successful_new_login_replaces_the_saved_account_without_a_password_preference() {
         let (base, server) = mock_server(vec![(
-            "GET /api/v1/auth/me ",
+            "GET /api/zhishu/v1/client/account ",
             200,
-            json!({"code":0,"data":{"id":2,"email":"other@example.com","role":"user","balance":0}}),
+            json!({"code":0,"data":{"id":2,"email":"other@example.com","status":"active","balance_usd":0}}),
         )]);
         let (_dir, store, _vault) =
             crate::zhishu::storage::platform_session::tests::saved_store(&base, now()).await;
@@ -2721,6 +1641,270 @@ mod tests {
         let (record, token) = store.load().await.unwrap().unwrap();
         assert_eq!(record.user_id, 2);
         assert_eq!(token, "other-refresh");
+        server.join().unwrap();
+    }
+    fn access_response() -> Value {
+        json!({"code":0,"data":{
+            "schema_version":1,"synced_at":"2026-10-31T08:00:00Z",
+            "account":profile()["data"],"groups":[{
+                "id":42,"name":"Exclusive without prefix","platform":"openai","status":"active",
+                "subscription_type":"standard","is_exclusive":true,
+                "credential":{"id":123,"name":"zhishu-client-42","key":"shared-model-secret","status":"active",
+                    "client_managed":true,"expires_at":null,"quota_usd":0,"used_usd":0},
+                "quota":{"available":true,"reasons":[]},"subscriptions":[],
+                "connection":{"base_url":"https://gateway.test","endpoints":{"responses":"/v1/responses"}},
+                "models":[{"id":"only-authorized","supports_streaming":false,"description":"echo shared-model-secret","unknown_token":"must-not-save"}],
+                "catalog_status":"ok"
+            }]
+        }})
+    }
+
+    #[tokio::test]
+    async fn access_is_the_only_key_source_and_keeps_server_authorized_groups() {
+        let (base, server) = mock_server(vec![(
+            "POST /api/zhishu/v1/client/access |access-secret",
+            200,
+            access_response(),
+        )]);
+        let discovery = model_session(base.clone())
+            .discover_group_catalogs()
+            .await
+            .unwrap();
+        assert_eq!(discovery.account.base_url, base);
+        assert_eq!(discovery.synced_at, 1793433600000);
+        assert_eq!(discovery.groups[0].name, "Exclusive without prefix");
+        let catalog = &discovery.catalogs[0];
+        assert_eq!(catalog.credential.key, "shared-model-secret");
+        assert_eq!(catalog.credential.key_name, "zhishu-client-42");
+        assert_eq!(
+            catalog.connection.as_ref().unwrap().base_url,
+            "https://gateway.test"
+        );
+        assert_eq!(catalog.models[0]["supports_streaming"], false);
+        assert!(catalog.models[0].get("supports_tools").is_none());
+        assert!(!serde_json::to_string(&catalog.models)
+            .unwrap()
+            .contains("must-not-save"));
+        assert!(!serde_json::to_string(&catalog.models)
+            .unwrap()
+            .contains("shared-model-secret"));
+        server.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn access_refreshes_once_without_falling_back_to_panel_endpoints() {
+        let (base, server) = mock_server(vec![
+            (
+                "POST /api/zhishu/v1/client/access |access-secret",
+                401,
+                json!({}),
+            ),
+            (
+                "POST /api/zhishu/v1/client/auth/refresh ",
+                200,
+                json!({"code":0,"data":{"access_token":"new-access","refresh_token":"new-refresh"}}),
+            ),
+            (
+                "POST /api/zhishu/v1/client/access |new-access",
+                200,
+                access_response(),
+            ),
+        ]);
+        assert_eq!(
+            model_session(base)
+                .discover_group_catalogs()
+                .await
+                .unwrap()
+                .catalogs
+                .len(),
+            1
+        );
+        server.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn access_errors_never_create_empty_snapshots_or_request_old_endpoints() {
+        for status in [403, 404, 429, 503] {
+            let (base, server) = mock_server(vec![(
+                "POST /api/zhishu/v1/client/access ",
+                status,
+                json!({"message":"shared-model-secret"}),
+            )]);
+            let result = model_session(base).discover_group_catalogs().await;
+            assert!(result.is_err());
+            assert!(!serde_json::to_string(&result.err().unwrap())
+                .unwrap()
+                .contains("shared-model-secret"));
+            server.join().unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn access_distinguishes_failed_catalog_empty_success_and_unavailable_quota() {
+        for failed in [false, true] {
+            let mut response = access_response();
+            response["data"]["groups"][0]["models"] = if failed { Value::Null } else { json!([]) };
+            response["data"]["groups"][0]["catalog_status"] =
+                json!(if failed { "failed" } else { "ok" });
+            response["data"]["groups"][0]["catalog_error"] = json!("MODEL_CATALOG_UNAVAILABLE");
+            response["data"]["groups"][0]["quota"] =
+                json!({"available":false,"reasons":["key_quota_exhausted"]});
+            let (base, server) =
+                mock_server(vec![("POST /api/zhishu/v1/client/access ", 200, response)]);
+            let data = model_session(base).discover_group_catalogs().await.unwrap();
+            assert_eq!(data.failed_group_ids.contains(&42), failed);
+            assert_eq!(data.catalogs[0].credential.key, "shared-model-secret");
+            assert!(!data.details[&42].quota.available);
+            server.join().unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn access_rejects_wrong_identity_schema_and_invalid_model_ids() {
+        for (path, value) in [
+            ("identity", json!(2)),
+            ("schema", json!(2)),
+            ("model", json!({"name":"no id"})),
+            ("duplicate", Value::Null),
+        ] {
+            let mut response = access_response();
+            match path {
+                "identity" => response["data"]["account"]["id"] = value,
+                "schema" => response["data"]["schema_version"] = value,
+                "duplicate" => {
+                    let group = response["data"]["groups"][0].clone();
+                    response["data"]["groups"]
+                        .as_array_mut()
+                        .unwrap()
+                        .push(group);
+                }
+                _ => response["data"]["groups"][0]["models"][0] = value,
+            }
+            let (base, server) =
+                mock_server(vec![("POST /api/zhishu/v1/client/access ", 200, response)]);
+            let state = model_session(base);
+            assert!(state.discover_group_catalogs().await.is_err());
+            if path == "identity" {
+                assert!(state.0.lock().await.session.is_none());
+            }
+            server.join().unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn usage_is_read_only_and_cannot_expose_keys_connection_or_models() {
+        let mut response = access_response();
+        response["data"]["groups"][0]["models"] = Value::Null;
+        let (base, server) = mock_server(vec![(
+            "GET /api/zhishu/v1/client/usage/summary |access-secret",
+            200,
+            response,
+        )]);
+        let result = subscription_usage(&model_session(base).0).await.unwrap();
+        let public = serde_json::to_value(result).unwrap();
+        assert_eq!(public["groups"][0]["quota"]["available"], true);
+        for secret in [
+            "shared-model-secret",
+            "connection",
+            "models",
+            "access-secret",
+        ] {
+            assert!(!public.to_string().contains(secret));
+        }
+        server.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn login_without_refresh_token_clears_previous_account_persistence() {
+        let (base, server) =
+            mock_server(vec![("GET /api/zhishu/v1/client/account ", 200, profile())]);
+        let (_dir, store, _vault) =
+            crate::zhishu::storage::platform_session::tests::saved_store(&base, now()).await;
+        let mut state = AuthState {
+            store: Some(store.clone()),
+            ..AuthState::default()
+        };
+        let result = finish_login(
+            &mut state,
+            &client().unwrap(),
+            base,
+            json!({"access_token":"access-only"}),
+        )
+        .await
+        .unwrap();
+        assert!(matches!(
+            result,
+            LoginResult::Authenticated {
+                persistence_warning: Some(_),
+                ..
+            }
+        ));
+        assert!(state
+            .session
+            .as_ref()
+            .unwrap()
+            .tokens
+            .refresh_token
+            .is_empty());
+        assert!(store.load().await.unwrap().is_none());
+        server.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn request_allowlist_rejects_arbitrary_paths_before_network() {
+        for (method, path) in [
+            (Method::GET, "/keys"),
+            (Method::POST, "/credentials"),
+            (Method::DELETE, "/access"),
+            (Method::GET, "/models"),
+        ] {
+            let result: Result<Value, _> = request(
+                &client().unwrap(),
+                "http://127.0.0.1:0",
+                method,
+                path,
+                None,
+                None,
+            )
+            .await;
+            assert_eq!(result.err().unwrap().code, "CLIENT_API_ONLY");
+        }
+    }
+
+    #[test]
+    fn config_resolves_web_links_from_origin_and_honors_disabled_entries() {
+        let mut value = config_response()["data"].clone();
+        value["registration_enabled"] = json!(false);
+        value["subscriptions_url"] = json!("javascript:alert(1)");
+        let config: ClientConfig = serde_json::from_value(value).unwrap();
+        let config = config.validate("https://platform.test/sub").unwrap();
+        assert!(config.register_url.is_none());
+        assert!(config.subscriptions_url.is_none());
+        assert_eq!(
+            config.password_reset_url.as_deref(),
+            Some("https://platform.test/forgot-password")
+        );
+    }
+    #[tokio::test]
+    async fn successful_empty_access_and_usage_are_valid_snapshots() {
+        let mut response = access_response();
+        response["data"]["groups"] = json!([]);
+        let (base, server) = mock_server(vec![
+            ("POST /api/zhishu/v1/client/access ", 200, response.clone()),
+            ("GET /api/zhishu/v1/client/usage/summary ", 200, response),
+        ]);
+        let state = model_session(base);
+        assert!(state
+            .discover_group_catalogs()
+            .await
+            .unwrap()
+            .groups
+            .is_empty());
+        assert!(subscription_usage(&state.0)
+            .await
+            .unwrap()
+            .groups
+            .is_empty());
         server.join().unwrap();
     }
 }

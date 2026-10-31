@@ -270,7 +270,7 @@ mod tests {
         let body = json!({"email": "test@example.com", "password": "login-password", "group_id": 42,
             "note": "query-secret header-secret", "totp_code": "123456"});
         let request = reqwest::Client::new()
-            .post("https://example.com/api/v1/keys")
+            .post("https://example.com/api/zhishu/v1/client/access")
             .query(&[
                 ("page", "2"),
                 ("tag", "first"),
@@ -301,7 +301,7 @@ mod tests {
     fn request_parameters_handle_empty_and_non_json_bodies() {
         let client = reqwest::Client::new();
         let empty = client
-            .get("https://example.com/api/v1/auth/me")
+            .get("https://example.com/api/zhishu/v1/client/account")
             .build()
             .unwrap();
         assert_eq!(
@@ -309,7 +309,7 @@ mod tests {
             json!({"query": {}, "body": null})
         );
         let invalid = client
-            .post("https://example.com/api/v1/auth/login")
+            .post("https://example.com/api/zhishu/v1/client/auth/login")
             .body("password=raw-secret")
             .build()
             .unwrap();

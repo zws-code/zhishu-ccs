@@ -186,6 +186,7 @@ export interface ProviderMeta {
     groupName?: string;
     keyName?: string;
     subscriptionType?: string;
+    connectionBaseUrl?: string;
   };
   // 自定义端点：以 URL 为键，值为端点信息
   custom_endpoints?: Record<string, CustomEndpoint>;

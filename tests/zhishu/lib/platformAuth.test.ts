@@ -21,4 +21,10 @@ describe("platform authentication IPC", () => {
       active: false,
     });
   });
+  it("passes config baseUrl using the registered IPC contract", async () => {
+    await platformAuthApi.config("https://platform.test");
+    expect(invoke).toHaveBeenCalledWith("platform_get_client_config", {
+      baseUrl: "https://platform.test",
+    });
+  });
 });

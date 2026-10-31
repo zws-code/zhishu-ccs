@@ -5302,5 +5302,23 @@
       "providerMissing": "この Oh My Pi プロバイダは保存済みリストにありません。",
       "legacyModelsJson": "Oh My Pi にはまだ旧形式の models.json があり、omp は次回起動時にこれを models.yml へ移行します。omp を一度起動してから、もう一度プロバイダを追加してください。"
     }
+  },
+  "clientQuota": {
+    "noLimit": "期間の上限未設定",
+    "title": "利用枠の状態",
+    "available": "利用可能",
+    "unavailable": "利用不可",
+    "key_missing": "専用キーがありません",
+    "key_expired": "キーの有効期限切れ",
+    "key_quota_exhausted": "キーの利用枠を消費しました",
+    "key_disabled": "キーは無効です",
+    "key_rate_limit_exhausted": "キーの期間利用枠を消費しました",
+    "balance_insufficient": "残高不足",
+    "subscription_expired": "サブスクリプション期限切れ",
+    "subscription_suspended": "サブスクリプション停止中",
+    "subscription_quota_exhausted": "サブスクリプションの利用枠を消費しました",
+    "daily": "日次",
+    "weekly": "週次",
+    "monthly": "月次"
   }
 }

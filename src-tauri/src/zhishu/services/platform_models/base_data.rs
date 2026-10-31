@@ -38,6 +38,9 @@ struct GroupSummary {
     failed: bool,
     error: Option<String>,
     models: Vec<ModelSummary>,
+    quota: Option<super::super::client_api::ClientQuota>,
+    subscriptions: Vec<super::super::client_api::ClientSubscription>,
+    credential: Option<super::super::client_api::CredentialMetadata>,
 }
 
 #[derive(Serialize)]
@@ -138,7 +141,13 @@ impl CachedCatalog {
                 .iter()
                 .map(|group| {
                     let catalog = catalogs.get(&group.id).copied();
+                    let details = self.discovery.details.get(&group.id);
                     GroupSummary {
+                        quota: details.map(|details| details.quota.clone()),
+                        subscriptions: details
+                            .map(|details| details.subscriptions.clone())
+                            .unwrap_or_default(),
+                        credential: details.and_then(|details| details.credential.clone()),
                         id: group.id,
                         name: group.name.clone(),
                         platform: group.platform.clone(),
@@ -191,14 +200,16 @@ impl CatalogStore {
     }
 
     fn load(&self) -> Result<Option<CachedCatalog>, PlatformAuthError> {
-        let cached: Option<CachedCatalog> = match std::fs::read(&self.path) {
+        let value: serde_json::Value = match std::fs::read(&self.path) {
             Ok(bytes) => serde_json::from_slice(&bytes).map_err(|_| storage_error())?,
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(_) => return Err(storage_error()),
         };
-        if cached.as_ref().is_some_and(|c| c.version != 1) {
-            return Err(storage_error());
+        // 旧快照无凭证接管/字段迁移；先检查版本，不解析或使用旧 Key。
+        if value.is_null() || value.get("version").and_then(serde_json::Value::as_u64) != Some(2) {
+            return Ok(None);
         }
+        let cached = serde_json::from_value(value).map_err(|_| storage_error())?;
         Ok(cached)
     }
 
@@ -215,8 +226,8 @@ impl CatalogStore {
 
     pub fn save(&self, discovery: GroupDiscovery) -> Result<CachedCatalog, PlatformAuthError> {
         let cached = CachedCatalog {
-            version: 1,
-            synced_at: chrono::Utc::now().timestamp_millis(),
+            version: 2,
+            synced_at: discovery.synced_at,
             credentials_cleared: false,
             discovery,
         };
@@ -373,5 +384,23 @@ mod tests {
         assert_eq!(summary["endpoints"], json!([]));
         assert_eq!(summary["reasoningLevels"], json!([]));
         assert!(ModelSummary::from_value(&json!({"name":"no id"})).is_none());
+    }
+    #[test]
+    fn legacy_snapshot_is_not_migrated_or_used_and_remains_untouched() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("catalog.json");
+        let bytes = br#"{"version":1,"legacy_key":"old-secret","discovery":{}}"#;
+        std::fs::write(&path, bytes).unwrap();
+        let store = CatalogStore::for_test(path.clone());
+        assert!(store.read("https://platform.test", 1).unwrap().is_none());
+        assert_eq!(
+            store
+                .group_key("https://platform.test", 1, 42)
+                .err()
+                .unwrap()
+                .code,
+            "CATALOG_REQUIRED"
+        );
+        assert_eq!(std::fs::read(path).unwrap(), bytes);
     }
 }

@@ -1,29 +1,54 @@
 import { invoke } from "@tauri-apps/api/core";
 
+/** Nested fields mirror the dedicated client protocol; no plaintext credentials. */
+export interface PlatformQuota {
+  available: boolean;
+  reasons: string[];
+}
 export interface PlatformUsageWindow {
-  limitUsd: number;
-  usedUsd: number;
-  remainingUsd: number;
-  percentage: number;
-  resetsAt: string | null;
+  limit_usd: number | null;
+  used_usd: number;
+  remaining_usd: number | null;
+  resets_at: string | null;
 }
-
-/** 订阅分组的额度快照；过期、暂停和进度缺失必须按状态展示，不能按缺省值推断不限量。 */
 export interface PlatformSubscriptionUsage {
-  subscriptionId: number;
-  groupId: number;
-  groupName: string;
-  groupPlatform: string;
-  expiresAt: string;
-  expiresInDays: number;
-  unlimited: boolean;
-  status?: string;
-  daily?: PlatformUsageWindow;
-  weekly?: PlatformUsageWindow;
-  monthly?: PlatformUsageWindow;
+  id: number;
+  group_id: number;
+  status: string;
+  starts_at: string;
+  expires_at: string;
+  active: boolean;
+  daily: PlatformUsageWindow;
+  weekly: PlatformUsageWindow;
+  monthly: PlatformUsageWindow;
 }
-
+export interface PlatformCredentialMetadata {
+  id: number;
+  name: string;
+  status: string;
+  client_managed: boolean;
+  expires_at: string | null;
+  quota_usd: number;
+  used_usd: number;
+}
+export interface PlatformUsageGroup {
+  id: number;
+  name: string;
+  platform: string;
+  status: string;
+  subscription_type: string;
+  quota: PlatformQuota;
+  subscriptions: PlatformSubscriptionUsage[];
+  credential: PlatformCredentialMetadata | null;
+}
+export interface PlatformUsageSummary {
+  baseUrl: string;
+  userId: number;
+  syncedAt: number;
+  balance: number;
+  groups: PlatformUsageGroup[];
+}
 export const platformUsageApi = {
   subscriptions: () =>
-    invoke<PlatformSubscriptionUsage[]>("platform_get_subscription_usage"),
+    invoke<PlatformUsageSummary>("platform_get_subscription_usage"),
 };

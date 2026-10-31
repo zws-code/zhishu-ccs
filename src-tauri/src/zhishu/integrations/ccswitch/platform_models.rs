@@ -156,6 +156,7 @@ pub(crate) fn provider(
         format!("platform-managed-{}", m.agent),
         "智枢平台托管".into(),
         None,
+        None,
     )
 }
 
@@ -182,6 +183,71 @@ pub(crate) fn service_provider(
         service_provider_id(&m.agent, group_id, group_platform, origin, user),
         format!("智枢平台 · {group_name}"),
         Some((group_id, group_platform, group_name, key_name)),
+        None,
+    )
+}
+
+/// Keep the account identity separate from the service-configured model gateway.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn service_provider_with_connection(
+    m: &AgentModel,
+    origin: &str,
+    user: i64,
+    key: &str,
+    key_id: i64,
+    previous: Option<&Provider>,
+    group_id: i64,
+    group_platform: &str,
+    group_name: &str,
+    key_name: &str,
+    connection: Option<&crate::zhishu::services::client_api::ClientConnection>,
+) -> Result<Provider, PlatformAuthError> {
+    let Some(connection) = connection else {
+        return service_provider(
+            m,
+            origin,
+            user,
+            key,
+            key_id,
+            previous,
+            group_id,
+            group_platform,
+            group_name,
+            key_name,
+        );
+    };
+    let (endpoint, suffix) = match m.protocol.as_str() {
+        "anthropic" => ("messages", "/v1/messages"),
+        "responses" => ("responses", "/v1/responses"),
+        "chat" => ("chat_completions", "/v1/chat/completions"),
+        "gemini" => ("gemini", "/v1beta/models"),
+        _ => return Err(fail("INCOMPATIBLE", "平台尚未适配这个模型的协议")),
+    };
+    let path = connection
+        .endpoints
+        .get(endpoint)
+        .ok_or_else(|| fail("INCOMPATIBLE", "平台未提供该协议的连接路径"))?;
+    let prefix = path
+        .strip_suffix(suffix)
+        .filter(|prefix| {
+            prefix.is_empty()
+                || (prefix.starts_with('/')
+                    && !prefix.starts_with("//")
+                    && !prefix.contains(['?', '#']))
+        })
+        .ok_or_else(|| fail("INCOMPATIBLE", "工具暂不支持平台配置的协议路径"))?;
+    let root = format!("{}{}", connection.base_url.trim_end_matches('/'), prefix);
+    build_provider(
+        m,
+        origin,
+        user,
+        key,
+        key_id,
+        previous,
+        service_provider_id(&m.agent, group_id, group_platform, origin, user),
+        format!("智枢平台 · {group_name}"),
+        Some((group_id, group_platform, group_name, key_name)),
+        Some(&root),
     )
 }
 
@@ -196,6 +262,7 @@ fn build_provider(
     id: String,
     name: String,
     group: Option<(i64, &str, &str, &str)>,
+    connection_root: Option<&str>,
 ) -> Result<Provider, PlatformAuthError> {
     app(&m.agent)?;
     let protocol_api = match m.protocol.as_str() {
@@ -217,7 +284,7 @@ fn build_provider(
             "WorkBuddy 仅支持 OpenAI Chat Completions 模型",
         ));
     }
-    let root = origin.trim_end_matches('/');
+    let root = connection_root.unwrap_or(origin).trim_end_matches('/');
     let base = format!("{root}/v1");
     // Native Anthropic clients append /v1/messages. OpenCode's AI SDK
     // expects /v1 in its prefix, so its options continue using `base`.
@@ -227,6 +294,8 @@ fn build_provider(
         &base
     };
     let model = &m.model;
+    // These native schemas need concrete input/reasoning defaults. The defaults
+    // below are local CLI policy; neither AgentModel nor the catalog is modified.
     let input = if m.input_modalities.is_empty() {
         vec!["text".to_string()]
     } else {
@@ -234,14 +303,14 @@ fn build_provider(
     };
     let mut settings = match m.agent.as_str() {
         "claude" => json!({"env": {
-            "ANTHROPIC_BASE_URL": if m.protocol == "anthropic" { origin } else { &base },
+            "ANTHROPIC_BASE_URL": if m.protocol == "anthropic" { root } else { &base },
             "ANTHROPIC_AUTH_TOKEN": key, "ANTHROPIC_MODEL": model,
             "ANTHROPIC_DEFAULT_SONNET_MODEL": model, "ANTHROPIC_DEFAULT_OPUS_MODEL": model,
             "ANTHROPIC_DEFAULT_HAIKU_MODEL": model, "CLAUDE_CODE_SUBAGENT_MODEL":model,
             "ANTHROPIC_SMALL_FAST_MODEL":model
         }}),
         "claude-desktop" => json!({"env": {
-            "ANTHROPIC_BASE_URL": if m.protocol == "anthropic" { origin } else { &base },
+            "ANTHROPIC_BASE_URL": if m.protocol == "anthropic" { root } else { &base },
             "ANTHROPIC_AUTH_TOKEN": key,
             "ANTHROPIC_MODEL": model
         }}),
@@ -271,6 +340,7 @@ fn build_provider(
                 "modelCatalog":{"models":[entry]}})
         }
         "grokbuild" => {
+            // GrokBuild requires a local context budget even when the platform is silent.
             let context_window = if m.context_window == 0 {
                 crate::grok_config::DEFAULT_CONTEXT_WINDOW as u64
             } else {
@@ -280,7 +350,7 @@ fn build_provider(
             json!({"config":toml::to_string(&config).map_err(|_| fail("CONFIG", "无法生成工具配置"))?})
         }
         "gemini" => {
-            json!({"env":{"GOOGLE_GEMINI_BASE_URL":origin, "GEMINI_API_KEY":key, "GEMINI_MODEL":model}, "config":{"model":{"name":model}}})
+            json!({"env":{"GOOGLE_GEMINI_BASE_URL":root, "GEMINI_API_KEY":key, "GEMINI_MODEL":model}, "config":{"model":{"name":model}}})
         }
         "opencode" => {
             json!({"npm":match m.protocol.as_str() {"anthropic" => "@ai-sdk/anthropic", "responses" => "@ai-sdk/openai", _ => "@ai-sdk/openai-compatible"},
@@ -355,6 +425,7 @@ fn build_provider(
                 capabilities.push("thinking");
             }
             let model_key = format!("{id}/{model}");
+            // Kimi requires a concrete context size; this is only a native fallback.
             let context = if m.context_window > 0 {
                 m.context_window
             } else {
@@ -463,6 +534,7 @@ fn build_provider(
             group_name: group.map(|(_, _, name, _)| name.to_string()),
             key_name: group.map(|(_, _, _, key_name)| key_name.to_string()),
             subscription_type: None,
+            connection_base_url: connection_root.map(str::to_owned),
         }),
         api_format: Some(
             match m.protocol.as_str() {
@@ -698,14 +770,107 @@ pub(crate) fn repair_protocol_base_url(
     true
 }
 
+pub(crate) fn refresh_connection_base(settings: &mut Value, previous: &str, next: &str) -> bool {
+    if previous == next {
+        return false;
+    }
+    fn replace(value: &mut Value, previous: &str, next: &str) -> bool {
+        match value {
+            Value::Object(fields) => {
+                let mut changed = false;
+                for (key, value) in fields {
+                    if key == "config" {
+                        if let Some(text) = value.as_str() {
+                            if let Ok(mut doc) = text.parse::<toml_edit::DocumentMut>() {
+                                let mut edited = false;
+                                fn visit(
+                                    table: &mut dyn toml_edit::TableLike,
+                                    previous: &str,
+                                    next: &str,
+                                    edited: &mut bool,
+                                ) {
+                                    for (key, item) in table.iter_mut() {
+                                        if key == "base_url" {
+                                            if let Some(url) = item.as_str() {
+                                                if url == previous
+                                                    || url == format!("{previous}/v1")
+                                                {
+                                                    let replacement =
+                                                        format!("{next}{}", &url[previous.len()..]);
+                                                    let decor = item
+                                                        .as_value()
+                                                        .map(|value| value.decor().clone());
+                                                    *item = toml_edit::value(replacement);
+                                                    if let (Some(decor), Some(value)) =
+                                                        (decor, item.as_value_mut())
+                                                    {
+                                                        *value.decor_mut() = decor;
+                                                    }
+                                                    *edited = true;
+                                                }
+                                            }
+                                        } else if let Some(child) = item.as_table_like_mut() {
+                                            visit(child, previous, next, edited);
+                                        }
+                                    }
+                                }
+                                visit(doc.as_table_mut(), previous, next, &mut edited);
+                                if edited {
+                                    *value = Value::String(doc.to_string());
+                                    changed = true;
+                                }
+                                continue;
+                            }
+                        }
+                    }
+                    if matches!(
+                        key.as_str(),
+                        "base_url"
+                            | "baseUrl"
+                            | "baseURL"
+                            | "url"
+                            | "ANTHROPIC_BASE_URL"
+                            | "GOOGLE_GEMINI_BASE_URL"
+                    ) {
+                        if let Some(url) = value.as_str() {
+                            if url == previous || url == format!("{previous}/v1") {
+                                *value = json!(format!("{next}{}", &url[previous.len()..]));
+                                changed = true;
+                            }
+                        }
+                    } else {
+                        changed |= replace(value, previous, next);
+                    }
+                }
+                changed
+            }
+            Value::Array(items) => {
+                let mut changed = false;
+                for item in items {
+                    changed |= replace(item, previous, next);
+                }
+                changed
+            }
+            _ => false,
+        }
+    }
+    replace(
+        settings,
+        previous.trim_end_matches('/'),
+        next.trim_end_matches('/'),
+    )
+}
+
 fn workbuddy_model_entry(m: &AgentModel, url: &str, key: &str) -> Result<Value, PlatformAuthError> {
+    // WorkBuddy requires concrete booleans. Unknown tool support is a local
+    // optimistic adapter policy; AgentModel and the platform snapshot retain None.
     let supports_reasoning = m.reasoning.unwrap_or(false) || !m.reasoning_levels.is_empty();
     let mut entry = json!({
         "id": m.model,
         "name": m.name,
         "url": url,
         "apiKey": key,
-        "supportsToolCall": m.supports_tools,
+        "supportsToolCall": m.supports_tools.unwrap_or(true),
         "supportsImages": m.input_modalities.iter().any(|item| item == "image"),
         "supportsReasoning": supports_reasoning,
         "useCustomProtocol": false
@@ -1288,5 +1453,68 @@ mod tests {
             None
         )
         .is_err());
+    }
+    #[test]
+    fn service_connection_uses_gateway_without_changing_account_identity() {
+        let connection = crate::zhishu::services::client_api::ClientConnection {
+            base_url: "https://gateway.test/tenant".into(),
+            endpoints: [("responses".into(), "/v1/responses".into())].into(),
+        };
+        let provider = service_provider_with_connection(
+            &model("codex", "responses"),
+            "https://login.test",
+            1,
+            "test-key",
+            123,
+            None,
+            42,
+            "openai",
+            "Group",
+            "shared",
+            Some(&connection),
+        )
+        .unwrap();
+        let managed = provider
+            .meta
+            .as_ref()
+            .unwrap()
+            .platform_managed
+            .as_ref()
+            .unwrap();
+        assert_eq!(managed.origin, "https://login.test");
+        assert_eq!(
+            provider.id,
+            service_provider_id("codex", 42, "openai", "https://login.test", 1)
+        );
+        assert_eq!(
+            managed.connection_base_url.as_deref(),
+            Some("https://gateway.test/tenant")
+        );
+        let config: toml::Value = provider.settings_config["config"]
+            .as_str()
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert_eq!(
+            config["model_providers"]["platform"]["base_url"].as_str(),
+            Some("https://gateway.test/tenant/v1")
+        );
+    }
+
+    #[test]
+    fn changed_gateway_updates_generated_urls_and_preserves_custom_urls_and_toml_comments() {
+        let mut settings = json!({"baseUrl":"https://old.test/v1", "nested":{"url":"https://custom.test/v1"},
+            "config":"# keep comment\n[model_providers.platform]\nbase_url = \"https://old.test/v1\" # keep inline\n"});
+        assert!(refresh_connection_base(
+            &mut settings,
+            "https://old.test",
+            "https://new.test"
+        ));
+        assert_eq!(settings["baseUrl"], "https://new.test/v1");
+        assert_eq!(settings["nested"]["url"], "https://custom.test/v1");
+        let text = settings["config"].as_str().unwrap();
+        assert!(text.contains("# keep comment"));
+        assert!(text.contains("https://new.test/v1"));
+        assert!(text.contains("# keep inline"));
     }
 }

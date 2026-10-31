@@ -1,4 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
+import type {
+  PlatformQuota,
+  PlatformSubscriptionUsage,
+  PlatformCredentialMetadata,
+} from "./platformUsage";
 import type { AppId } from "@/lib/api/types";
 
 /** 本地同步结果：数据库行变化与原生文件变化分别统计，部分成功仍需展示 warnings。 */
@@ -49,6 +54,9 @@ export interface PlatformCatalogGroup {
   keyId?: number | null;
   keyName?: string | null;
   keyAvailable?: boolean;
+  quota?: PlatformQuota | null;
+  subscriptions?: PlatformSubscriptionUsage[];
+  credential?: PlatformCredentialMetadata | null;
   failed: boolean;
   error: string | null;
   models: PlatformCatalogModel[];
@@ -85,7 +93,7 @@ export const platformModelsApi = {
       userId,
       groupId,
     }),
-  // 第一阶段联网更新目录并按需管理分组 Key；第二阶段仅按本机目录更新工具供应商。
+  // 第一阶段通过客户端 access 接口更新目录，Key 生命周期由服务端管理；第二阶段仅按本机目录更新工具供应商。
   syncCatalog: () => invoke<PlatformCatalog>("platform_sync_catalog"),
   sync: (agent?: AppId) =>
     invoke<PlatformSyncSummary>("platform_sync_providers", {

@@ -146,23 +146,23 @@
 - `platform_get_account({ active })` 返回 `{ baseUrl, user: { id, email, username, role, balance } }` 或 `null`；平台错误保持 `{ code, message }`。前端按页面可见性传 `active`，后端还检查主窗口可见且未最小化；后台检查不延长闲置期限。
 - 重启从 keyring 恢复 refresh token，向平台刷新并验证账户；连续超过七天未使用、确认凭据失效或用户身份变化时清除会话。401 按现有路径刷新，轮换结果先保存再继续请求；暂时断网或凭据库故障保留可重试状态。
 - `PlatformAuthContext` 每分钟及窗口重新可见、网络恢复时查询账户。已有账户遇到暂时网络错误仍可使用本地功能；启动恢复失败进入 `recoveryPending` 重试页，可主动退出后重新登录，但没有未验证的离线入口。
-- 认证 HTTP 路径均带 `/api/v1` 前缀：`/settings/public`、`/auth/login`、`/auth/login/2fa`、`/auth/me`、`/auth/refresh`、`/auth/logout`。保留人机验证不支持时明确拒绝的行为，不绕过平台验证。
+- 认证 HTTP 路径仅使用 `/api/zhishu/v1/client` 前缀：`/config`、`/auth/login`、`/auth/login/2fa`、`/account`、`/auth/refresh`、`/auth/logout`。网页入口来自 config 的地址及开关；缺少 refresh token 时明确提示不能自动续期，不复用旧账号令牌。保留人机验证不支持时明确拒绝的行为，不绕过平台验证。
 - 主动退出先失效本机会话指针并清理会话 keyring，再尽力撤销服务端 refresh token，同时清理前端查询缓存；保留本机目录、供应商数据库和工具配置中的 API Key，不改写原生配置。退出后平台目录与 Key 查看/同步仍需登录并校验账户归属；同账号重新登录可继续使用本机目录。
 - 要改先做什么：核对 `platform_auth.rs`、`platform_session.rs`、`platform_login_history.rs`、门禁和 Context；覆盖重启恢复、轮换后断网、凭据库故障、七天边界、2FA、切换账号、主动退出与迟到响应。
 
 ### 平台基础数据与供应商同步
 
 - 为什么：平台拉取会管理服务端 Key，本地同步会写供应商和工具配置；两阶段副作用不同，不能把按钮重新合并为隐式联网与自动应用。
-- 平台层：`platform_sync_catalog()` 获取可用分组、完整订阅、分页 Key 和模型目录，按需创建分组 Key，保存 `platform-catalog.json`，返回目录摘要；不修改 Agent 供应商。整体拉取失败保留上一快照，分组失败保留失败标记。
+- 平台层：`platform_sync_catalog()` 仅通过 `POST /api/zhishu/v1/client/access` 获取授权分组、专用 Key、模型、连接与额度，保存版本 2 的 `platform-catalog.json`；旧快照不迁移，需重新同步。客户端不管理 Key 生命周期，私密原子保存快照，返回目录摘要；不修改 Agent 供应商。整体拉取失败保留上一快照，分组失败保留失败标记。
 - 本地层：`platform_get_catalog()` 返回当前账户本机摘要或 `null`；`platform_sync_providers({ agent })` 只从本机目录生成供应商，不发平台请求、不创建/撤销 Key，也不触发平台额度刷新，且不做同步前检测或覆盖确认。`agent: null` 表示全部已支持应用。缺快照返回 `CATALOG_REQUIRED`；旧版本退出或显式清理过 Key 的快照返回 `CATALOG_CREDENTIALS_REQUIRED`，需先手动同步平台数据。
 - 应用页右上角「更多」中的「一键删除平台供应商」调用 `platform_delete_providers({ agent, baseUrl, userId })`，删除当前应用、当前账户的平台托管行；「平台基础数据」页面的同名按钮传 `agent: null`，遍历全部已支持应用（含未显示应用），返回总计及逐应用 `apps` 结果，单个应用失败不阻塞其他应用。复用操作锁和 `ProviderService`，无安全备用项的当前供应商保留并提示。该操作不依赖平台目录、不联网、不改平台目录、不撤销服务端 Key，部分失败也记录 `platform_delete` 报告；后续同步可重新添加供应商。
 - 同步返回 `{ added, removed, skipped, warnings }`，另有可选 `updated`、`nativeFilesChanged`。部分成功仍需展示 warnings。供应商行有变化不代表原生配置文件已变化。
 - 目录摘要为 `{ baseUrl, userId, syncedAt, credentialsCleared, groups, warnings }`，`syncedAt` 为 Unix 毫秒，模型展示字段使用白名单。`platform_get_catalog_key({ baseUrl, userId, groupId })` 只读本机单个 Key，并校验当前身份、快照归属及分组；查看详情不触发同步。
-- 平台层读取 `/api/v1/groups/available`、`/api/v1/subscriptions`、分页 `/api/v1/keys`，按需 `POST /api/v1/keys`，用模型 Key 访问 `/v1/models` 及其能力目录；网页登录 JWT 不能作为模型 Key。订阅分组不受名称前缀限制，普通分组要求 `智枢router-ccs-` 前缀，专用 Key 名为 `zhishu-ccs-<platform>-<group-id>`。
-- 专用 Key 按当前账户的名称与分组复用，额度耗尽不能靠新建 Key 绕过。旧 Key 仅由平台层在检查所有应用托管项及手工供应商引用后撤销；过期/暂停订阅的归属和失败分组须保留，不能按当前可用分组简单误删。
+- 平台层只调用客户端专用 API。共享 Key 唯一来源为 `/access`，客户端不做分组前缀授权推断、Key 命名查找/创建/替换/删除，也不请求独立模型目录或旧 credentials 回退。登录 JWT 与模型 Key 分离。
+- 专用 Key 的授权、共享与生命周期由服务端管理；客户端删除 Provider 或退出不能删除 Key。额度与 `keyAvailable` 独立展示；服务端仍返回的过期/暂停订阅和目录失败组保留本地项，成功快照中消失的分组按撤销授权协调。
 - 协调和清理保留 `meta.platformManaged` 的来源、用户、分组与订阅类型判断；不修改本地自建项和其他账号项。一般不主动切换当前供应商；删除当前项需要先找到安全备用项，否则保留并提示。刷新模型目录时保留未知字段、未报告参数和用户选择，目录失败不能当作空列表删除。
 - 当前前后端平台白名单为 `claude`、`claude-desktop`、`codex`、`gemini`、`grokbuild`、`opencode`、`openclaw`、`hermes`、`pi`、`deepseek-harness`、`workbuddy`、`mcode`、`kimi`；`agy` 尚不在其中。新增应用必须同时核对 `platform_models/adapter.rs::AGENTS` 和 `src/config/platformConfig.ts::PLATFORM_SYNC_APPS`，一致性回归见 `tests/config/platformConfig.test.ts`。
-- 订阅额度通过 `platform_get_subscription_usage` 在 Rust 中读取 `/api/v1/subscriptions/progress` 与完整订阅记录，按分组匹配；前端按账户缓存、五分钟刷新。过期、暂停、进度缺失及查询失败不能显示为不限量或退回钱包余额。
+- 订阅额度通过 `platform_get_subscription_usage` 在 Rust 中只读 `/api/zhishu/v1/client/usage/summary`，返回账户隔离的 `{ baseUrl, userId, syncedAt, balance, groups }`，按分组保留全部订阅；前端按账户缓存、五分钟刷新。过期、暂停、进度缺失及查询失败不能显示为不限量或退回钱包余额。
 - 要改先做什么：核对 `APPLY_LOCK`、本地身份校验、目录解析与存储、`sync_report`、局部恢复及前端缓存失效；用模拟响应和临时目录验证两阶段互不越界。
 
 ## 5. 可以放心改的叶子区域
@@ -215,6 +215,6 @@
 
 - TODO：确定二开对应的上游基线 commit/tag；当前 `origin` 仍指向上游，逐文件的原版/二开归属不能仅凭目录判定。
 - TODO：确认登录过期后返回登录页是否符合产品要求，还是需要新增离线进入主界面的降级路径。
-- TODO：补充平台服务端正式接口版本、响应样例、错误码、Key 创建/撤销与额度策略，以及 `/v1/models` 普通列表和能力清单的兼容承诺。
+- 客户端协议以 `docs/zhishu/client-api-integration.md` 和 ADR-0004 为准；真实多设备共享 Key、系统凭据库和 CLI 端到端验收仍待执行。
 - TODO：补充 WorkBuddy 目标版本与真实 `models.json` 的运行验收，以及 DeepSeek Harness `desktop` 配置的端到端验证；平台同步已实现，不能再列为尚未接入。
 - TODO：补充 macOS、Windows、Linux 上系统凭据库与七天会话恢复的实际验收记录；已有模拟测试不替代真实系统、断网和重启验证。

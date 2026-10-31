@@ -5225,5 +5225,23 @@
     "restoreHint": "Bağlantınızı kontrol edin veya sistem kimlik bilgisi deposunun kilidini açıp yeniden deneyin. Kaydedilen oturumunuz korunur.",
     "retryRestore": "Oturumu geri yüklemeyi dene",
     "sessionHint": "Yeniden başlatmalarda oturum açık kalır. 7 günden uzun süre kullanılmazsa yeniden giriş gerekir. Parolayı hatırla yalnızca bir sonraki girişte parolayı doldurur."
+  },
+  "clientQuota": {
+    "noLimit": "Dönem sınırı ayarlanmamış",
+    "title": "Kota durumu",
+    "available": "Kullanılabilir",
+    "unavailable": "Kullanılamıyor",
+    "key_missing": "Özel anahtar eksik",
+    "key_expired": "Anahtarın süresi doldu",
+    "key_quota_exhausted": "Anahtar kotası tükendi",
+    "key_disabled": "Anahtar devre dışı",
+    "key_rate_limit_exhausted": "Anahtar dönem kotası tükendi",
+    "balance_insufficient": "Yetersiz bakiye",
+    "subscription_expired": "Abonelik süresi doldu",
+    "subscription_suspended": "Abonelik askıya alındı",
+    "subscription_quota_exhausted": "Abonelik kotası tükendi",
+    "daily": "Günlük",
+    "weekly": "Haftalık",
+    "monthly": "Aylık"
   }
 }

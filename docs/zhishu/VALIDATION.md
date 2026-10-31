@@ -89,3 +89,43 @@ Rust doctest 由仓库现有 `doctest = false` 禁用。
 | `git diff --check` | 通过 |
 
 测试只使用本机模拟平台、临时目录和模拟凭据库。未运行全量测试、Clippy、前端类型检查或构建，也未进行真实平台登录、真实凭据库、Windows/Linux 与安装包验证。HTTP 明文传输及地址附带内容的清除行为见 [平台登录文档](platform-login.md)。
+
+
+## 客户端专用 API 改造（2026-10-31）
+
+范围：按 [客户端专用接口契约](client-api-integration.md) 将平台登录、恢复、账户、基础同步与额度查询统一到 `/api/zhishu/v1/client`，删除自有旧平台调用、Key 查找/创建/替换/撤销与网络模型发现逻辑，不保留旧接口回退。前后端契约、额度与订阅展示、版本 2 私密快照、网关地址适配及相关文档同步更新。
+
+侵入等级为 L0 自有业务、L1 注册/翻译、L2 可选共享 Provider 元数据；复用 ProviderService、应用锁、路径解析、原子配置发布/恢复、keyring 与账户查询隔离。不修改上游 DAO/schema、代理或通用配置引擎。决策、兼容与回退见 [ADR-0004](adr/ADR-0004-client-api-only.md)，上游薄接入见 [补丁登记](UPSTREAM_PATCHES.md) CLIENT-20261031-01～03。
+
+| 检查 | 本次结果 |
+|---|---|
+| `pnpm typecheck` | 通过 |
+| `pnpm format:check` | 通过 |
+| `pnpm test:unit` | 283 文件、3604 项通过 |
+| `pnpm build:renderer` | 最终前端构建通过；保留浏览器数据过旧、duration 类歧义、混合静态/动态导入和大 chunk 的既有警告 |
+| 全量 Rust 库测试：`cargo test --offline --manifest-path src-tauri/Cargo.toml --lib` | 完整复跑 4360 项通过、0 失败、11 项既有忽略项；未排除 OAuth 用例 |
+| 最终自有模块回归：`cargo test --offline --manifest-path src-tauri/Cargo.toml --lib zhishu:: --quiet` | 195 项通过；覆盖全量库测试之后的恒真字段移除、缺凭证警告去重和 Clippy 条件合并 |
+| 最终 `cargo clippy --offline --manifest-path src-tauri/Cargo.toml -- -D warnings` | 通过 |
+| 最终 `cargo fmt --check --manifest-path src-tauri/Cargo.toml` | 通过 |
+| 旧平台路径与 Key 生命周期源码审查 | 扫描 `src/zhishu` 与 `src-tauri/src/zhishu` 的 Rust/TS/TSX：旧 `/api/v1`、账户/分组/订阅/模型发现路径及旧 Key 生命周期函数引用为 0；另有 HTTP 请求方法/路径封闭白名单回归 |
+| 变更文档相对链接核对 | README、补丁表、登录、基础数据、接入契约与 ADR 共 26 条有效，无缺失目标 |
+| `git diff --check` | 通过 |
+
+初轮全量 Rust 库测试为 4358 项通过、2 项失败、11 项忽略：本次缺凭证警告重复导致的断言失败已修复；另一项为未修改的 `proxy::providers::codex_oauth_auth::browser::tests::replacement_closes_the_previous_keep_alive_connection`，错误 `IncompleteMessage`。完整复跑全部通过，但保留该用例的偶发失败记录（历史验证亦有同类记录）。全量库测试完成后仅清理已无意义的目录可用字段/分支；最终 195 项自有模块测试及 Clippy、格式检查覆盖最终代码，不宣称最后清理后再次执行全量库测试。收尾 Clippy 曾指出可合并的嵌套条件，已修复并重新通过。
+
+Rust 每轮使用独立临时目录：
+
+```bash
+CC_SWITCH_TEST_HOME="$(mktemp -d /tmp/zhishu-client-api.XXXXXX)" cargo test --offline --manifest-path src-tauri/Cargo.toml --lib
+CC_SWITCH_TEST_HOME="$(mktemp -d /tmp/zhishu-client-api.XXXXXX)" cargo test --offline --manifest-path src-tauri/Cargo.toml --lib zhishu:: --quiet
+```
+
+网络/存储回归使用本机模拟 HTTP、临时目录、内存数据库和模拟凭据库，不改智能体的 `HOME`/`CODEX_HOME`，未运行真实账户操作或真实 CLI 配置切换。
+
+兼容与未验证项：
+
+- 旧版 `platform-catalog.json` 不迁移、不接管旧 Key；读取返回无目录，升级后需重新同步平台基础数据。新版本 2 快照与原生配置写入保留既有私密权限、原子保存和恢复路径。
+- 真实服务端专用接口、多个客户端共用同一 Key、续订/撤权、请求丢失后的服务端事务幂等尚未联调；模拟测试不能代替服务端验收。
+- 真实系统 keyring、macOS/Windows/Linux 实机矩阵、各 CLI 的模型调用与配置运行未验收。
+- 本次仅执行完整 Rust `--lib`；独立集成测试目标、开发/发布脚本、安装、签名、公证和跨版本升级未执行，未发布或推送。
+- 保留用户原有 README/基础数据文档修改、接入契约文件和未跟踪 `out/`；未创建提交。

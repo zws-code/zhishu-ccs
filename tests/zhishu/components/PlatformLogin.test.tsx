@@ -20,13 +20,18 @@ import {
   PlatformAuthProvider,
   usePlatformAuth,
 } from "@/zhishu/auth/PlatformAuthContext";
-import { platformAuthApi, type PlatformAccount } from "@/zhishu/api/platformAuth";
+import {
+  platformAuthApi,
+  type PlatformAccount,
+} from "@/zhishu/api/platformAuth";
 import { toast } from "sonner";
+import { settingsApi } from "@/lib/api/index";
 import zh from "@/i18n/locales/zh.json";
 
 vi.mock("@/zhishu/api/platformAuth", async (original) => ({
   ...(await original<typeof import("@/zhishu/api/platformAuth")>()),
   platformAuthApi: {
+    config: vi.fn(),
     account: vi.fn(),
     history: vi.fn(),
     savedPassword: vi.fn(),
@@ -116,6 +121,23 @@ async function submitCredentials() {
 }
 
 beforeEach(() => {
+  vi.mocked(platformAuthApi.config)
+    .mockReset()
+    .mockResolvedValue({
+      schema_version: 1,
+      site_name: "",
+      api_base_url: "http://127.0.0.1:3000",
+      login_methods: ["password"],
+      totp_enabled: true,
+      registration_enabled: true,
+      password_reset_enabled: true,
+      register_url: "https://portal.test/register",
+      password_reset_url: "https://portal.test/reset",
+      subscriptions_url: null,
+      turnstile_enabled: false,
+      tencent_captcha_enabled: false,
+      aliyun_captcha_enabled: false,
+    });
   vi.mocked(platformModelsApi.syncCatalog)
     .mockReset()
     .mockResolvedValue(catalog);
@@ -140,6 +162,44 @@ beforeEach(() => {
 });
 
 describe("platform login", () => {
+  it("uses configured web entries and hides them when disabled", async () => {
+    const config = await platformAuthApi.config(account.baseUrl);
+    vi.mocked(platformAuthApi.config).mockResolvedValue({
+      ...config,
+      registration_enabled: false,
+      site_name: "Client test platform",
+    });
+    renderGate();
+    await screen.findByText("Client test platform");
+    expect(
+      screen.queryByRole("button", { name: zh.platformAuth.register }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.platformAuth.forgot }),
+    );
+    await waitFor(() =>
+      expect(settingsApi.openExternal).toHaveBeenCalledWith(
+        "https://portal.test/reset",
+      ),
+    );
+  });
+
+  it("does not retain links from a previous platform while config is loading", async () => {
+    renderGate();
+    await screen.findByRole("button", { name: zh.platformAuth.register });
+    vi.mocked(platformAuthApi.config).mockImplementation(
+      () => new Promise(() => {}),
+    );
+    const address = screen.getByDisplayValue("http://127.0.0.1:3000");
+    fireEvent.change(address, { target: { value: "https://another.test" } });
+    expect(
+      screen.queryByRole("button", { name: zh.platformAuth.register }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: zh.platformAuth.forgot }),
+    ).not.toBeInTheDocument();
+  });
+
   it("gates the app and passes the development backend URL to Rust", async () => {
     vi.mocked(platformAuthApi.login).mockResolvedValue({
       status: "authenticated",

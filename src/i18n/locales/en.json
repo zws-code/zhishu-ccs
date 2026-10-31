@@ -5323,5 +5323,23 @@
       "providerMissing": "This Oh My Pi provider is no longer saved.",
       "legacyModelsJson": "Oh My Pi still has a legacy models.json, which omp migrates to models.yml on its next start. Run omp once, then add the provider again."
     }
+  },
+  "clientQuota": {
+    "noLimit": "No window limit set",
+    "title": "Quota status",
+    "available": "Available",
+    "unavailable": "Unavailable",
+    "key_missing": "Dedicated key missing",
+    "key_expired": "Key expired",
+    "key_quota_exhausted": "Key quota exhausted",
+    "key_disabled": "Key disabled",
+    "key_rate_limit_exhausted": "Key window quota exhausted",
+    "balance_insufficient": "Insufficient balance",
+    "subscription_expired": "Subscription expired",
+    "subscription_suspended": "Subscription suspended",
+    "subscription_quota_exhausted": "Subscription quota exhausted",
+    "daily": "Daily",
+    "weekly": "Weekly",
+    "monthly": "Monthly"
   }
 }
