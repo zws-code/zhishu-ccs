@@ -12,6 +12,16 @@
 
 本轮执行记录（2026-11-01）：提交前在独立基线上执行 TypeScript `--noEmit` 和完整 Node 发布回归，类型检查通过、58 项回归全部通过（含新增脚本 22 项，覆盖指定 tag、仅发送本次 tag、合并中止、带空格路径、真实 Cargo 离线同步）。脚本 Prettier、CLI 指定 tag 预览及 `git diff --check` 通过。COS Python 回归此前共执行 23 项，21 项通过、2 项因本机缺 COS SDK 跳过。原共享工作区的首次类型检查曾因并行上游合并引入的 `yaml` 未安装而失败，独立提交未混入该合并或该依赖。完整前端/Rust 测试、构建、真实 GitHub/COS 发布和 Windows/macOS 安装升级未执行。
 
+## 2026-10-31：撤回 DeepSeek 遗留预设分组补丁
+
+用户确认按审查建议移除无效的 `deepseek-official` 特判；“浏览目录”快捷入口按用户要求保留。
+
+| 文件 | 当前处理及必要性 | 等级 | 验证 |
+|---|---|---|---|
+| `src/components/providers/forms/presetGroups.ts` | 撤回二开新增的一行 ID 特判，完整恢复上游 4.0.22（`b7642674`）。现有预设没有该 ID；DeepSeek API 预设沿用 `cn_official → vendor`，DSH 账号入口沿用 `official → login`。新增 Adapter 无需介入，直接复用原分类函数 | L2 补丁撤回 | 本轮执行与未验证项见[验证记录](../history/validation.md) |
+
+只减少无调用对象的上游差异，不新增依赖、IPC、schema 或配置写入；无数据、安全凭据及跨平台存储变更。回退仅恢复该行自有判断，不涉及数据迁移。
+
 ## 2026-10-31：平台与上游边界收敛
 
 决策见 [ADR-0008](../adr/ADR-0008-upstream-patch-convergence.md)。本段覆盖下方历史条目对应能力的当前状态；历史表不改写。

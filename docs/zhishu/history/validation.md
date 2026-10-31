@@ -2,6 +2,14 @@
 
 > 本页保留各次任务的执行结果和未验证项；测试数量、代码路径、分支状态及临时资料均属于当时快照。本次文档整理没有重跑这些历史测试。当前行为以 [代码基线](../development/baseline.md)、功能说明和源码为准。
 
+## DeepSeek 遗留分组补丁撤回（2026-10-31）
+
+用户确认撤回无效的 `deepseek-official` 分组特判，并保留供应商页“浏览目录”快捷入口。本次仅移除 `presetGroups.ts` 中一行二开代码，完整复用上游预设分组；DeepSeek API 和 DSH 账号登录分别沿用原有“模型厂商”和“账号登录”分类。侵入等级 L2 补丁撤回，补丁登记和本记录为 L0；无 IPC、数据库、凭据或 CLI 配置变更。
+
+已执行：`pnpm typecheck`、修改文件的 Prettier 检查和 `git diff --check` 通过；`pnpm test:unit tests/components/ProviderPresetSelector.test.tsx tests/components/DshAddProviderDialog.test.tsx src/config/dshProviderPresets.test.ts` 共 3 文件、26 项通过。另以 `git diff --exit-code b7642674 -- src/components/providers/forms/presetGroups.ts` 确认该文件与上游 4.0.22 逐字节一致。测试保留既有浏览器兼容数据库过旧提示。
+
+未执行全仓测试、renderer/桌面构建、Rust 或真实 CLI/平台验收；本次只涉及展示分类中的无效分支，不操作真实账号或配置。未创建提交、推送或发布，保留已有 `out/`。
+
 ## 平台与上游边界收敛（2026-10-31）
 
 范围：[ADR-0008](../adr/ADR-0008-upstream-patch-convergence.md)。基于 `2fea90d7` 工作区实施，保留任务开始前已有的文档整理、开发签名及 Vite 配置修改。文档整理已独立提交为 `5f70b01a`；本次收敛仅作本地提交，不推送或发布。
