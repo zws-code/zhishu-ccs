@@ -362,3 +362,10 @@ L3 的统一依据见 [ADR-0002](adr/ADR-0002-structure-and-history.md)，数据
 | DETAILS-20261031-01 | `src/i18n/locales/{zh,zh-TW,en,ja,tr}.json` | 增加详情页签、模型搜索、数量与用量表头文案 | 复用共享 i18n 字典加载入口 | L1 | PlatformCatalogPage / typecheck | 2026-10-31 |
 
 布局与本地搜索位于自有 `PlatformCatalogDetails`、`PlatformCatalogModels`，L0；复用上游 Sheet、Tabs、Collapsible、Input 和既有显式 Key 组件。概览改用单一滚动区域，移除内部 SheetBody 包装，避免其 `scroll-stable` 与 `overscroll-contain` 截断滚轮；未改通用 Sheet 或全局 CSS，未删除任何上游实现。无 IPC、持久化或配置写入变化；回退只需恢复自有详情布局及相应翻译/测试，不涉及数据迁移。
+
+
+## 0.0.3 发布准备复核（2026-10-31）
+
+复核 ZS-044、ZS-046、ZS-047、ZS-148：package/Tauri/Cargo/lock 版本统一为 0.0.3，L1，工具固定读取的版本字段不能通过 Adapter 替代。Cargo 生成锁文件，不升级依赖。
+
+复核 ZS-003（L1）：GitHub 固定工作流增加本次发布分支演练入口，并仅为 v0.0.3 正式 tag 强制启用 COS 全球上传加速；其他 ref 保持现有仓库变量语义。复用既有签名、3 GB 加速读取上限、不可变产物及双清单检查，不改客户端更新地址/公钥。验证与剩余风险见 [0.0.3 发布记录](RELEASE-0.0.3.md)。

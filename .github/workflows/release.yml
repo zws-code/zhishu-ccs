@@ -5,6 +5,7 @@ on:
     # Dedicated validation ref: branch pushes compile only; uploads still require a tag.
     branches:
       - 'codex/cos-validation'
+      - 'codex/release-0.0.3'
     tags:
       - 'v*'
   # 手动触发即干跑：完整编译、签名、公证，产物只留在 workflow 里，不建 GitHub Release
@@ -26,7 +27,8 @@ env:
   ZHISHU_UPDATE_PUBLIC_KEY: ${{ vars.ZHISHU_UPDATE_PUBLIC_KEY }}
   COS_BUCKET: ${{ vars.COS_BUCKET }}
   COS_REGION: ${{ vars.COS_REGION }}
-  COS_UPLOAD_ACCELERATE: ${{ vars.COS_UPLOAD_ACCELERATE || 'false' }}
+  # Enable global upload acceleration for the explicitly authorized 0.0.3 release.
+  COS_UPLOAD_ACCELERATE: ${{ github.ref == 'refs/tags/v0.0.3' && 'true' || vars.COS_UPLOAD_ACCELERATE || 'false' }}
   COS_PREFIX: ${{ vars.COS_PREFIX || 'ccs/stable' }}
   COS_PUBLIC_BASE_URL: ${{ vars.COS_PUBLIC_BASE_URL }}
   MACOS_SIGNING_MODE: ${{ vars.ZHISHU_MACOS_SIGNING_MODE || 'developer-id' }}

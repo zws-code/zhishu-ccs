@@ -1,0 +1,26 @@
+{
+  "version": "0.0.3",
+  "items": [
+    {
+      "type": "improve",
+      "zh": "平台接入专用客户端接口，优化模型与额度展示",
+      "zh-TW": "平台接入專用用戶端介面，最佳化模型與額度顯示",
+      "en": "Use dedicated client APIs and improve model and quota details",
+      "ja": "専用クライアントAPIに対応し、モデルと利用枠の表示を改善"
+    },
+    {
+      "type": "new",
+      "zh": "账号基础数据独立保存，支持退出并清理本机数据",
+      "zh-TW": "帳號基礎資料獨立儲存，支援登出並清理本機資料",
+      "en": "Keep account catalogs separate and optionally clear local account data on logout",
+      "ja": "アカウント別にデータを保存し、ログアウト時のローカルデータ削除に対応"
+    },
+    {
+      "type": "improve",
+      "zh": "完善清理结果弹窗，新增模型搜索并修复详情滚动",
+      "zh-TW": "完善清理結果彈窗，新增模型搜尋並修復詳情捲動",
+      "en": "Improve cleanup dialogs, add model search, and fix scrolling in catalog details",
+      "ja": "削除結果ダイアログを改善し、モデル検索と詳細画面のスクロール修正を追加"
+    }
+  ]
+}
