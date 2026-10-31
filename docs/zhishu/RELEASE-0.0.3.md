@@ -35,7 +35,18 @@
 | 生产公开配置 `release:check v0.0.3` | 通过，未连接腾讯云 |
 | 工作流 YAML 解析 / `git diff --check` | 通过 |
 | `cargo fmt --check` | 通过 |
-| Rust 全量隔离回归 / Clippy | 运行中，尚不宣称通过 |
+| Rust 全量隔离回归 | 最终 4369 项单元测试 + 212 项集成测试通过，11 项忽略 |
+| `cargo clippy --offline --locked ... -- -D warnings` | 通过 |
+
+首轮全量 Rust 回归出现已记录的 OAuth keep-alive 测试 `replacement_closes_the_previous_keep_alive_connection` 的 `IncompleteMessage` 偶发失败（4368 项通过、1 项失败）；单项复测通过后，再次完整运行库与集成测试全部通过。测试使用独立 `CC_SWITCH_TEST_HOME` 临时目录，串行执行；未设置智能体 HOME/CODEX_HOME。
+
+候选提交：`e4a7771c6a1975f54daf193f16c377e168a40340`；GitHub 构建演练运行 `41194527102`，尚在运行。分支演练不会上传 COS 或创建 Release。
+
+## EXCEPTION-RELEASE-003：实机验收延期
+
+2026-10-31，已向用户明确说明本次 Windows/macOS 实机安装升级未验收，以及 macOS 沿用 adhoc、未公证。用户答复「批准 直接发布」，批准在自动化回归、云端构建及签名校验通过后发布，并启用全球加速上传 COS。
+
+范围仅为本次 0.0.3 实机安装/升级验收延期；不免除签名、哈希、不可变产物、平台完整性与清单校验。责任人为本次发布维护者；实机升级检查继续作为后续发布前待办，不记为通过。
 
 GitHub 现存运行 `41193536620` 是旧 `codex/cos-validation` / `7e8b707` 的分支演练，包含旧 Linux 矩阵，与本次 0.0.3 无关。本次不取消或覆盖它，使用独立发布分支。
 
