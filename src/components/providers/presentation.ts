@@ -863,6 +863,7 @@ export function buildAdditiveSections(input: AdditiveInput): ProviderSection[] {
     let status: CardPresentation["status"];
     let isDefault = false;
     let removeReason: string | undefined = piBlocked;
+    let deleteReason: string | undefined;
 
     // OpenCode 的顶层 model 一直允许移走所指的那家，这里不改；OpenClaw 不能
     if (app === "openclaw" || app === "opencode") {
@@ -940,7 +941,7 @@ export function buildAdditiveSections(input: AdditiveInput): ProviderSection[] {
         chips,
         dim: managed,
         editDisabledReason: readOnlyReason,
-        deleteDisabledReason: readOnlyReason ?? piBlocked,
+        deleteDisabledReason: readOnlyReason ?? deleteReason ?? piBlocked,
         buttons,
         menuItems: menuItems.length ? menuItems : undefined,
       },

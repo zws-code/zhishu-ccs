@@ -1,6 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { PlatformAuthProvider } from "@/zhishu/auth/PlatformAuthContext";
+import { PlatformAuthGate } from "@/zhishu/auth/PlatformLogin";
 import { DatabaseUpgrade } from "./components/DatabaseUpgrade";
 import { UpdateProvider } from "./contexts/UpdateContext";
 import "./index.css";
@@ -58,7 +60,7 @@ interface ConfigLoadErrorPayload {
 async function handleConfigLoadError(
   payload: ConfigLoadErrorPayload | null,
 ): Promise<void> {
-  const path = payload?.path ?? "~/.cc-switch/config.json";
+  const path = payload?.path ?? "~/.zhishu-ccs/config.json";
   const detail = payload?.error ?? "Unknown error";
 
   await message(
@@ -139,7 +141,11 @@ async function bootstrap() {
               <MotionConfig reducedMotion="user">
                 {/* 全局悬停提示：移上去立即出现（HoverTip） */}
                 <TooltipProvider delayDuration={0} skipDelayDuration={0}>
-                  <App />
+                  <PlatformAuthProvider>
+                    <PlatformAuthGate>
+                      <App />
+                    </PlatformAuthGate>
+                  </PlatformAuthProvider>
                 </TooltipProvider>
               </MotionConfig>
               <Toaster />

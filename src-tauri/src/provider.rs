@@ -232,9 +232,16 @@ impl Provider {
                 crate::pi_config::provider_base_url(settings).unwrap_or_default(),
                 crate::pi_config::resolve_usage_api_key(&str_at(settings.get("apiKey"))),
             ),
+            AppType::WorkBuddy => (str_at(settings.get("url")), str_at(settings.get("apiKey"))),
             // OpenCode (OMO) nests credentials under `options` (the SDK options object).
             AppType::OpenCode | AppType::Mcode => {
-                let options = settings.get("options");
+                let options = if app_type == &AppType::OpenCode
+                    && self.opencode_config_format() == Some(OpenCodeConfigFormat::V2)
+                {
+                    settings.get("settings")
+                } else {
+                    settings.get("options")
+                };
                 (
                     str_at(options.and_then(|o| o.get("baseURL"))),
                     str_at(options.and_then(|o| o.get("apiKey"))),
@@ -481,6 +488,9 @@ impl LocalProxyRequestOverrides {
 /// 供应商元数据
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProviderMeta {
+    /// System-owned platform row. Never attach this identity to user providers.
+    #[serde(rename = "platformManaged", skip_serializing_if = "Option::is_none")]
+    pub platform_managed: Option<PlatformManagedProvider>,
     /// 自定义端点列表（按 URL 去重存储）
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub custom_endpoints: HashMap<String, crate::settings::CustomEndpoint>,
@@ -662,6 +672,29 @@ pub fn parse_custom_user_agent(
         Some(ua) => HeaderValue::from_str(ua).map(Some),
         None => Ok(None),
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformManagedProvider {
+    /// Last generated gateway root, distinct from the authenticated platform origin.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connection_base_url: Option<String>,
+    pub origin: String,
+    pub user_id: i64,
+    pub entry_id: String,
+    pub model: String,
+    pub key_id: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_id: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_platform: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subscription_type: Option<String>,
 }
 
 impl ProviderMeta {

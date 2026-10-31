@@ -20,7 +20,9 @@ use crate::live::engine::read_current;
 use crate::live::floor;
 use crate::live::patch::json::{self as patch_json, JsonPatch};
 use crate::live::patch::{KeyPath, LivePatch, LiveWriteError};
-use crate::live::project::claude::{direct_patch, project_onto, store_into_row, ClaudeProjection};
+use crate::live::project::claude::{
+    direct_patch, project_onto, store_into_row, with_derived_model_slots, ClaudeProjection,
+};
 use crate::mode::operation::{AppWrite, FileChange};
 use crate::mode::state::{op, PendingTarget};
 use crate::provider::Provider;
@@ -119,7 +121,8 @@ pub fn view(state: &AppState, settings_config: &Value) -> Result<EditorView, App
         &file.path,
         &live,
         prev.as_ref(),
-        &ClaudeProjection::of(settings_config),
+        // 显示的就是切换后的样子：和切换写盘一样补齐模型档位。
+        &with_derived_model_slots(ClaudeProjection::of(settings_config)),
     )?;
     Ok(EditorView {
         inactive: inactive_fields(settings_config, &settings),
@@ -369,7 +372,7 @@ pub(crate) fn write_live(
             .map(|provider| ClaudeProjection::of(&provider.settings_config));
         let mut patch = direct_patch(
             prev.as_ref(),
-            &ClaudeProjection::of(&write.target.settings_config),
+            &with_derived_model_slots(ClaudeProjection::of(&write.target.settings_config)),
         );
         // 和切换一样：删掉以前开发版写进去的账号目录
         super::claude_official::strip_from_patch(&mut patch);

@@ -28,14 +28,8 @@ import {
   translatePiProviderMutationError,
 } from "@/utils/errorUtils";
 import { useDragSort } from "@/hooks/useDragSort";
-import {
-  useOpenClawLiveProviderIds,
-  useOpenClawDefaultModel,
-} from "@/hooks/useOpenClaw";
-import {
-  useHermesLiveProviderIds,
-  useHermesModelConfig,
-} from "@/hooks/useHermes";
+import { useOpenClawDefaultModel } from "@/hooks/useOpenClaw";
+import { useHermesModelConfig } from "@/hooks/useHermes";
 import { useStreamCheck } from "@/hooks/useStreamCheck";
 import { ProviderCard } from "@/components/providers/ProviderCard";
 import { ProviderEmptyState } from "@/components/providers/ProviderEmptyState";
@@ -51,6 +45,7 @@ import { cn } from "@/lib/utils";
 import { isTextEditableTarget } from "@/utils/domUtils";
 import { extractProviderBaseUrl } from "@/utils/providerConfigUtils";
 import { usePiCurrentState } from "@/lib/query/pi";
+import { useConfigMembership } from "@/zhishu/integrations/ccswitch/useConfigMembership";
 import { isPiFamilyApp } from "@/config/appConfig";
 import { isHermesReadOnlyProvider } from "@/config/hermesProviderPresets";
 import {
@@ -129,21 +124,11 @@ export function ProviderList({
     appId,
   );
 
-  const { data: opencodeLiveIds, isPending: isOpencodeLiveIdsPending } =
-    useQuery({
-      queryKey: ["opencodeLiveProviderIds"],
-      queryFn: () => providersApi.getOpenCodeLiveProviderIds(),
-      enabled: appId === "opencode",
-    });
   const { data: opencodeDefaultModel } = useQuery({
     queryKey: ["opencodeDefaultModel"],
     queryFn: () => providersApi.getOpenCodeDefaultModel(),
     enabled: appId === "opencode",
   });
-  const { data: openclawLiveIds, isPending: isOpenclawLiveIdsPending } =
-    useOpenClawLiveProviderIds(appId === "openclaw");
-  const { data: hermesLiveIds, isPending: isHermesLiveIdsPending } =
-    useHermesLiveProviderIds(appId === "hermes");
   const { data: hermesModelConfig } = useHermesModelConfig(appId === "hermes");
   const { data: openclawDefaultModel } = useOpenClawDefaultModel(
     appId === "openclaw",
@@ -152,9 +137,7 @@ export function ProviderList({
   const { data: currentOmoId } = useCurrentOmoProviderId(isOpenCode);
   const { data: currentOmoSlimId } = useCurrentOmoSlimProviderId(isOpenCode);
   const {
-    data: piCurrentState,
     isSuccess: isPiCurrentStateSuccess,
-    isPending: isPiCurrentStatePending,
     isError: isPiCurrentStateError,
     error: piCurrentStateError,
   } = usePiCurrentState(isPiFamilyApp(appId), appId === "omp" ? "omp" : "pi");
@@ -162,43 +145,8 @@ export function ProviderList({
   // 累加式应用要等 live 里有哪些供应商读回来（成功或失败）才知道卡片该进哪个分区；
   // 在那之前按加载中画骨架，不然卡片先全落进「可添加」，读回来再整体搬到「已添加」。
   // 一张卡都没有时不用等，直接出空状态
-  const isLiveMembershipPending =
-    (appId === "opencode" && isOpencodeLiveIdsPending) ||
-    (appId === "openclaw" && isOpenclawLiveIdsPending) ||
-    (appId === "hermes" && isHermesLiveIdsPending) ||
-    (isPiFamilyApp(appId) && isPiCurrentStatePending);
-
-  const isInConfig = useCallback(
-    (provider: Provider): boolean => {
-      switch (appId) {
-        case "kimi":
-        case "mcode":
-          return provider.meta?.liveConfigManaged === true;
-        case "opencode":
-          return opencodeLiveIds?.includes(provider.id) ?? false;
-        case "openclaw":
-          return openclawLiveIds?.includes(provider.id) ?? false;
-        case "hermes":
-          return hermesLiveIds?.includes(provider.id) ?? false;
-        case "pi":
-        case "omp":
-          return isPiStateReady
-            ? (piCurrentState?.enabledProviderIds.includes(provider.id) ??
-                false)
-            : false;
-        default:
-          return true;
-      }
-    },
-    [
-      appId,
-      opencodeLiveIds,
-      openclawLiveIds,
-      hermesLiveIds,
-      isPiStateReady,
-      piCurrentState,
-    ],
-  );
+  const { isInConfig, isPending: isLiveMembershipPending } =
+    useConfigMembership(appId);
 
   const handleTest = useCallback(
     (provider: Provider) => {
@@ -221,6 +169,9 @@ export function ProviderList({
       }
       if (appId === "claude-desktop") {
         return (await providersApi.importClaudeDesktopFromClaude()) > 0;
+      }
+      if (appId === "workbuddy") {
+        return (await providersApi.importWorkBuddyFromLive()) > 0;
       }
       return providersApi.importDefault(appId);
     },

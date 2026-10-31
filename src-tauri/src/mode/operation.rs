@@ -374,8 +374,10 @@ impl<'a> AppWrite<'a> {
         changes: &[FileChange<'_>],
         target: PendingTarget,
     ) -> Result<OperationReport, AppError> {
-        run(&self.store, &self.guard, op, changes, target, &|target| {
-            self.commit(target)
+        crate::config_history::with_audit_context(self.guard.app(), op, || {
+            run(&self.store, &self.guard, op, changes, target, &|target| {
+                self.commit(target)
+            })
         })
     }
 }

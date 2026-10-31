@@ -54,6 +54,7 @@ fn app_display_name(app: &AppType) -> &'static str {
         AppType::OpenClaw => "OpenClaw",
         AppType::Hermes => "Hermes",
         AppType::Pi => "Pi",
+        AppType::WorkBuddy => "WorkBuddy",
         AppType::Mcode => "MiniMax Code",
         AppType::Kimi => "Kimi Code",
         AppType::Agy => "Antigravity",
@@ -2774,6 +2775,12 @@ fn navigate(app: &tauri::AppHandle, navigation: TrayNavigation) {
 /// 显示并聚焦主窗口；轻量模式下重建窗口。
 pub fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
+        // 先把应用切回 Regular，再显示并聚焦窗口。反过来会让 macOS 在
+        // Accessory 状态下激活窗口，Dock tile 可能不会随激活策略恢复。
+        #[cfg(target_os = "macos")]
+        {
+            apply_tray_policy(app, true);
+        }
         #[cfg(target_os = "windows")]
         {
             let _ = window.set_skip_taskbar(false);
@@ -2784,10 +2791,6 @@ pub fn show_main_window(app: &tauri::AppHandle) {
         #[cfg(target_os = "linux")]
         {
             crate::linux_fix::nudge_main_window(window.clone(), "tray-show-main");
-        }
-        #[cfg(target_os = "macos")]
-        {
-            apply_tray_policy(app, true);
         }
     } else if crate::lightweight::is_lightweight_mode() {
         if let Err(e) = crate::lightweight::exit_lightweight_mode(app) {
@@ -3017,12 +3020,46 @@ pub fn apply_tray_policy(app: &tauri::AppHandle, dock_visible: bool) {
         ActivationPolicy::Accessory
     };
 
-    if let Err(err) = app.set_dock_visibility(dock_visible) {
-        log::warn!("设置 Dock 显示状态失败: {err}");
-    }
-
+    // Don't also call set_dock_visibility: it uses TransformProcessType, while
+    // set_activation_policy uses NSApplication.setActivationPolicy. Both toggle
+    // the same foreground/accessory state. A second transform makes macOS
+    // recreate the Dock tile without reapplying applicationIconImage, so the
+    // icon changes after the window is closed and reopened.
     if let Err(err) = app.set_activation_policy(desired_policy) {
         log::warn!("设置激活策略失败: {err}");
+    }
+
+    if dock_visible {
+        // 从 Accessory 切回 Regular 时 macOS 会重建 Dock tile。开发/直接运行时
+        // 进程没有 app bundle，tile 会退回通用的 exec 图标，所以显式重挂一次。
+        if let Err(err) = app.run_on_main_thread(restore_application_icon) {
+            log::warn!("安排恢复 Dock 图标失败: {err}");
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn restore_application_icon() {
+    use objc2_06::{AllocAnyThread, MainThreadMarker};
+    use objc2_app_kit_03::{NSApplication, NSImage};
+    use objc2_foundation_03::NSData;
+
+    // 必须使用带圆角蒙版的 ICNS；icon.png 是直角白底图，恢复到 Dock 会破坏
+    // macOS 图标规范。这里与 Tauri 开发模式加载应用图标的格式保持一致。
+    const APP_ICON_ICNS: &[u8] = include_bytes!("../icons/icon.icns");
+
+    let Some(mtm) = MainThreadMarker::new() else {
+        log::warn!("恢复 Dock 图标失败：不在主线程");
+        return;
+    };
+    let data = NSData::with_bytes(APP_ICON_ICNS);
+    let Some(icon) = NSImage::initWithData(NSImage::alloc(), &data) else {
+        log::warn!("恢复 Dock 图标失败：无法解析应用图标");
+        return;
+    };
+    let ns_app = NSApplication::sharedApplication(mtm);
+    unsafe {
+        ns_app.setApplicationIconImage(Some(&icon));
     }
 }
 

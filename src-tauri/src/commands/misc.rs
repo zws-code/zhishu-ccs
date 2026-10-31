@@ -90,6 +90,7 @@ pub async fn check_for_updates(handle: AppHandle) -> Result<bool, String> {
 /// 便携版新版本压缩包的下载地址，命名与 release.yml 的「Prepare Windows Assets」一致：
 /// `CC-Switch-v<版本>-Windows[-arm64]-Portable.zip`。版本号不像版本号时返回 None。
 fn portable_zip_url(version: &str, arm64: bool) -> Option<String> {
+    // TODO(zhishu): Replace upstream portable release URLs with Zhishu-hosted release assets.
     let version = version.trim().trim_start_matches('v');
     let looks_like_version = version.starts_with(|c: char| c.is_ascii_digit())
         && version

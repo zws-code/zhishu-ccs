@@ -73,6 +73,7 @@ describe("useDirectorySettings", () => {
       if (app === "opencode") return "/remote/opencode";
       if (app === "openclaw") return "/remote/openclaw";
       if (app === "pi") return "/remote/pi";
+      if (app === "workbuddy") return "/remote/workbuddy";
       if (app === "omp") return "/remote/omp";
       return "/remote/hermes";
     });
@@ -99,6 +100,7 @@ describe("useDirectorySettings", () => {
       openclaw: "/remote/openclaw",
       hermes: "/remote/hermes",
       pi: "/remote/pi",
+      workbuddy: "/remote/workbuddy",
       omp: "/remote/omp",
     });
   });
@@ -112,36 +114,39 @@ describe("useDirectorySettings", () => {
     ["openclaw", "openclawConfigDir"],
     ["hermes", "hermesConfigDir"],
     ["pi", "piConfigDir"],
+    ["workbuddy", "workbuddyConfigDir"],
+    ["omp", "ompConfigDir"],
   ] as const)(
     "syncs the %s display when form drafts are discarded",
     async (app, field) => {
+      const resolvedKey = app;
       const initialSettings = createSettings({ [field]: undefined });
       const { result, rerender } = renderHook(
         ({ settings }) => useDirectorySettings({ settings, onUpdateSettings }),
         { initialProps: { settings: initialSettings } },
       );
       await waitFor(() => expect(result.current.isLoading).toBe(false));
-      const backendDirectory = result.current.resolvedDirs[app];
+      const backendDirectory = result.current.resolvedDirs[resolvedKey];
       rerender({
         settings: { ...initialSettings, skipClaudeOnboarding: true },
       });
-      expect(result.current.resolvedDirs[app]).toBe(backendDirectory);
+      expect(result.current.resolvedDirs[resolvedKey]).toBe(backendDirectory);
 
       act(() => result.current.updateAppConfigDir("/unsaved/app"));
       rerender({
         settings: { ...initialSettings, [field]: "/unsaved/config" },
       });
-      expect(result.current.resolvedDirs[app]).toBe("/unsaved/config");
+      expect(result.current.resolvedDirs[resolvedKey]).toBe("/unsaved/config");
 
       rerender({ settings: initialSettings });
       await waitFor(() =>
-        expect(result.current.resolvedDirs[app]).toBe(backendDirectory),
+        expect(result.current.resolvedDirs[resolvedKey]).toBe(backendDirectory),
       );
       expect(result.current.appConfigDir).toBe("/unsaved/app");
       expect(result.current.resolvedDirs.appConfig).toBe("/unsaved/app");
 
       rerender({ settings: { ...initialSettings, [field]: "/saved/config" } });
-      expect(result.current.resolvedDirs[app]).toBe("/saved/config");
+      expect(result.current.resolvedDirs[resolvedKey]).toBe("/saved/config");
     },
   );
 
@@ -344,7 +349,7 @@ describe("useDirectorySettings", () => {
 
     expect(result.current.appConfigDir).toBe("/new/app");
     expect(selectConfigDirectoryMock).toHaveBeenCalledWith(
-      "/home/mock/.cc-switch",
+      "/home/mock/.zhishu-ccs",
     );
   });
 
@@ -374,7 +379,9 @@ describe("useDirectorySettings", () => {
     });
     expect(result.current.resolvedDirs.claude).toBe("/home/mock/.claude");
     expect(result.current.resolvedDirs.codex).toBe("/home/mock/.codex");
-    expect(result.current.resolvedDirs.appConfig).toBe("/home/mock/.cc-switch");
+    expect(result.current.resolvedDirs.appConfig).toBe(
+      "/home/mock/.zhishu-ccs",
+    );
   });
 
   it("updates openclaw directory when browsing succeeds", async () => {

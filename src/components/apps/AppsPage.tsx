@@ -46,7 +46,7 @@ import type { AppId } from "@/lib/api";
 import { providersApi } from "@/lib/api/providers";
 import type { ToolInstallationReport } from "@/lib/api/settings";
 import type { VisibleApps } from "@/types";
-import { DEFAULT_VISIBLE_APPS, orderAppIds } from "@/config/appConfig";
+import { APP_IDS, DEFAULT_VISIBLE_APPS, orderAppIds } from "@/config/appConfig";
 import { useSettings } from "@/hooks/useSettings";
 import { isUpdateAvailable } from "@/lib/version";
 import { cn } from "@/lib/utils";
@@ -107,17 +107,27 @@ const SOURCE_LABEL: Record<string, string> = {
   pip: "pip",
 };
 
-type Row = { kind: "tool"; tool: ToolName } | { kind: "desktop" };
+type Row =
+  | { kind: "tool"; tool: ToolName }
+  | { kind: "desktop" }
+  | { kind: "manual"; app: AppId };
 
-const ROW_BY_APP = Object.fromEntries([
-  ["claude-desktop", { kind: "desktop" }],
-  ...TOOL_NAMES.map((tool) => [TOOL_APP_IDS[tool], { kind: "tool", tool }]),
-]) as Record<AppId, Row>;
+const ROW_BY_APP = Object.fromEntries(
+  APP_IDS.map((app): [AppId, Row] => {
+    if (app === "claude-desktop") return [app, { kind: "desktop" }];
+    const tool = TOOL_NAMES.find((name) => TOOL_APP_IDS[name] === app);
+    return [app, tool ? { kind: "tool", tool } : { kind: "manual", app }];
+  }),
+) as Record<AppId, Row>;
 
 type RowSection = { key: string; title: string; rows: Row[] };
 
 const rowKey = (row: Row): AppId =>
-  row.kind === "desktop" ? "claude-desktop" : TOOL_APP_IDS[row.tool];
+  row.kind === "desktop"
+    ? "claude-desktop"
+    : row.kind === "manual"
+      ? row.app
+      : TOOL_APP_IDS[row.tool];
 
 // 只上下拖，且停在本组的列表框里：列表框裁掉超出的部分，拖出去整行会看不见
 const verticalDragModifiers: Modifier[] = [
@@ -189,6 +199,7 @@ export function AppsPage() {
     if (row.kind === "desktop") {
       return isDesktopStatusPending ? null : Boolean(desktopStatus?.installed);
     }
+    if (row.kind === "manual") return false;
     const info = tools.toolVersionByName.get(row.tool);
     if (!info && tools.isLoadingTools) return null;
     return isToolPresent(info, tools.installReports?.[row.tool]);
@@ -208,9 +219,9 @@ export function AppsPage() {
           { key: "notInstalled", installed: false },
         ] as const
       )
-        .map(({ key, installed }) => {
+        .map(({ key, installed }): RowSection => {
           const rows = rowStates
-            .filter((s) => s.installed === installed)
+            .filter((s) => s.row.kind !== "manual" && s.installed === installed)
             .map((s) => s.row);
           return {
             key,
@@ -223,6 +234,13 @@ export function AppsPage() {
             rows,
           };
         })
+        .concat([
+          {
+            key: "manual",
+            title: t("appsPage.manuallyManaged"),
+            rows: orderedRows.filter((row) => row.kind === "manual"),
+          },
+        ])
         .filter((section) => section.rows.length > 0);
   // 行换组会重新挂载，操作列的量宽要跟着重新观察新节点
   const sectionLayoutKey = sections
@@ -356,6 +374,18 @@ export function AppsPage() {
           </span>
         }
         visibility={visibilitySwitch("claude-desktop")}
+      />
+    ) : row.kind === "manual" ? (
+      <AppRow
+        key={row.app}
+        app={row.app}
+        name={<span className="truncate">{APP_DISPLAY_NAME[row.app]}</span>}
+        version={
+          <span className="text-caption text-fg-2">
+            {t("appsPage.manuallyManaged")}
+          </span>
+        }
+        visibility={visibilitySwitch(row.app)}
       />
     ) : (
       <ToolRow

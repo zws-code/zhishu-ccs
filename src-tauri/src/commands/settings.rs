@@ -278,6 +278,7 @@ pub async fn restart_app(app: AppHandle) -> Result<bool, String> {
 #[tauri::command]
 pub async fn install_update_and_restart(app: AppHandle) -> Result<bool, String> {
     let builder = app.updater_builder();
+    // TODO(zhishu): Replace upstream updater endpoints with a Zhishu-hosted signed manifest.
     // Windows 上 updater 以 `msiexec /passive /promptrestart` 安装 MSI。passive 没有模态框、
     // 未指定重启选项时，安装目录里有文件被占用，Windows Installer 会不经确认直接重启系统
     // （#8534）。`/promptrestart` 只对应 REBOOTPROMPT，挡不住这一点，因此显式追加

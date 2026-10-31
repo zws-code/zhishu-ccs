@@ -319,6 +319,7 @@ describe("SessionManagerPage", () => {
         openclaw: false,
         hermes: false,
         pi: false,
+        workbuddy: false,
         mcode: false,
         kimi: false,
         agy: false,

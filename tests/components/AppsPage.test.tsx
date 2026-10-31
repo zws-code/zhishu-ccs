@@ -723,7 +723,13 @@ describe("AppsPage concurrent CLI upgrades", () => {
       within(
         screen.getByRole("region", { name: "appsPage.sectionInstalled" }),
       ).getAllByRole("button", { name: "appsPage.dragHandle" }),
-    ).toHaveLength(APP_IDS.length - 2);
+    ).toHaveLength(APP_IDS.length - 3); // 两个未安装应用和一个手动管理应用
+    expect(rowApps("appsPage.manuallyManaged")).toEqual(["workbuddy"]);
+    expect(
+      within(
+        screen.getByRole("region", { name: "appsPage.manuallyManaged" }),
+      ).queryByRole("button", { name: "appsPage.dragHandle" }),
+    ).toBeNull();
     expect(
       within(
         screen.getByRole("region", { name: "appsPage.sectionNotInstalled" }),
@@ -2070,6 +2076,22 @@ describe("AppsPage concurrent CLI upgrades", () => {
 });
 
 describe("AppsPage visibility column", () => {
+  it("includes every registered app even without installation management", async () => {
+    vi.resetModules();
+    await renderApps();
+    const { APP_IDS } = await import("@/config/appConfig");
+    expect(
+      screen.getAllByRole("switch", { name: /appsPage\.showInSidebar/ }),
+    ).toHaveLength(APP_IDS.length);
+    for (const name of ["WorkBuddy"]) {
+      expect(card(name).getByRole("switch")).toBeEnabled();
+      expect(
+        card(name).getByText("appsPage.manuallyManaged"),
+      ).toBeInTheDocument();
+      expect(card(name).queryByRole("button")).toBeNull();
+    }
+  });
+
   it("renders the sidebar visibility switches small with the action color", async () => {
     vi.resetModules();
     await renderApps();

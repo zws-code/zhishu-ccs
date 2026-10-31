@@ -61,6 +61,7 @@ const DIRECTORY_KEYS = [
   "openclawConfigDir",
   "hermesConfigDir",
   "piConfigDir",
+  "workbuddyConfigDir",
   "ompConfigDir",
 ] as const;
 
@@ -134,6 +135,7 @@ export function useSettings(): UseSettingsResult {
       openclaw: sanitizeDir(data?.openclawConfigDir),
       hermes: sanitizeDir(data?.hermesConfigDir),
       pi: sanitizeDir(data?.piConfigDir),
+      workbuddy: sanitizeDir(data?.workbuddyConfigDir),
       omp: sanitizeDir(data?.ompConfigDir),
     });
     setRequiresRestart(false);
@@ -222,6 +224,9 @@ export function useSettings(): UseSettingsResult {
           mergedSettings.openclawConfigDir,
         );
         const sanitizedPiDir = sanitizeDir(mergedSettings.piConfigDir);
+        const sanitizedWorkBuddyDir = sanitizeDir(
+          mergedSettings.workbuddyConfigDir,
+        );
         const sanitizedOmpDir = sanitizeDir(mergedSettings.ompConfigDir);
         const {
           webdavSync: _ignoredWebdavSync,
@@ -238,6 +243,7 @@ export function useSettings(): UseSettingsResult {
           opencodeConfigDir: sanitizedOpencodeDir,
           openclawConfigDir: sanitizedOpenclawDir,
           piConfigDir: sanitizedPiDir,
+          workbuddyConfigDir: sanitizedWorkBuddyDir,
           ompConfigDir: sanitizedOmpDir,
           language: mergedSettings.language,
         };
@@ -359,6 +365,9 @@ export function useSettings(): UseSettingsResult {
           mergedSettings.openclawConfigDir,
         );
         const sanitizedPiDir = sanitizeDir(mergedSettings.piConfigDir);
+        const sanitizedWorkBuddyDir = sanitizeDir(
+          mergedSettings.workbuddyConfigDir,
+        );
         const sanitizedOmpDir = sanitizeDir(mergedSettings.ompConfigDir);
         const previousAppDir = initialAppConfigDir;
         const previousClaudeDir = sanitizeDir(data?.claudeConfigDir);
@@ -368,6 +377,7 @@ export function useSettings(): UseSettingsResult {
         const previousOpencodeDir = sanitizeDir(data?.opencodeConfigDir);
         const previousOpenclawDir = sanitizeDir(data?.openclawConfigDir);
         const previousPiDir = sanitizeDir(data?.piConfigDir);
+        const previousWorkBuddyDir = sanitizeDir(data?.workbuddyConfigDir);
         const previousOmpDir = sanitizeDir(data?.ompConfigDir);
         const {
           webdavSync: _ignoredWebdavSync,
@@ -384,6 +394,7 @@ export function useSettings(): UseSettingsResult {
           opencodeConfigDir: sanitizedOpencodeDir,
           openclawConfigDir: sanitizedOpenclawDir,
           piConfigDir: sanitizedPiDir,
+          workbuddyConfigDir: sanitizedWorkBuddyDir,
           ompConfigDir: sanitizedOmpDir,
           language: mergedSettings.language,
         };
@@ -475,6 +486,8 @@ export function useSettings(): UseSettingsResult {
         const opencodeDirChanged = sanitizedOpencodeDir !== previousOpencodeDir;
         const openclawDirChanged = sanitizedOpenclawDir !== previousOpenclawDir;
         const piDirChanged = sanitizedPiDir !== previousPiDir;
+        const workbuddyDirChanged =
+          sanitizedWorkBuddyDir !== previousWorkBuddyDir;
         const ompDirChanged = sanitizedOmpDir !== previousOmpDir;
         if (
           !pluginSynced &&
@@ -495,6 +508,11 @@ export function useSettings(): UseSettingsResult {
         }
         if (piDirChanged) {
           await invalidatePiDirectoryCaches(queryClient);
+        }
+        if (workbuddyDirChanged) {
+          await queryClient.invalidateQueries({
+            queryKey: ["providers", "workbuddy"],
+          });
         }
         if (ompDirChanged) {
           await invalidatePiDirectoryCaches(queryClient, "omp");

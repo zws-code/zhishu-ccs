@@ -26,8 +26,8 @@ use crate::claude_desktop_config::{self, DesktopTarget};
 use crate::error::AppError;
 use crate::live::engine::DeviceStore;
 use crate::live::project::claude::{
-    direct_patch, proxy_projection, ClaudeProjection, ProxyAuth, StackRoleModel,
-    PROXY_TOKEN_PLACEHOLDER,
+    direct_patch, proxy_projection, with_derived_model_slots, ClaudeProjection, ProxyAuth,
+    StackRoleModel, PROXY_TOKEN_PLACEHOLDER,
 };
 use crate::live::project::gemini::GeminiProjection;
 use crate::live::project::grok::GrokProjection;
@@ -529,8 +529,9 @@ fn write_direct(
     match app {
         AppType::Claude => {
             let empty = ClaudeProjection::default();
-            let projection = usable_direct(app, direct.as_ref())
-                .map(|provider| ClaudeProjection::of(&provider.settings_config));
+            let projection = usable_direct(app, direct.as_ref()).map(|provider| {
+                with_derived_model_slots(ClaudeProjection::of(&provider.settings_config))
+            });
             let mut patch = direct_patch(
                 live_now.claude_exclusive_owner().as_ref(),
                 projection.as_ref().unwrap_or(&empty),
@@ -1316,6 +1317,7 @@ async fn set_stack_member_locked(
 ) -> Result<(), String> {
     let current = settled_stack(app)?;
     let mut next = current.clone();
+    let mut roster = None;
     if enabled {
         let target = provider(state, app, provider_id)?
             .ok_or_else(|| format!("供应商不存在: {provider_id}"))?;
@@ -1323,6 +1325,10 @@ async fn set_stack_member_locked(
         stack::allocate_key(&mut next, &target);
         if !next.is_member(provider_id) {
             next.members.push(provider_id.to_string());
+            roster = Some(crate::config_history::ConfigOperationSummary {
+                added: vec![target.name.clone()],
+                removed: Vec::new(),
+            });
         }
     } else {
         let mode = current::mode_state(app);
@@ -1332,12 +1338,39 @@ async fn set_stack_member_locked(
                     .to_string(),
             );
         }
+        let was_member = next.members.iter().any(|id| id == provider_id);
         next.members.retain(|id| id != provider_id);
+        if was_member {
+            // 删除供应商会先移出名单再删行，这里通常还能查到名字。
+            let name = provider(state, app, provider_id)
+                .ok()
+                .flatten()
+                .map(|target| target.name)
+                .unwrap_or_else(|| provider_id.to_string());
+            roster = Some(crate::config_history::ConfigOperationSummary {
+                added: Vec::new(),
+                removed: vec![name],
+            });
+        }
     }
     if next == current {
         return Ok(());
     }
-    publish_stack(state, app, next).await
+    publish_stack(state, app, next).await?;
+
+    // 名单变了就要留下记录，即使没有可见的文件差异：Codex 只改派生的模型目录（只记
+    // 指纹），契约没变时甚至一个文件都不写。摘要是独立记录，不能作为单文件还原。
+    if let Some(summary) = roster {
+        if let Err(error) = crate::config_history::record_operation_summary(
+            app.as_str(),
+            op::STACK,
+            &stack_summary_path(app),
+            summary,
+        ) {
+            log::warn!("记录 {} 的聚合名单变更失败: {error}", app.as_str());
+        }
+    }
+    Ok(())
 }
 
 /// 落定新的 Stack 名单：代理模式且已接上时和契约一起提交，否则只落定名单。
@@ -1357,6 +1390,19 @@ async fn publish_stack(state: &AppState, app: &AppType, next: StackState) -> Res
                 ..PendingTarget::default()
             },
         ),
+    }
+}
+
+/// 聚合名单摘要记录展示用的主文件：Codex 是派生的模型目录，其他应用是客户端配置。
+fn stack_summary_path(app: &AppType) -> std::path::PathBuf {
+    match app {
+        AppType::Claude => crate::config::get_claude_settings_path(),
+        AppType::Codex => crate::codex_config::get_codex_model_catalog_path(),
+        AppType::ClaudeDesktop => crate::claude_desktop_config::live_file_paths()
+            .ok()
+            .and_then(|paths| paths.into_iter().next())
+            .unwrap_or_default(),
+        _ => std::path::PathBuf::new(),
     }
 }
 
@@ -1850,8 +1896,7 @@ async fn drain_legacy_backup(state: &AppState, app: &AppType) -> bool {
             return false;
         }
     };
-    let dir = crate::config::get_home_dir()
-        .join(".cc-switch")
+    let dir = crate::config::get_device_data_dir()
         .join("backups")
         .join("proxy-live-backup");
     let stamp = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
@@ -2670,8 +2715,18 @@ mod mode_tests {
 "#;
 
     /// 回到直连后：值和用户的原文件相同；非关键字段的顺序不变（关键字段可能挪到末尾）。
-    fn assert_back_to_user_settings() {
-        let original: Value = serde_json::from_str(USER_SETTINGS).unwrap();
+    /// 直连行只写了主模型，写盘的那一份会补齐三个档位；没发生写入时文件还是用户原样。
+    fn assert_back_to_user_settings(slots_derived: bool) {
+        let mut original: Value = serde_json::from_str(USER_SETTINGS).unwrap();
+        if slots_derived {
+            for key in [
+                "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+                "ANTHROPIC_DEFAULT_SONNET_MODEL",
+                "ANTHROPIC_DEFAULT_OPUS_MODEL",
+            ] {
+                original["env"][key] = json!("claude-sonnet-4-6");
+            }
+        }
         let live = settings();
         assert_eq!(live, original);
         let keys = |value: &Value| -> Vec<String> {
@@ -2722,7 +2777,7 @@ mod mode_tests {
         );
 
         exit(&state, &AppType::Claude).await.expect("exit");
-        assert_back_to_user_settings();
+        assert_back_to_user_settings(true);
         // 第一次写入可能挪动关键字段的位置，之后的往返字节稳定。
         let settled = fs::read(settings_path()).unwrap();
         enter(&state, &AppType::Claude, false)
@@ -2893,7 +2948,7 @@ mod mode_tests {
                 .is_none(),
             "the direct provider does not need it, so leaving proxy mode removes it"
         );
-        assert_back_to_user_settings();
+        assert_back_to_user_settings(true);
     }
 
     #[tokio::test]
@@ -3160,7 +3215,7 @@ mod mode_tests {
 
         crate::mode::operation::recover_on_startup(&state.db);
         assert_eq!(mode(&AppType::Claude).mode, Some(Mode::Direct));
-        assert_back_to_user_settings();
+        assert_back_to_user_settings(true);
         if state.proxy_service.is_running().await {
             state.proxy_service.stop().await.unwrap();
         }
@@ -3199,7 +3254,10 @@ mod mode_tests {
                 state.db.get_live_backup("claude").await.unwrap().is_none(),
                 "the old version would replay a leftover backup row after a downgrade"
             );
-            let drained = home.dir.path().join(".cc-switch/backups/proxy-live-backup");
+            let drained = home
+                .dir
+                .path()
+                .join(".zhishu-ccs/backups/proxy-live-backup");
             assert_eq!(
                 fs::read_dir(&drained).unwrap().count(),
                 1,
@@ -3824,7 +3882,7 @@ command = "fs-server"
         let dormant = &doc["model_providers"]["custom"];
         assert_eq!(
             dormant["base_url"].as_str(),
-            Some("http://127.0.0.1:15721/v1"),
+            Some("http://127.0.0.1:25721/v1"),
             "the dormant table points at the configured local proxy: {text}"
         );
         assert_eq!(
@@ -5811,7 +5869,7 @@ model_provider = "c"
         assert_eq!(stack.key_of("zhipu"), Some("zhipu"));
 
         exit(&state, &AppType::Claude).await.expect("exit");
-        assert_back_to_user_settings();
+        assert_back_to_user_settings(true);
     }
 
     #[tokio::test]
@@ -5850,7 +5908,7 @@ model_provider = "c"
 
         exit(&state, &AppType::Claude).await.expect("exit");
         assert!(settings().get(CLAUDE_MODEL_PICKER).is_none());
-        assert_back_to_user_settings();
+        assert_back_to_user_settings(true);
     }
 
     #[tokio::test]
@@ -5870,7 +5928,7 @@ model_provider = "c"
         assert_eq!(settings()["env"][CLAUDE_MAX_CONTEXT_ENV], "128000");
 
         exit(&state, &AppType::Claude).await.expect("exit");
-        assert_back_to_user_settings();
+        assert_back_to_user_settings(true);
         assert!(
             stack_state().is_member("kimi"),
             "the list outlives proxy mode"
@@ -5948,7 +6006,7 @@ model_provider = "c"
 
         // 退出再以 Stack 模式进入：名单原样恢复。
         exit(&state, &AppType::Claude).await.expect("exit");
-        assert_back_to_user_settings();
+        assert_back_to_user_settings(true);
         enter(&state, &AppType::Claude, true)
             .await
             .expect("stack mode again");
@@ -5987,7 +6045,7 @@ model_provider = "c"
         exit(&state, &AppType::Claude).await.expect("exit");
         assert_eq!(view().mode, "direct");
         assert_eq!(view().route_provider_id.as_deref(), Some("zhipu"));
-        assert_back_to_user_settings();
+        assert_back_to_user_settings(true);
 
         // 选了不存在的供应商：什么都不改。
         enter_with_route(&state, &AppType::Claude, false, Some("missing"))
@@ -6016,7 +6074,7 @@ model_provider = "c"
         assert_eq!(view().direct_provider_id.as_deref(), Some("a"));
         assert_eq!(in_use(&state, &AppType::Claude).as_deref(), Some("a"));
         assert!(stack_state().is_empty());
-        assert_back_to_user_settings();
+        assert_back_to_user_settings(false);
 
         // 不存在的、不能走代理的官方订阅：拒绝，记下的那家不变。
         set_route(&state, &AppType::Claude, "missing")
@@ -6040,7 +6098,7 @@ model_provider = "c"
         assert_eq!(in_use(&state, &AppType::Claude).as_deref(), Some("zhipu"));
         assert_eq!(stack_state().members, vec!["kimi", "zhipu"]);
         exit(&state, &AppType::Claude).await.expect("exit");
-        assert_back_to_user_settings();
+        assert_back_to_user_settings(true);
     }
 
     #[tokio::test]
@@ -6099,7 +6157,7 @@ model_provider = "c"
             vec!["claude"]
         );
         assert!(!current::is_proxy(&AppType::Claude));
-        assert_back_to_user_settings();
+        assert_back_to_user_settings(true);
         assert_eq!(stack_state().members, vec!["kimi", "a"], "the list stays");
     }
 

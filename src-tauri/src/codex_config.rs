@@ -268,6 +268,9 @@ const CODEX_RESERVED_MODEL_PROVIDER_IDS: &[&str] = &[
 
 /// 获取 Codex 配置目录路径
 pub fn get_codex_config_dir() -> PathBuf {
+    if let Some(home) = crate::config::isolated_dev_home() {
+        return home.join(".codex");
+    }
     if let Some(custom) = crate::settings::get_codex_override_dir() {
         return custom;
     }

@@ -71,6 +71,7 @@ export const useAddProviderMutation = (appId: AppId) => {
         appId === "openclaw" ||
         appId === "hermes" ||
         appId === "pi" ||
+        appId === "workbuddy" ||
         appId === "mcode" ||
         appId === "kimi" ||
         appId === "omp"
@@ -169,6 +170,11 @@ export const useAddProviderMutation = (appId: AppId) => {
       if (isPiFamilyApp(appId)) {
         await invalidatePiProviderCaches(queryClient, appId);
       }
+      if (appId === "workbuddy") {
+        await queryClient.invalidateQueries({
+          queryKey: ["providers", "workbuddy"],
+        });
+      }
     },
   });
 };
@@ -242,6 +248,11 @@ export const useUpdateProviderMutation = (appId: AppId) => {
         // 默认模型可能在 Kimi Code 里改过：失败时也重读，页面上的「默认」才跟得上
         await queryClient.invalidateQueries({
           queryKey: ["providers", "kimi"],
+        });
+      }
+      if (appId === "workbuddy") {
+        await queryClient.invalidateQueries({
+          queryKey: ["providers", "workbuddy"],
         });
       }
     },
@@ -325,6 +336,11 @@ export const useDeleteProviderMutation = (appId: AppId) => {
         // 默认模型可能在 Kimi Code 里改过：失败时也重读，页面上的「默认」才跟得上
         await queryClient.invalidateQueries({
           queryKey: ["providers", "kimi"],
+        });
+      }
+      if (appId === "workbuddy") {
+        await queryClient.invalidateQueries({
+          queryKey: ["providers", "workbuddy"],
         });
       }
     },
@@ -415,6 +431,11 @@ export const useSwitchProviderMutation = (appId: AppId) => {
     onSettled: async () => {
       if (isPiFamilyApp(appId)) {
         await invalidatePiProviderCaches(queryClient, appId);
+      }
+      if (appId === "workbuddy") {
+        await queryClient.invalidateQueries({
+          queryKey: ["providers", "workbuddy"],
+        });
       }
     },
   });

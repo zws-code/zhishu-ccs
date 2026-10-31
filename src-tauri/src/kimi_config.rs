@@ -472,6 +472,75 @@ pub(crate) fn current_provider() -> Result<String, AppError> {
     Ok(current_provider_in(&document).unwrap_or_default().into())
 }
 
+pub(crate) fn platform_selection() -> Result<Value, AppError> {
+    let document = read(&config_path())?;
+    let provider = current_provider_in(&document).unwrap_or_default();
+    let model = document
+        .get("default_model")
+        .and_then(Value::as_str)
+        .and_then(|key| {
+            document
+                .get("models")
+                .and_then(|models| models.get(key))
+                .and_then(|entry| entry.get("model"))
+        })
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    Ok(json!({
+        "defaultProvider": provider,
+        "defaultModel": model,
+    }))
+}
+
+#[cfg(test)]
+pub(crate) fn set_platform_default(provider_id: &str, model: &str) -> Result<(), AppError> {
+    let _guard = WRITE_LOCK
+        .lock()
+        .map_err(|error| AppError::Message(error.to_string()))?;
+    let path = config_path();
+    let before = read(&path)?;
+    if before
+        .get("providers")
+        .and_then(|providers| providers.get(provider_id))
+        .is_none()
+    {
+        return Err(AppError::InvalidInput(format!(
+            "Kimi Code provider '{provider_id}' is not enabled in config.toml"
+        )));
+    }
+    let key = before
+        .get("models")
+        .and_then(Value::as_object)
+        .and_then(|models| {
+            models.iter().find_map(|(key, entry)| {
+                (entry.get("provider").and_then(Value::as_str) == Some(provider_id)
+                    && entry.get("model").and_then(Value::as_str) == Some(model))
+                .then(|| key.clone())
+            })
+        })
+        .ok_or_else(|| {
+            AppError::InvalidInput(format!(
+                "Kimi Code provider '{provider_id}' has no model '{model}'"
+            ))
+        })?;
+    let mut after = before.clone();
+    after["default_model"] = json!(key);
+    write(&path, &before, &after)
+}
+
+#[cfg(test)]
+pub(crate) fn platform_default_matches(provider_id: &str, model: &str) -> Result<bool, AppError> {
+    let document = read(&config_path())?;
+    Ok(document
+        .get("default_model")
+        .and_then(Value::as_str)
+        .and_then(|key| document.get("models").and_then(|models| models.get(key)))
+        .is_some_and(|entry| {
+            entry.get("provider").and_then(Value::as_str) == Some(provider_id)
+                && entry.get("model").and_then(Value::as_str) == Some(model)
+        }))
+}
+
 fn current_provider_in(document: &Value) -> Option<&str> {
     let selected = document.get("default_model")?.as_str()?;
     let id = document

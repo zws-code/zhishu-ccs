@@ -21,6 +21,16 @@ import {
 import { emitTauriEvent } from "../msw/tauriMocks";
 import { server } from "../msw/server";
 
+const platformDeletion = vi.hoisted(() => ({
+  visible: false,
+  disabled: false,
+  pending: false,
+  remove: vi.fn(),
+}));
+vi.mock("@/zhishu/models/usePlatformProviderDeletion", () => ({
+  usePlatformProviderDeletion: () => platformDeletion,
+}));
+
 const toastSuccessMock = vi.fn();
 const toastErrorMock = vi.fn();
 const skillsPanelMocks = vi.hoisted(() => ({
@@ -230,6 +240,8 @@ const renderApp = (AppComponent: ComponentType) => {
 describe("App integration with MSW", () => {
   beforeEach(() => {
     resetProviderState();
+    platformDeletion.visible = false;
+    platformDeletion.remove.mockReset();
     toastSuccessMock.mockReset();
     toastErrorMock.mockReset();
     skillsPanelMocks.initialViews = [];
@@ -245,8 +257,26 @@ describe("App integration with MSW", () => {
     };
     windowMocks.onResized.mockImplementation(listen);
     windowMocks.onScaleChanged.mockImplementation(listen);
-    localStorage.removeItem("cc-switch-last-view");
+    localStorage.setItem("cc-switch-last-view", "providers");
     localStorage.removeItem("cc-switch-last-app");
+  });
+
+  it("offers one-click platform provider deletion in the app's more menu", async () => {
+    platformDeletion.visible = true;
+    const { default: App } = await import("@/App");
+    renderApp(App);
+    await screen.findByTestId("provider-list");
+    const trigger = screen.getByRole("button", {
+      name: /更多操作|moreActions/,
+      hidden: true,
+    });
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    const item = await screen.findByRole("menuitem", {
+      name: /一键删除平台供应商|deleteProviders/,
+      hidden: true,
+    });
+    fireEvent.click(item);
+    expect(platformDeletion.remove).toHaveBeenCalledTimes(1);
   });
 
   it("covers basic provider flows via real hooks", async () => {
@@ -882,7 +912,9 @@ describe("App integration with MSW", () => {
     await waitFor(() =>
       expect(toastErrorMock).toHaveBeenCalledWith(
         "notifications.removeFromConfigFailed",
-        expect.objectContaining({ description: "kimi.error.defaultModelInUse" }),
+        expect.objectContaining({
+          description: "kimi.error.defaultModelInUse",
+        }),
       ),
     );
     await waitFor(() =>
@@ -982,6 +1014,23 @@ describe("App integration with MSW", () => {
     );
 
     liveIdsSpy.mockRestore();
+  });
+
+  it("opens the shared platform data page from the sidebar and persists its navigation", async () => {
+    const { default: App } = await import("@/App");
+    renderApp(App);
+    fireEvent.click(sidebarApp("平台基础数据"));
+    expect(
+      screen.getByRole("heading", { name: "平台基础数据", hidden: true }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "同步平台基础数据", hidden: true }),
+    ).toBeDisabled();
+    await waitFor(() =>
+      expect(localStorage.getItem("cc-switch-last-view")).toBe(
+        "platformCatalog",
+      ),
+    );
   });
 
   it("renders the Skills page with its own header", async () => {

@@ -27,6 +27,7 @@ export const APP_IDS: AppId[] = [
   "openclaw",
   "hermes",
   "pi",
+  "workbuddy",
   "mcode",
   "kimi",
   "agy",
@@ -43,6 +44,7 @@ export const DEFAULT_VISIBLE_APPS: VisibleApps = {
   openclaw: true,
   hermes: true,
   pi: true,
+  workbuddy: true,
   mcode: true,
   kimi: true,
   agy: true,
@@ -134,10 +136,18 @@ export function isStackAppId(appId: string): appId is StackAppId {
 
 export type AdditiveAppId = Extract<
   AppId,
-  "opencode" | "openclaw" | "hermes" | "pi" | "mcode" | "kimi" | "omp"
+  | "opencode"
+  | "openclaw"
+  | "hermes"
+  | "pi"
+  | "workbuddy"
+  | "mcode"
+  | "kimi"
+  | "omp"
 >;
 
 export const ADDITIVE_APP_IDS: AdditiveAppId[] = [
+  "workbuddy",
   "mcode",
   "kimi",
   "opencode",
@@ -173,8 +183,11 @@ export function usesEditorView(appId: AppId): boolean {
   return EDITOR_VIEW_APP_IDS.includes(appId);
 }
 
-/** Claude Desktop、OpenClaw 不由 CC Switch 管理 MCP；Pi 1.0 起内置 MCP（`~/.pi/agent/mcp.json`） */
-export type McpAppId = Exclude<AppId, "claude-desktop" | "openclaw">;
+/** Claude Desktop、OpenClaw 不由 CC Switch 管理 MCP。 */
+export type McpAppId = Exclude<
+  AppId,
+  "claude-desktop" | "openclaw" | "workbuddy"
+>;
 export const MCP_APP_IDS: McpAppId[] = [
   "claude",
   "codex",
@@ -319,6 +332,21 @@ export const APP_ICON_MAP: Record<AppId, AppConfig> = {
       "bg-sky-500/10 ring-1 ring-sky-500/20 hover:bg-sky-500/20 text-sky-700 dark:text-sky-300",
     badgeClass:
       "bg-sky-500/10 text-sky-700 dark:text-sky-300 hover:bg-sky-500/20 border-0 gap-1.5",
+  },
+  workbuddy: {
+    label: "WorkBuddy",
+    icon: (
+      <ProviderIcon
+        icon="tencent"
+        name="WorkBuddy"
+        size={14}
+        showFallback={false}
+      />
+    ),
+    activeClass:
+      "bg-blue-500/10 ring-1 ring-blue-500/20 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400",
+    badgeClass:
+      "bg-blue-500/10 text-blue-700 dark:text-blue-300 hover:bg-blue-500/20 border-0 gap-1.5",
   },
   omp: {
     label: "Oh My Pi",

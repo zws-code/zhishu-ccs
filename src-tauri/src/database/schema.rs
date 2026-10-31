@@ -134,7 +134,7 @@ impl Database {
         conn.execute("CREATE TABLE IF NOT EXISTS proxy_config (
             app_type TEXT PRIMARY KEY CHECK (app_type IN ('claude','codex','gemini','grokbuild')),
             proxy_enabled INTEGER NOT NULL DEFAULT 0, listen_address TEXT NOT NULL DEFAULT '127.0.0.1',
-            listen_port INTEGER NOT NULL DEFAULT 15721, enable_logging INTEGER NOT NULL DEFAULT 1,
+            listen_port INTEGER NOT NULL DEFAULT 25721, enable_logging INTEGER NOT NULL DEFAULT 1,
             enabled INTEGER NOT NULL DEFAULT 0, auto_failover_enabled INTEGER NOT NULL DEFAULT 0,
             max_retries INTEGER NOT NULL DEFAULT 3, streaming_first_byte_timeout INTEGER NOT NULL DEFAULT 60,
             streaming_idle_timeout INTEGER NOT NULL DEFAULT 120, non_streaming_timeout INTEGER NOT NULL DEFAULT 600,
@@ -389,7 +389,7 @@ impl Database {
             [],
         );
         let _ = conn.execute(
-            "ALTER TABLE proxy_config ADD COLUMN listen_port INTEGER NOT NULL DEFAULT 15721",
+            "ALTER TABLE proxy_config ADD COLUMN listen_port INTEGER NOT NULL DEFAULT 25721",
             [],
         );
         let _ = conn.execute(
@@ -596,6 +596,14 @@ impl Database {
                         Self::set_user_version(conn, 21)?;
                     }
                     21 => {
+                        log::info!("迁移数据库从 v21 到 v22（路由默认端口迁到 25721）");
+                        Self::migrate_v21_to_v22(conn)?;
+                        Self::set_user_version(conn, 22)?;
+                    }
+                    22 => {
+                        // Both branches used v22 for different migrations. Reconcile
+                        // either starting point, preserving existing flags and custom ports.
+                        Self::migrate_v21_to_v22(conn)?;
                         for table in ["mcp_servers", "skills"] {
                             if Self::table_exists(conn, table)? {
                                 Self::add_column_if_missing(
@@ -606,18 +614,6 @@ impl Database {
                                 )?;
                             }
                         }
-                        Self::set_user_version(conn, 22)?;
-                    }
-                    22 => {
-                        // Oh My Pi：只有 MCP 存开关；Skills 的启用状态按原生目录现算（同 Pi）。
-                        if Self::table_exists(conn, "mcp_servers")? {
-                            Self::add_column_if_missing(
-                                conn,
-                                "mcp_servers",
-                                "enabled_omp",
-                                "BOOLEAN NOT NULL DEFAULT 0",
-                            )?;
-                        }
                         Self::set_user_version(conn, 23)?;
                     }
                     _ => {
@@ -627,6 +623,16 @@ impl Database {
                     }
                 }
                 version = Self::get_user_version(conn)?;
+            }
+            // Zhishu and upstream both shipped v23 with different additions.
+            // Reconcile existing v23 databases too, within the migration savepoint.
+            if Self::needs_omp_schema_reconciliation(conn)? {
+                Self::add_column_if_missing(
+                    conn,
+                    "mcp_servers",
+                    "enabled_omp",
+                    "BOOLEAN NOT NULL DEFAULT 0",
+                )?;
             }
             Ok(())
         })();
@@ -643,6 +649,11 @@ impl Database {
                 Err(e)
             }
         }
+    }
+
+    pub(crate) fn needs_omp_schema_reconciliation(conn: &Connection) -> Result<bool, AppError> {
+        Ok(Self::table_exists(conn, "mcp_servers")?
+            && !Self::has_column(conn, "mcp_servers", "enabled_omp")?)
     }
 
     /// v0 -> v1 迁移：补齐所有缺失列
@@ -743,7 +754,7 @@ impl Database {
                 conn,
                 "proxy_config",
                 "listen_port",
-                "INTEGER NOT NULL DEFAULT 15721",
+                "INTEGER NOT NULL DEFAULT 25721",
             )?;
             Self::add_column_if_missing(
                 conn,
@@ -953,7 +964,7 @@ impl Database {
         conn.execute("CREATE TABLE proxy_config_new (
             app_type TEXT PRIMARY KEY CHECK (app_type IN ('claude','codex','gemini','grokbuild')),
             proxy_enabled INTEGER NOT NULL DEFAULT 0, listen_address TEXT NOT NULL DEFAULT '127.0.0.1',
-            listen_port INTEGER NOT NULL DEFAULT 15721, enable_logging INTEGER NOT NULL DEFAULT 1,
+            listen_port INTEGER NOT NULL DEFAULT 25721, enable_logging INTEGER NOT NULL DEFAULT 1,
             enabled INTEGER NOT NULL DEFAULT 0, auto_failover_enabled INTEGER NOT NULL DEFAULT 0,
             max_retries INTEGER NOT NULL DEFAULT 3, streaming_first_byte_timeout INTEGER NOT NULL DEFAULT 60,
             streaming_idle_timeout INTEGER NOT NULL DEFAULT 120, non_streaming_timeout INTEGER NOT NULL DEFAULT 600,
@@ -1516,7 +1527,7 @@ impl Database {
                 app_type TEXT PRIMARY KEY CHECK (app_type IN ('claude','codex','gemini','grokbuild')),
                 proxy_enabled INTEGER NOT NULL DEFAULT 0,
                 listen_address TEXT NOT NULL DEFAULT '127.0.0.1',
-                listen_port INTEGER NOT NULL DEFAULT 15721,
+                listen_port INTEGER NOT NULL DEFAULT 25721,
                 enable_logging INTEGER NOT NULL DEFAULT 1,
                 enabled INTEGER NOT NULL DEFAULT 0,
                 auto_failover_enabled INTEGER NOT NULL DEFAULT 0,
@@ -1543,7 +1554,7 @@ impl Database {
             ("app_type", "'claude'"),
             ("proxy_enabled", "0"),
             ("listen_address", "'127.0.0.1'"),
-            ("listen_port", "15721"),
+            ("listen_port", "25721"),
             ("enable_logging", "1"),
             ("enabled", "0"),
             ("auto_failover_enabled", "0"),
@@ -1667,6 +1678,23 @@ impl Database {
                 "INTEGER",
             )?;
         }
+        Ok(())
+    }
+
+    /// v21 -> v22: move rows still on the old CC Switch default port to the
+    /// Zhishu-specific port. Custom ports are intentionally preserved.
+    fn migrate_v21_to_v22(conn: &Connection) -> Result<(), AppError> {
+        if !Self::table_exists(conn, "proxy_config")? {
+            return Ok(());
+        }
+
+        conn.execute(
+            "UPDATE proxy_config
+             SET listen_port = 25721, updated_at = datetime('now')
+             WHERE listen_port = 15721",
+            [],
+        )
+        .map_err(|e| AppError::Database(format!("迁移路由端口失败: {e}")))?;
         Ok(())
     }
 
@@ -3985,6 +4013,132 @@ mod tests {
     }
 
     #[test]
+    fn merged_v22_migration_reconciles_both_branch_schemas() -> Result<(), AppError> {
+        for upstream_v22 in [false, true] {
+            let conn = Connection::open_in_memory()?;
+            conn.execute_batch(
+                "CREATE TABLE mcp_servers(id TEXT PRIMARY KEY, enabled_codex BOOLEAN);
+                 CREATE TABLE skills(id TEXT PRIMARY KEY, enabled_claude BOOLEAN);
+                 INSERT INTO mcp_servers VALUES ('m', 1);
+                 INSERT INTO skills VALUES ('s', 1);
+                 CREATE TABLE proxy_config(app_type TEXT PRIMARY KEY, listen_port INTEGER, updated_at TEXT);
+                 INSERT INTO proxy_config VALUES ('claude', 15721, NULL), ('codex', 12345, NULL);",
+            )?;
+            if upstream_v22 {
+                for table in ["mcp_servers", "skills"] {
+                    conn.execute_batch(&format!(
+                        "ALTER TABLE {table} ADD COLUMN enabled_kimi BOOLEAN NOT NULL DEFAULT 0;
+                         UPDATE {table} SET enabled_kimi = 1;"
+                    ))?;
+                }
+            } else {
+                Database::migrate_v21_to_v22(&conn)?;
+            }
+            Database::set_user_version(&conn, 22)?;
+            // A second run must leave the migrated database unchanged.
+            for _ in 0..2 {
+                Database::apply_schema_migrations_on_conn(&conn)?;
+                assert_eq!(Database::get_user_version(&conn)?, SCHEMA_VERSION);
+                for (table, flag) in [
+                    ("mcp_servers", "enabled_codex"),
+                    ("skills", "enabled_claude"),
+                ] {
+                    let flags: (i64, i64) = conn.query_row(
+                        &format!("SELECT {flag}, enabled_kimi FROM {table}"),
+                        [],
+                        |row| Ok((row.get(0)?, row.get(1)?)),
+                    )?;
+                    assert_eq!(flags, (1, i64::from(upstream_v22)));
+                }
+                let ports: Vec<i64> = conn
+                    .prepare("SELECT listen_port FROM proxy_config ORDER BY app_type")?
+                    .query_map([], |row| row.get(0))?
+                    .collect::<Result<_, _>>()?;
+                assert_eq!(ports, vec![25721, 12345]);
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn merged_v23_reconciles_omp_without_changing_existing_data() -> Result<(), AppError> {
+        for upstream_v23 in [false, true] {
+            let conn = Connection::open_in_memory()?;
+            conn.execute_batch(
+                "CREATE TABLE mcp_servers(id TEXT PRIMARY KEY, enabled_kimi BOOLEAN);
+                 INSERT INTO mcp_servers VALUES ('m', 1);
+                 CREATE TABLE proxy_config(app_type TEXT PRIMARY KEY, listen_port INTEGER);
+                 INSERT INTO proxy_config VALUES ('claude', 15721), ('codex', 12345);",
+            )?;
+            if upstream_v23 {
+                conn.execute_batch(
+                    "ALTER TABLE mcp_servers ADD COLUMN enabled_omp BOOLEAN NOT NULL DEFAULT 0;
+                     UPDATE mcp_servers SET enabled_omp = 1;",
+                )?;
+            }
+            Database::set_user_version(&conn, 23)?;
+            assert_eq!(
+                Database::needs_omp_schema_reconciliation(&conn)?,
+                !upstream_v23
+            );
+            for _ in 0..2 {
+                Database::apply_schema_migrations_on_conn(&conn)?;
+                assert!(!Database::needs_omp_schema_reconciliation(&conn)?);
+                assert_eq!(Database::get_user_version(&conn)?, 23);
+                let flags: (i64, i64) = conn.query_row(
+                    "SELECT enabled_kimi, enabled_omp FROM mcp_servers WHERE id = 'm'",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )?;
+                assert_eq!(flags, (1, i64::from(upstream_v23)));
+                let ports: Vec<i64> = conn
+                    .prepare("SELECT listen_port FROM proxy_config ORDER BY app_type")?
+                    .query_map([], |row| row.get(0))?
+                    .collect::<Result<_, _>>()?;
+                assert_eq!(ports, vec![15721, 12345]);
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn merged_migration_failure_rolls_back_version_and_port_changes() -> Result<(), AppError> {
+        let conn = Connection::open_in_memory()?;
+        conn.execute_batch(
+            "CREATE TABLE mcp_servers(id TEXT PRIMARY KEY, enabled_codex BOOLEAN);
+             INSERT INTO mcp_servers VALUES ('m', 1);
+             CREATE TABLE proxy_config(app_type TEXT PRIMARY KEY, listen_port INTEGER, updated_at TEXT);
+             INSERT INTO proxy_config VALUES ('claude', 15721, NULL);",
+        )?;
+        Database::set_user_version(&conn, 21)?;
+        conn.authorizer(Some(|context: rusqlite::hooks::AuthContext<'_>| {
+            if matches!(
+                context.action,
+                rusqlite::hooks::AuthAction::AlterTable { .. }
+            ) {
+                rusqlite::hooks::Authorization::Deny
+            } else {
+                rusqlite::hooks::Authorization::Allow
+            }
+        }));
+        assert!(Database::apply_schema_migrations_on_conn(&conn).is_err());
+        assert_eq!(Database::get_user_version(&conn)?, 21);
+        assert_eq!(
+            conn.query_row("SELECT listen_port FROM proxy_config", [], |row| row
+                .get::<_, i64>(0))?,
+            15721
+        );
+        assert!(!Database::has_column(&conn, "mcp_servers", "enabled_kimi")?);
+        assert!(!Database::has_column(&conn, "mcp_servers", "enabled_omp")?);
+        assert_eq!(
+            conn.query_row("SELECT enabled_codex FROM mcp_servers", [], |row| row
+                .get::<_, i64>(0))?,
+            1
+        );
+        Ok(())
+    }
+
+    #[test]
     fn kimi_clean_database_persists_mcp_and_skill_flags_independently() -> Result<(), AppError> {
         let db = Database::memory()?;
         let server = serde_json::from_value(serde_json::json!({"id":"m", "name":"m", "server":{"command":"echo"}, "apps":{"kimi":true,"codex":true}})).unwrap();
@@ -4212,6 +4366,48 @@ mod tests {
         )?;
         assert_eq!(byte_offset, None, "存量行的字节游标必须为 NULL");
         assert_eq!(fingerprint, None, "存量行的尾部指纹必须为 NULL");
+        Ok(())
+    }
+
+    #[test]
+    fn fresh_proxy_rows_use_zhishu_default_port() -> Result<(), AppError> {
+        let conn = Connection::open_in_memory()?;
+        Database::create_tables_on_conn(&conn)?;
+
+        let ports: Vec<i64> = conn
+            .prepare("SELECT listen_port FROM proxy_config ORDER BY app_type")?
+            .query_map([], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(ports, vec![25721, 25721, 25721, 25721]);
+        Ok(())
+    }
+
+    #[test]
+    fn migrate_v21_to_v22_updates_only_legacy_default_port() -> Result<(), AppError> {
+        let conn = Connection::open_in_memory()?;
+        Database::create_tables_on_conn(&conn)?;
+        conn.execute(
+            "UPDATE proxy_config SET listen_port = 15721 WHERE app_type = 'claude'",
+            [],
+        )?;
+        conn.execute(
+            "UPDATE proxy_config SET listen_port = 12345 WHERE app_type = 'codex'",
+            [],
+        )?;
+        conn.execute(
+            "UPDATE proxy_config SET listen_port = 25721 WHERE app_type = 'gemini'",
+            [],
+        )?;
+        Database::set_user_version(&conn, 21)?;
+
+        Database::apply_schema_migrations_on_conn(&conn)?;
+
+        assert_eq!(Database::get_user_version(&conn)?, SCHEMA_VERSION);
+        let ports: Vec<i64> = conn
+            .prepare("SELECT listen_port FROM proxy_config ORDER BY app_type")?
+            .query_map([], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(ports, vec![25721, 12345, 25721, 25721]);
         Ok(())
     }
 }

@@ -19,6 +19,7 @@ export type AppType =
 
 /** Skill 应用启用状态 */
 export interface SkillApps {
+  workbuddy?: boolean;
   claude: boolean;
   "claude-desktop"?: boolean;
   codex: boolean;

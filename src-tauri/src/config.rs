@@ -13,7 +13,7 @@ use crate::error::AppError;
 /// - `dirs::home_dir()` 在 Windows 上使用 `SHGetKnownFolderPath(FOLDERID_Profile)`，
 ///   返回的是真实用户目录（类似 `C:\\Users\\Alice`），与 v3.10.2 行为一致。
 /// - 不要直接使用 `HOME` 环境变量：它可能由 Git/Cygwin/MSYS 等第三方工具注入，
-///   且不一定等于用户目录，可能导致 `.cc-switch/cc-switch.db` 路径变化，从而“看起来像数据丢失”。
+///   且不一定等于用户目录，可能导致 `.zhishu-ccs/cc-switch.db` 路径变化，从而“看起来像数据丢失”。
 ///
 /// ## 测试隔离
 ///
@@ -27,6 +27,17 @@ pub fn get_home_dir() -> PathBuf {
     dirs::home_dir().unwrap_or_else(|| {
         log::warn!("无法获取用户主目录，回退到当前目录");
         PathBuf::from(".")
+    })
+}
+
+/// The isolated development launcher sets this explicitly. Only CC Switch's
+/// application data and Codex are redirected; every other CLI keeps using the
+/// production user home.
+pub(crate) fn isolated_dev_home() -> Option<PathBuf> {
+    std::env::var_os("ZHISHU_CCS_DEV_HOME").map(|home| {
+        let path = PathBuf::from(home);
+        assert!(path.is_absolute(), "ZHISHU_CCS_DEV_HOME must be absolute");
+        path
     })
 }
 
@@ -309,16 +320,19 @@ pub fn get_claude_settings_path() -> PathBuf {
     settings
 }
 
-/// 获取应用配置目录路径 (~/.cc-switch)
+/// 获取应用配置目录路径 (~/.zhishu-ccs)
 pub fn get_app_config_dir() -> PathBuf {
+    if let Some(home) = isolated_dev_home() {
+        return home.join(".zhishu-ccs");
+    }
     if let Some(custom) = crate::app_store::get_app_config_dir_override() {
         return custom;
     }
 
-    let default_dir = get_home_dir().join(".cc-switch");
+    let default_dir = get_home_dir().join(".zhishu-ccs");
 
-    // 兼容 v3.10.3：当用户环境存在 `HOME` 且与真实用户目录不同，
-    // v3.10.3 可能在 `HOME/.cc-switch/` 下创建/使用了数据库。
+    // 当环境变量 `HOME` 与真实用户目录不同，仅在新的数据目录名下查找兼容数据库，
+    // 不回退到原版 CC Switch 的 `.cc-switch` 目录。
     // 这里仅在“默认位置没有数据库”时回退到旧位置，避免再次出现“供应商消失”问题，
     // 同时也避免新安装因为 `HOME` 被设置而写入非预期路径。
     //
@@ -338,10 +352,10 @@ pub fn get_app_config_dir() -> PathBuf {
             if let Ok(home_env) = std::env::var("HOME") {
                 let trimmed = home_env.trim();
                 if !trimmed.is_empty() {
-                    let legacy_dir = PathBuf::from(trimmed).join(".cc-switch");
+                    let legacy_dir = PathBuf::from(trimmed).join(".zhishu-ccs");
                     if legacy_dir.join("cc-switch.db").exists() {
                         log::info!(
-                            "Detected v3.10.3 legacy database at {}, using it instead of {}",
+                            "Detected alternate HOME database at {}, using it instead of {}",
                             legacy_dir.display(),
                             default_dir.display()
                         );
@@ -353,6 +367,15 @@ pub fn get_app_config_dir() -> PathBuf {
     }
 
     default_dir
+}
+
+/// Device-local CC Switch state. Unlike a user-configured app data override,
+/// this path must follow the isolated development home during `pnpm dev`.
+pub fn get_device_data_dir() -> PathBuf {
+    if let Some(home) = isolated_dev_home() {
+        return home.join(".zhishu-ccs");
+    }
+    get_home_dir().join(".zhishu-ccs")
 }
 
 /// 获取应用配置文件路径
@@ -590,6 +613,7 @@ pub(crate) fn stage_write(
 /// 失败时临时文件留在原处：写入引擎的 pending 指着它，下次恢复要靠它前滚（目标文件被
 /// 占用、只读这类失败，过后多半能补完）。只做一次性原子写的调用方自己删。
 pub(crate) fn commit_staged(tmp: &Path, path: &Path) -> Result<(), AppError> {
+    let history = crate::config_history::capture_before(path);
     #[cfg(windows)]
     {
         use std::os::windows::ffi::OsStrExt;
@@ -686,6 +710,9 @@ pub(crate) fn commit_staged(tmp: &Path, path: &Path) -> Result<(), AppError> {
             });
         }
     }
+    if let Some(history) = history {
+        history.finish(fs::read(path).ok());
+    }
     Ok(())
 }
 
@@ -705,6 +732,70 @@ mod tests {
         use std::sync::OnceLock;
         static LOCK: OnceLock<std::sync::Mutex<()>> = OnceLock::new();
         LOCK.get_or_init(|| std::sync::Mutex::new(()))
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn isolated_dev_only_redirects_app_and_codex_paths() {
+        struct RestoreEnv(Vec<(&'static str, Option<std::ffi::OsString>)>);
+        impl Drop for RestoreEnv {
+            fn drop(&mut self) {
+                for (key, value) in &self.0 {
+                    match value {
+                        Some(value) => std::env::set_var(key, value),
+                        None => std::env::remove_var(key),
+                    }
+                }
+                let _ = crate::settings::reload_settings();
+            }
+        }
+
+        let temp = tempfile::tempdir().unwrap();
+        let dev_home = temp.path().join("development");
+        let working_home = temp.path().join("working");
+        let working_codex = working_home.join(".codex");
+        fs::create_dir_all(&working_codex).unwrap();
+        let working_config = working_codex.join("config.toml");
+        fs::write(&working_config, "model = \"working\"\n").unwrap();
+        let _restore = RestoreEnv(
+            ["ZHISHU_CCS_DEV_HOME", "CC_SWITCH_TEST_HOME"]
+                .into_iter()
+                .map(|key| (key, std::env::var_os(key)))
+                .collect(),
+        );
+        std::env::set_var("CC_SWITCH_TEST_HOME", &working_home);
+        std::env::set_var("ZHISHU_CCS_DEV_HOME", &dev_home);
+        crate::settings::reload_settings().unwrap();
+        crate::settings::update_settings(crate::settings::AppSettings {
+            codex_config_dir: Some(working_codex.to_string_lossy().into_owned()),
+            ..Default::default()
+        })
+        .unwrap();
+
+        assert_eq!(get_home_dir(), working_home);
+        assert_eq!(get_app_config_dir(), dev_home.join(".zhishu-ccs"));
+        assert_eq!(get_device_data_dir(), dev_home.join(".zhishu-ccs"));
+        assert_eq!(get_claude_config_dir(), working_home.join(".claude"));
+        assert_eq!(
+            crate::gemini_config::get_gemini_dir(),
+            working_home.join(".gemini")
+        );
+        assert_eq!(
+            crate::codex_config::get_codex_config_dir(),
+            dev_home.join(".codex")
+        );
+        write_text_file_private(
+            &crate::codex_config::get_codex_config_path(),
+            "model = \"testing\"\n",
+        )
+        .unwrap();
+        assert_eq!(
+            fs::read_to_string(working_config).unwrap(),
+            "model = \"working\"\n"
+        );
+        std::env::remove_var("ZHISHU_CCS_DEV_HOME");
+        assert_eq!(get_app_config_dir(), working_home.join(".zhishu-ccs"));
+        assert_eq!(get_device_data_dir(), working_home.join(".zhishu-ccs"));
     }
 
     fn assert_atomic_write_replaces_existing_file(dir: &Path) {
@@ -1010,7 +1101,7 @@ mod tests {
     /// 回归：`CC_SWITCH_TEST_HOME` 必须盖过 v3.10.3 的 `HOME` 兼容回退。
     ///
     /// Windows 上回退只看"默认位置有没有 cc-switch.db"，而测试临时目录里通常没有，
-    /// 于是会被引向 `HOME/.cc-switch`——runner 的 HOME 下往往真有一份 db，测试就此
+    /// 于是会被引向 `HOME/.zhishu-ccs`——runner 的 HOME 下往往真有一份 db，测试就此
     /// 读写到真实用户数据（既污染用户库，又让断言读到别人写下的状态）。
     #[cfg(windows)]
     #[test]
@@ -1023,7 +1114,7 @@ mod tests {
 
         // 假装 HOME 指向另一处，并且那里有一份 db——正是会触发回退的形状
         let legacy_home = tempfile::tempdir().expect("tempdir");
-        let legacy_dir = legacy_home.path().join(".cc-switch");
+        let legacy_dir = legacy_home.path().join(".zhishu-ccs");
         std::fs::create_dir_all(&legacy_dir).expect("create legacy dir");
         std::fs::write(legacy_dir.join("cc-switch.db"), b"legacy").expect("seed legacy db");
 
@@ -1045,7 +1136,7 @@ mod tests {
             None => std::env::remove_var("HOME"),
         }
 
-        let expected = test_home.path().join(".cc-switch");
+        let expected = test_home.path().join(".zhishu-ccs");
         assert_eq!(
             dir, expected,
             "测试 home 优先：不得回退到 HOME 下的旧库目录"
@@ -1065,7 +1156,11 @@ pub fn copy_file(from: &Path, to: &Path) -> Result<(), AppError> {
 /// 删除文件
 pub fn delete_file(path: &Path) -> Result<(), AppError> {
     if path.exists() {
+        let history = crate::config_history::capture_before(path);
         fs::remove_file(path).map_err(|e| AppError::io(path, e))?;
+        if let Some(history) = history {
+            history.finish(None);
+        }
     }
     Ok(())
 }

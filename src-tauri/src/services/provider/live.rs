@@ -30,6 +30,9 @@ pub(crate) fn provider_exists_in_live_config(
         AppType::Hermes => crate::hermes_config::get_providers()
             .map(|providers| providers.contains_key(provider_id)),
         AppType::Pi => crate::pi_config::pi_provider_exists(provider_id),
+        // WorkBuddy groups several native model entries under one provider. The
+        // provider ID is a cc-switch identity and is not stored in models.json.
+        AppType::WorkBuddy => Ok(false),
         AppType::Kimi => {
             crate::kimi_config::get_providers().map(|providers| providers.contains_key(provider_id))
         }
@@ -304,6 +307,7 @@ fn settings_contain_common_config(app_type: &AppType, settings: &Value, snippet:
         | AppType::OpenClaw
         | AppType::Hermes
         | AppType::Pi
+        | AppType::WorkBuddy
         | AppType::Mcode
         | AppType::Kimi
         | AppType::Agy
@@ -383,6 +387,7 @@ pub(crate) fn remove_common_config_from_settings(
         | AppType::OpenClaw
         | AppType::Hermes
         | AppType::Pi
+        | AppType::WorkBuddy
         | AppType::Mcode
         | AppType::Kimi
         | AppType::ClaudeDesktop
@@ -537,194 +542,202 @@ pub(crate) fn codex_managed_oauth_live_auth(
 
 /// Write live configuration snapshot for a provider
 pub(crate) fn write_live_snapshot(app_type: &AppType, provider: &Provider) -> Result<(), AppError> {
-    match app_type {
-        AppType::Claude => {
-            return Err(AppError::localized(
-                "claude.live.requires_engine",
-                "Claude Code 配置只能经关键字段写入流程写入",
-                "Claude Code configuration must be written through the key-field write flow",
-            ));
-        }
-        AppType::ClaudeDesktop => {
-            return Err(AppError::localized(
-                "claude_desktop.live.requires_db_context",
-                "Claude Desktop 配置写入需要通过供应商切换流程执行",
-                "Claude Desktop configuration must be written through the provider switch flow",
-            ));
-        }
-        AppType::Codex => {
-            return Err(AppError::localized(
-                "codex.live.requires_engine",
-                "Codex 配置只能经关键字段写入流程写入",
-                "Codex configuration must be written through the key-field write flow",
-            ));
-        }
-        AppType::Gemini => {
-            return Err(AppError::localized(
-                "gemini.live.requires_engine",
-                "Gemini CLI 配置只能经关键字段写入流程写入",
-                "Gemini CLI configuration must be written through the key-field write flow",
-            ));
-        }
-        AppType::GrokBuild => {
-            return Err(AppError::localized(
-                "grokbuild.live.requires_engine",
-                "Grok Build 配置只能经关键字段写入流程写入",
-                "Grok Build configuration must be written through the key-field write flow",
-            ));
-        }
-        AppType::OpenCode => {
-            // OpenCode uses additive mode - write provider to config
-            use crate::opencode_config;
-            use crate::provider::{OpenCodeConfigFormat, OpenCodeProviderConfig};
-            use serde::Deserialize;
-
-            // Native declarations may rely on a built-in definition without a package:
-            // a stored override must stay re-addable after removal from live. The UI
-            // still requires a definition for a new or renamed ID, as it does for V1.
-            let (config_to_write, format) = opencode_config::provider_fragment(
-                &provider.id,
-                &provider.settings_config,
-                provider.opencode_config_format(),
-            )?;
-            if format == OpenCodeConfigFormat::V2 {
-                return opencode_config::set_provider_with_format(
-                    &provider.id,
-                    config_to_write.clone(),
-                    format,
-                );
-            }
-
-            // A new ID cannot inherit an existing provider's built-in definition.
-            // Check at the write boundary as well as in the UI, including old copies.
-            let has_npm = config_to_write
-                .get("npm")
-                .and_then(Value::as_str)
-                .is_some_and(|npm| !npm.trim().is_empty());
-            let has_models = config_to_write
-                .get("models")
-                .and_then(Value::as_object)
-                .is_some_and(|models| !models.is_empty());
-            if (!has_npm || !has_models)
-                && !opencode_config::get_providers()?.contains_key(&provider.id)
-            {
+    crate::config_history::with_audit_context(app_type.as_str(), "apply", || {
+        match app_type {
+            AppType::Claude => {
                 return Err(AppError::localized(
+                    "claude.live.requires_engine",
+                    "Claude Code 配置只能经关键字段写入流程写入",
+                    "Claude Code configuration must be written through the key-field write flow",
+                ));
+            }
+            AppType::ClaudeDesktop => {
+                return Err(AppError::localized(
+                    "claude_desktop.live.requires_db_context",
+                    "Claude Desktop 配置写入需要通过供应商切换流程执行",
+                    "Claude Desktop configuration must be written through the provider switch flow",
+                ));
+            }
+            AppType::Codex => {
+                return Err(AppError::localized(
+                    "codex.live.requires_engine",
+                    "Codex 配置只能经关键字段写入流程写入",
+                    "Codex configuration must be written through the key-field write flow",
+                ));
+            }
+            AppType::Gemini => {
+                return Err(AppError::localized(
+                    "gemini.live.requires_engine",
+                    "Gemini CLI 配置只能经关键字段写入流程写入",
+                    "Gemini CLI configuration must be written through the key-field write flow",
+                ));
+            }
+            AppType::GrokBuild => {
+                return Err(AppError::localized(
+                    "grokbuild.live.requires_engine",
+                    "Grok Build 配置只能经关键字段写入流程写入",
+                    "Grok Build configuration must be written through the key-field write flow",
+                ));
+            }
+            AppType::OpenCode => {
+                // OpenCode uses additive mode - write provider to config
+                use crate::opencode_config;
+                use crate::provider::{OpenCodeConfigFormat, OpenCodeProviderConfig};
+                use serde::Deserialize;
+
+                // Native declarations may rely on a built-in definition without a package:
+                // a stored override must stay re-addable after removal from live. The UI
+                // still requires a definition for a new or renamed ID, as it does for V1.
+                let (config_to_write, format) = opencode_config::provider_fragment(
+                    &provider.id,
+                    &provider.settings_config,
+                    provider.opencode_config_format(),
+                )?;
+                if format == OpenCodeConfigFormat::V2 {
+                    return opencode_config::set_provider_with_format(
+                        &provider.id,
+                        config_to_write.clone(),
+                        format,
+                    );
+                }
+
+                // A new ID cannot inherit an existing provider's built-in definition.
+                // Check at the write boundary as well as in the UI, including old copies.
+                let has_npm = config_to_write
+                    .get("npm")
+                    .and_then(Value::as_str)
+                    .is_some_and(|npm| !npm.trim().is_empty());
+                let has_models = config_to_write
+                    .get("models")
+                    .and_then(Value::as_object)
+                    .is_some_and(|models| !models.is_empty());
+                if (!has_npm || !has_models)
+                    && !opencode_config::get_providers()?.contains_key(&provider.id)
+                {
+                    return Err(AppError::localized(
                     "provider.opencode.custom_definition_required",
                     "新的 OpenCode 供应商标识需要填写 npm 包和至少一个模型；只有配置中已有的同名供应商可以沿用默认定义",
                     "A new OpenCode provider ID requires an npm package and at least one model; only an existing ID in the live config may inherit defaults",
                 ));
-            }
-
-            // Validate with the existing type, but persist the original fragment:
-            // the type does not describe every OpenCode provider/model field.
-            let opencode_config_result = OpenCodeProviderConfig::deserialize(config_to_write);
-
-            match opencode_config_result {
-                Ok(_) => {
-                    opencode_config::set_provider_with_format(
-                        &provider.id,
-                        config_to_write.clone(),
-                        format,
-                    )?;
-                    log::info!("OpenCode provider '{}' written to live config", provider.id);
                 }
-                Err(e) => {
-                    log::warn!(
-                        "Failed to parse OpenCode provider config for '{}': {}",
-                        provider.id,
-                        e
-                    );
-                    // Only write if config looks like a valid provider fragment
-                    if config_to_write.get("npm").is_some()
-                        || config_to_write.get("options").is_some()
-                    {
+
+                // Validate with the existing type, but persist the original fragment:
+                // the type does not describe every OpenCode provider/model field.
+                let opencode_config_result = OpenCodeProviderConfig::deserialize(config_to_write);
+
+                match opencode_config_result {
+                    Ok(_) => {
                         opencode_config::set_provider_with_format(
                             &provider.id,
                             config_to_write.clone(),
                             format,
                         )?;
-                        log::info!(
-                            "OpenCode provider '{}' written as raw JSON to live config",
-                            provider.id
+                        log::info!("OpenCode provider '{}' written to live config", provider.id);
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            "Failed to parse OpenCode provider config for '{}': {}",
+                            provider.id,
+                            e
                         );
-                    } else {
-                        return Err(AppError::Message(format!(
+                        // Only write if config looks like a valid provider fragment
+                        if config_to_write.get("npm").is_some()
+                            || config_to_write.get("options").is_some()
+                        {
+                            opencode_config::set_provider_with_format(
+                                &provider.id,
+                                config_to_write.clone(),
+                                format,
+                            )?;
+                            log::info!(
+                                "OpenCode provider '{}' written as raw JSON to live config",
+                                provider.id
+                            );
+                        } else {
+                            return Err(AppError::Message(format!(
                             "OpenCode provider '{}' has invalid config structure for live config (must contain 'npm' or 'options')",
                             provider.id
                         )));
+                        }
                     }
                 }
             }
-        }
-        AppType::OpenClaw => {
-            // OpenClaw uses additive mode - write provider to config
-            use crate::openclaw_config;
-            use crate::openclaw_config::OpenClawProviderConfig;
+            AppType::OpenClaw => {
+                // OpenClaw uses additive mode - write provider to config
+                use crate::openclaw_config;
+                use crate::openclaw_config::OpenClawProviderConfig;
 
-            // Convert settings_config to OpenClawProviderConfig
-            let openclaw_config_result =
-                serde_json::from_value::<OpenClawProviderConfig>(provider.settings_config.clone());
+                // Convert settings_config to OpenClawProviderConfig
+                let openclaw_config_result = serde_json::from_value::<OpenClawProviderConfig>(
+                    provider.settings_config.clone(),
+                );
 
-            match openclaw_config_result {
-                Ok(config) => {
-                    openclaw_config::set_typed_provider(&provider.id, &config)?;
-                    log::info!("OpenClaw provider '{}' written to live config", provider.id);
-                }
-                Err(e) => {
-                    log::warn!(
-                        "Failed to parse OpenClaw provider config for '{}': {}",
-                        provider.id,
-                        e
-                    );
-                    // Try to write as raw JSON if it looks valid
-                    if provider.settings_config.get("baseUrl").is_some()
-                        || provider.settings_config.get("api").is_some()
-                        || provider.settings_config.get("models").is_some()
-                    {
-                        openclaw_config::set_provider(
-                            &provider.id,
-                            provider.settings_config.clone(),
-                        )?;
-                        log::info!(
-                            "OpenClaw provider '{}' written as raw JSON to live config",
-                            provider.id
+                match openclaw_config_result {
+                    Ok(config) => {
+                        openclaw_config::set_typed_provider(&provider.id, &config)?;
+                        log::info!("OpenClaw provider '{}' written to live config", provider.id);
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            "Failed to parse OpenClaw provider config for '{}': {}",
+                            provider.id,
+                            e
                         );
-                    } else {
-                        return Err(AppError::Message(format!(
+                        // Try to write as raw JSON if it looks valid
+                        if provider.settings_config.get("baseUrl").is_some()
+                            || provider.settings_config.get("api").is_some()
+                            || provider.settings_config.get("models").is_some()
+                        {
+                            openclaw_config::set_provider(
+                                &provider.id,
+                                provider.settings_config.clone(),
+                            )?;
+                            log::info!(
+                                "OpenClaw provider '{}' written as raw JSON to live config",
+                                provider.id
+                            );
+                        } else {
+                            return Err(AppError::Message(format!(
                             "OpenClaw provider '{}' has invalid config structure for live config (must contain 'baseUrl', 'api', or 'models')",
                             provider.id
                         )));
+                        }
                     }
                 }
             }
+            AppType::Hermes => {
+                crate::hermes_config::set_provider(&provider.id, provider.settings_config.clone())?;
+                log::debug!("Hermes provider '{}' written to live config", provider.id);
+            }
+            AppType::Kimi => {
+                crate::kimi_config::set_provider(&provider.id, provider.settings_config.clone())?
+            }
+            AppType::Mcode => {
+                crate::mcode_config::set_provider(&provider.id, provider.settings_config.clone())?
+            }
+            AppType::Pi => {
+                return Err(AppError::InvalidInput(
+                    "Pi providers use the Pi provider service".to_string(),
+                ));
+            }
+            AppType::WorkBuddy => {
+                return Err(AppError::InvalidInput(
+                    "WorkBuddy providers use the WorkBuddy provider service".to_string(),
+                ));
+            }
+            AppType::Agy => {
+                return Err(AppError::Config(
+                    "Antigravity configuration requires the provider switch flow".into(),
+                ));
+            }
+            AppType::Omp => {
+                return Err(AppError::InvalidInput(
+                    "Oh My Pi providers use the Oh My Pi provider service".to_string(),
+                ));
+            }
         }
-        AppType::Hermes => {
-            crate::hermes_config::set_provider(&provider.id, provider.settings_config.clone())?;
-            log::debug!("Hermes provider '{}' written to live config", provider.id);
-        }
-        AppType::Kimi => {
-            crate::kimi_config::set_provider(&provider.id, provider.settings_config.clone())?
-        }
-        AppType::Mcode => {
-            crate::mcode_config::set_provider(&provider.id, provider.settings_config.clone())?
-        }
-        AppType::Pi => {
-            return Err(AppError::InvalidInput(
-                "Pi providers use the Pi provider service".to_string(),
-            ));
-        }
-        AppType::Agy => {
-            return Err(AppError::Config(
-                "Antigravity configuration requires the provider switch flow".into(),
-            ));
-        }
-        AppType::Omp => {
-            return Err(AppError::InvalidInput(
-                "Oh My Pi providers use the Oh My Pi provider service".to_string(),
-            ));
-        }
-    }
-    Ok(())
+        Ok(())
+    })
 }
 
 /// Sync all providers to live configuration (for additive mode apps)
@@ -765,6 +778,9 @@ pub(crate) fn sync_additive_app_to_live(
     state: &AppState,
     app_type: &AppType,
 ) -> Result<(), AppError> {
+    if matches!(app_type, AppType::WorkBuddy) {
+        return Ok(());
+    }
     sync_all_providers_to_live(state, app_type)?;
 
     // 本函数语义是"把这个应用同步到 live"，MCP 重投影也只针对该应用；
@@ -855,7 +871,7 @@ pub fn sync_current_to_live(state: &AppState) -> Result<(), AppError> {
     for app_type in AppType::all() {
         if matches!(
             app_type,
-            AppType::Pi | AppType::Mcode | AppType::Kimi | AppType::Omp
+            AppType::Pi | AppType::WorkBuddy | AppType::Mcode | AppType::Kimi | AppType::Omp
         ) {
             continue;
         }
@@ -1016,6 +1032,9 @@ pub fn read_live_settings(app_type: AppType) -> Result<Value, AppError> {
         AppType::Pi => Err(AppError::InvalidInput(
             "Pi providers are read from Pi's native models file".to_string(),
         )),
+        AppType::WorkBuddy => Err(AppError::InvalidInput(
+            "WorkBuddy providers are read from WorkBuddy's native models file".to_string(),
+        )),
         AppType::Agy => crate::agy_config::read_live_settings(),
         AppType::Omp => Err(AppError::InvalidInput(
             "Oh My Pi providers are read from Oh My Pi's native models file".to_string(),
@@ -1138,6 +1157,7 @@ pub fn import_default_config(state: &AppState, app_type: AppType) -> Result<bool
         | AppType::OpenClaw
         | AppType::Hermes
         | AppType::Pi
+        | AppType::WorkBuddy
         | AppType::Mcode
         | AppType::Kimi
         | AppType::Omp => {

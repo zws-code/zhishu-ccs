@@ -12,6 +12,7 @@ import {
   Folder,
   FolderOpen,
   Globe,
+  History,
   Info,
   Loader2,
   Route,
@@ -34,6 +35,7 @@ import { AppPageHeader } from "@/components/shell/AppPageHeader";
 import { DirectoryInput } from "@/components/settings/DirectorySettings";
 import { ImportExportSection } from "@/components/settings/ImportExportSection";
 import { BackupListSection } from "@/components/settings/BackupListSection";
+import { ConfigChangeHistoryPanel } from "@/zhishu/config-history/ConfigChangeHistoryPanel";
 import { WebdavSyncSection } from "@/components/settings/WebdavSyncSection";
 import { AboutSection } from "@/components/settings/AboutSection";
 import { RoutingSection } from "@/components/settings/sections/RoutingSection";
@@ -61,6 +63,7 @@ const SECTION_ICON: Record<
   routing: Route,
   network: Globe,
   data: Database,
+  configHistory: History,
   about: Info,
 };
 
@@ -520,6 +523,20 @@ export function SettingsPage({
               </div>
             </SettingsBlock>
           </>
+        );
+      case "configHistory":
+        return (
+          <SettingsBlock
+            title={t("settings.configHistory.title")}
+            help={{
+              title: t("settings.configHistory.title"),
+              body: t("settings.configHistory.description"),
+            }}
+          >
+            <div className="rounded-panel border border-border bg-surface p-5">
+              <ConfigChangeHistoryPanel />
+            </div>
+          </SettingsBlock>
         );
       case "about":
         return <AboutSection isPortable={isPortable} />;

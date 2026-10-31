@@ -153,6 +153,9 @@ vi.mock("@/components/settings/GlobalProxySettings", () => ({
 vi.mock("@/components/settings/CodexAuthSettings", () => ({
   CodexAuthSettings: () => <div>codex-auth-settings</div>,
 }));
+vi.mock("@/zhishu/config-history/ConfigChangeHistoryPanel", () => ({
+  ConfigChangeHistoryPanel: () => <div>config-change-history-panel</div>,
+}));
 
 const renderSettingsPage = (
   props?: Partial<ComponentProps<typeof SettingsPage>>,
@@ -218,6 +221,20 @@ describe("SettingsPage", () => {
       }),
     ).toBeInTheDocument();
     expect(screen.getByText("global-proxy-settings")).toBeInTheDocument();
+  });
+
+  it("renders the config change history as its own section", () => {
+    renderSettingsPage({ section: "configHistory" });
+
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "settings.sections.configHistory",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("config-change-history-panel"),
+    ).toBeInTheDocument();
   });
 
   it("saves general switches immediately and links to the Apps page", async () => {

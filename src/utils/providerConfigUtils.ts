@@ -1178,6 +1178,7 @@ export const extractProviderBaseUrl = (
     (isPlainObject(object.provider) ? object.provider.base_url : undefined) ||
     object.baseUrl ||
     object.base_url ||
+    object.url ||
     object.options?.baseURL ||
     (Array.isArray(object.models)
       ? object.models.find(

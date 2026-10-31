@@ -163,6 +163,15 @@ pub async fn get_config_status(
                 path,
             })
         }
+        AppType::WorkBuddy => {
+            let config_path = crate::workbuddy_config::get_workbuddy_models_path();
+            Ok(ConfigStatus {
+                exists: config_path.exists(),
+                path: crate::workbuddy_config::get_workbuddy_home()
+                    .to_string_lossy()
+                    .to_string(),
+            })
+        }
         AppType::Agy => {
             let dir = crate::agy_config::agy_dir();
             Ok(ConfigStatus {
@@ -204,6 +213,7 @@ pub async fn get_config_dir(app: String) -> Result<String, String> {
         AppType::OpenClaw => crate::openclaw_config::get_openclaw_dir(),
         AppType::Hermes => crate::hermes_config::get_hermes_dir(),
         AppType::Pi => crate::pi_config::get_pi_agent_dir().map_err(|e| e.to_string())?,
+        AppType::WorkBuddy => crate::workbuddy_config::get_workbuddy_home(),
         AppType::Kimi => crate::kimi_config::data_dir(),
         AppType::Omp => crate::omp_config::get_omp_agent_dir().map_err(|e| e.to_string())?,
         AppType::Mcode => crate::mcode_config::config_path()
@@ -230,6 +240,7 @@ pub async fn open_config_folder(handle: AppHandle, app: String) -> Result<bool, 
         AppType::OpenClaw => crate::openclaw_config::get_openclaw_dir(),
         AppType::Hermes => crate::hermes_config::get_hermes_dir(),
         AppType::Pi => crate::pi_config::get_pi_agent_dir().map_err(|e| e.to_string())?,
+        AppType::WorkBuddy => crate::workbuddy_config::get_workbuddy_home(),
         AppType::Kimi => crate::kimi_config::data_dir(),
         AppType::Omp => crate::omp_config::get_omp_agent_dir().map_err(|e| e.to_string())?,
         AppType::Mcode => crate::mcode_config::config_path()
