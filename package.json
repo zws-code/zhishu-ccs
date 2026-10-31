@@ -17,8 +17,10 @@
     "test:unit": "vitest run",
     "test:unit:watch": "vitest watch",
     "release:prepare": "node scripts/zhishu/prepare-release.mjs",
+    "release:tag": "node scripts/zhishu/tag-release.mjs",
+    "test:release-tag": "node --test scripts/zhishu/tag-release.test.mjs",
     "test:release-config": "node --test scripts/zhishu/release-config.test.mjs",
-    "test:release": "node --test scripts/zhishu/release-config.test.mjs scripts/zhishu/release-artifacts.test.mjs scripts/zhishu/cos-release.test.mjs scripts/zhishu/resume-release.test.mjs",
+    "test:release": "node --test scripts/zhishu/release-config.test.mjs scripts/zhishu/release-artifacts.test.mjs scripts/zhishu/cos-release.test.mjs scripts/zhishu/resume-release.test.mjs scripts/zhishu/tag-release.test.mjs",
     "release:check": "node scripts/zhishu/cos-release.mjs check",
     "test:release-cos": "python3 -B -m unittest discover -s scripts/zhishu -p 'test_publish_cos.py'"
   },
@@ -96,6 +98,7 @@
     "smol-toml": "^1.4.2",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
+    "yaml": "^2.8.1",
     "zod": "^4.1.12"
   }
 }
