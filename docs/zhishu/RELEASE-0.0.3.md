@@ -1,0 +1,83 @@
+# 0.0.3 发布与验证记录
+
+日期：2026-10-31（Asia/Shanghai）。状态：已正式发布。北京时间 **19:23** 完成 COS 稳定清单切换和 GitHub Release 发布，GitHub 标记 Latest。
+
+## 范围与实施说明
+
+- 用户要求正式发布 0.0.3，并启用 COS 国际/全球加速上传。
+- 业务基线：`abd1f3f9212af65c8b143a549e40877f518f5208`；相对 0.0.2 包含客户端专用 API、账号独立目录与清理退出、清理结果弹窗、模型搜索及详情滚动修复。
+- 上游基线：4.0.21 / `c4db63c60d2a1ddcb4bd9f81152b9c6126413659`，本次通过 merge-base 复核。本次不混入上游同步；0.0.2 记录中的恒定时间认证比较、代理自循环保护等待吸收项仍是已知风险，未宣称完成最新上游安全审计。
+- 复用既有 GitHub Actions、Tauri updater 签名、COS 不可变上传与稳定清单发布；平台业务继续复用 ProviderService、DAO、配置写入和恢复链路。
+- L1：统一 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 版本；Cargo 使用 `update --workspace --offline` 同步锁文件，仅改变本包版本。固定工具入口无法由新增 Adapter 替代。
+- L1：`.github/workflows/release.yml` 仅为 `refs/tags/v0.0.3` 强制启用 `COS_UPLOAD_ACCELERATE=true`，其余 ref 沿用仓库变量/default false；添加当前发布分支作为构建演练入口，分支推送不上传 COS。
+- L0：新增三条四语应用公告和本记录，更新补丁登记。保留用户原有未跟踪 `out/`。
+- 不改应用身份、生产更新地址、公钥、安装格式、数据库 schema 或凭据策略。发布矩阵仍为 macOS universal 与 Windows x64/ARM64 NSIS EXE，Linux 暂停。
+
+## 验收与风险
+
+完成标准：本地回归、GitHub 平台构建、签名/哈希验证、加速上传成功、两个稳定清单和 GitHub Release 一致，保留原 payload。
+
+上传加速继续使用既有 `cos.accelerate.myqcloud.com`，累计读取上限 3 GB（包含重试）；客户端仍用 COS 国内 HTTPS 更新/下载地址。只为本次版本启用，不修改后续发布的仓库变量。
+
+生产客户端 `/api/zhishu/v1/client/config` 返回 HTTP 200/code 0，未认证 `/account` 返回 401。仅检查公开端点，不代表真实登录、2FA、keyring、账号清理和实际 CLI 已验收。
+
+当前生产构建配置沿用平台 IP HTTP 地址、macOS adhoc（未公证）；Tauri 更新签名独立保留。Windows/macOS 实机安装升级、真实账户与 CLI 验收尚未完成，不能以编译成功代替。
+
+## 本次验证
+
+| 检查 | 本次结果 |
+| --- | --- |
+| `pnpm typecheck` / `pnpm format:check` | 通过 |
+| `pnpm test:unit` | 283 个文件、3613 项全部通过 |
+| `pnpm test:release` | 36 项通过 |
+| `pnpm test:release-cos` | 初轮 23 项、2 项因缺 SDK 跳过；临时 venv 安装固定 SDK 后 23 项全部通过 |
+| `pnpm build:renderer` | 通过，保留既有 chunk 等构建警告 |
+| 生产公开配置 `release:check v0.0.3` | 通过，未连接腾讯云 |
+| 工作流 YAML 解析 / `git diff --check` | 通过 |
+| `cargo fmt --check` | 通过 |
+| Rust 全量隔离回归 | 最终 4369 项单元测试 + 212 项集成测试通过，11 项忽略 |
+| `cargo clippy --offline --locked ... -- -D warnings` | 通过 |
+
+首轮全量 Rust 回归出现已记录的 OAuth keep-alive 测试 `replacement_closes_the_previous_keep_alive_connection` 的 `IncompleteMessage` 偶发失败（4368 项通过、1 项失败）；单项复测通过后，再次完整运行库与集成测试全部通过。测试使用独立 `CC_SWITCH_TEST_HOME` 临时目录，串行执行；未设置智能体 HOME/CODEX_HOME。
+
+候选提交：`e4a7771c6a1975f54daf193f16c377e168a40340`；GitHub 构建演练运行 `41194527102`，全部构建及签名/清单校验成功。分支演练不会上传 COS 或创建 Release。
+
+## EXCEPTION-RELEASE-003：实机验收延期
+
+2026-10-31，已向用户明确说明本次 Windows/macOS 实机安装升级未验收，以及 macOS 沿用 adhoc、未公证。用户答复「批准 直接发布」，批准在自动化回归、云端构建及签名校验通过后发布，并启用全球加速上传 COS。
+
+范围仅为本次 0.0.3 实机安装/升级验收延期；不免除签名、哈希、不可变产物、平台完整性与清单校验。责任人为本次发布维护者；实机升级检查继续作为后续发布前待办，不记为通过。
+
+GitHub 现存运行 `41193536620` 是旧 `codex/cos-validation` / `7e8b707` 的分支演练，包含旧 Linux 矩阵，与本次 0.0.3 无关。本次不取消或覆盖它，使用独立发布分支。
+
+## 恢复
+
+发布前可撤销准备提交；正式上传后保留 tag 和不可变版本目录。失败复用原签名 payload，重跑失败作业或使用恢复流程；代码修复发更高版本，不覆盖同版本、不降级稳定清单。两份稳定清单按顺序切换，不宣称跨对象事务。
+
+## 正式发布结果
+
+- 正式 tag `v0.0.3` 固定于 `ae43931716e63976c2c1fee343c0fbea3f9698a8`，未移动。
+- [正式运行 41195037726](https://github.com/zws-code/zhishu-ccs/actions/runs/41195037726) 全部作业成功，包括 COS 发布与独立 GitHub Release 作业。
+- [GitHub Release v0.0.3](https://github.com/zws-code/zhishu-ccs/releases/tag/v0.0.3) 已公开并标记 Latest，11 个上传附件（页面另计 2 个源码归档）。
+- 正式 payload artifact `13040568458`，163191545 字节，归档摘要 `sha256:5a66c026b8af47c54d8dba2132af841abc9fc9131ab2f9382fb68c283f966716`；保留至 2026-11-30，恢复时仍须核对实际未过期状态。
+- 正式上传步骤日志确认 `COS_UPLOAD_ACCELERATE: true`，19:22:49 前所有文件已完成对象校验，19:23:00 完成稳定清单发布。全球加速仅用于上传，客户端地址保持 COS 国内 HTTPS。
+- `latest.json` 和 `client-release.json` 均为 0.0.3，与版本目录中的对应文件逐字节一致；更新清单有 4 个平台键，网页清单有 4 个下载项。
+- 实际下载 COS 全部 10 个文件，大小与 SHA-256 全部匹配；3 个独立更新包使用生产公钥验签通过，生成的 4 个平台条目与在线清单一致。
+- 实际下载 GitHub 11 个附件（含 `release.json`），大小和 SHA-256 全部与 COS 原 payload 一致。
+- 已读取实际 macOS 更新包：版本 0.0.3、identifier `com.zhishu.ccswitch.desktop`，Intel/Apple Silicon 双架构，二进制内嵌生产 COS 更新地址及既有公钥。
+- 本次未执行实机安装/升级、真实 keyring/账号清理或 CLI 运行验收；按 EXCEPTION-RELEASE-003 保留待办。macOS adhoc 未公证，Windows Tauri 更新签名不等于系统代码签名。
+
+### 公网文件校验
+
+| 文件 | 字节数 | SHA-256 |
+| --- | ---: | --- |
+| `Zhishu-Ccs-v0.0.3-Windows-arm64.exe` | 12314681 | `1b8ecc604bdc2fdc09e27dd0d22c977f46a218fa5d36557b90d986f60a9d0e6f` |
+| `Zhishu-Ccs-v0.0.3-Windows-arm64.exe.sig` | 432 | `075b90c107c91b451b38ce548fa8b2d77c9c2d92c9459fabc64b8f4c93c97e13` |
+| `Zhishu-Ccs-v0.0.3-Windows.exe` | 13630359 | `43122631b1aeed86605dfb42fbfc2677c502ed4e2858dd73f2a6354d3f9fdec7` |
+| `Zhishu-Ccs-v0.0.3-Windows.exe.sig` | 428 | `bf9b967fae2d57ecd60220fd73803b31c2c7d79513d07fe87a58af96737b9437` |
+| `Zhishu-Ccs-v0.0.3-macOS.dmg` | 45598982 | `30eb94f3f90d0167154d049c89c9906dccee48ea2eb5bff784644c3e04e2e2ce` |
+| `Zhishu-Ccs-v0.0.3-macOS.tar.gz` | 46582086 | `5a5767190a61751870a049107559f275a907b1a36d9ae130038518bb9218d886` |
+| `Zhishu-Ccs-v0.0.3-macOS.tar.gz.sig` | 416 | `394ea8a573befc896584a99068d494010dcc1d400bb0050ff7bc57017e36936a` |
+| `Zhishu-Ccs-v0.0.3-macOS.zip` | 45675884 | `84b481a1ac969872d5a3d000660655a2e05001efe875a89c1dcedb08f26f74e9` |
+| `client-release.json` | 1596 | `463c213f7bca3877227e2d5595d42d43db057c8f96a2f3afcd1a6523573ef224` |
+| `latest.json` | 2558 | `c639f16b801bb8c46008a56b199c31487f235c333e2e43ad37879cbc43e05605` |

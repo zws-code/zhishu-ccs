@@ -14,7 +14,7 @@ CC Switch 的做法是让 Codex 始终连本机路由，仍以 Responses API 发
 
 这条链路主要分成四步：
 
-1. Codex 接管时，本地配置会被写成 `http://127.0.0.1:15721/v1`，并强制保持 `wire_api = "responses"`。
+1. Codex 接管时，本地配置会被写成 `http://127.0.0.1:25721/v1`，并强制保持 `wire_api = "responses"`。
 2. 供应商的上游格式 `anthropic` 会告诉路由：真实上游说的是 Anthropic Messages 协议。
 3. 路由把 `/responses` 改写到 `/v1/messages`，并把 Responses 请求体转换成 Anthropic 请求体。
 4. 上游返回后，路由再把 Anthropic 的 JSON 或 SSE 转回 Codex 能理解的 Responses JSON/SSE——推理内容、工具调用、图片都在转换范围内。
@@ -60,12 +60,12 @@ Codex 页签目前没有 Anthropic 内置预设，下面走「自定义配置」
 
 进入设置里的 `路由` 页面，展开 `本地路由`，完成两个开关：
 
-1. 打开 `路由总开关`，启动本地服务（首次开启会弹出一个说明确认框）。默认地址是 `127.0.0.1:15721`。
+1. 打开 `路由总开关`，启动本地服务（首次开启会弹出一个说明确认框）。默认地址是 `127.0.0.1:25721`。
 2. 在 `路由启用` 中打开 `Codex`。如果只想让 Codex 走路由，可以保持 Claude、Gemini 关闭。
 
 ![本地路由页面中启用 Codex 接管](../images/codex-claude-routing/04-local-route-codex-takeover.png)
 
-接管后，CC Switch 会把 Codex 的 live 配置指向本机路由（`base_url = http://127.0.0.1:15721/v1`），`auth.json` 里只有占位符。真实 Claude Key 仍保存在 CC Switch 的供应商配置里，由本地路由在转发时按你选的认证字段注入。
+接管后，CC Switch 会把 Codex 的 live 配置指向本机路由（`base_url = http://127.0.0.1:25721/v1`），`auth.json` 里只有占位符。真实 Claude Key 仍保存在 CC Switch 的供应商配置里，由本地路由在转发时按你选的认证字段注入。
 
 ## 第三步：切换供应商并重启 Codex
 
@@ -95,7 +95,7 @@ Codex 页签目前没有 Anthropic 内置预设，下面走「自定义配置」
 
 **Codex 报 404 或找不到 `/responses`**
 
-通常是没有开启 Codex 路由接管，或者你手动把网关的地址直接写给了 Codex——Anthropic 协议的上游没有 `/responses` 端点，这样一定 404。检查 `~/.codex/config.toml` 里当前 provider 的 `base_url` 是否指向 `http://127.0.0.1:15721/v1`。
+通常是没有开启 Codex 路由接管，或者你手动把网关的地址直接写给了 Codex——Anthropic 协议的上游没有 `/responses` 端点，这样一定 404。检查 `~/.codex/config.toml` 里当前 provider 的 `base_url` 是否指向 `http://127.0.0.1:25721/v1`。
 
 **上游返回 404（路由已开启）**
 

@@ -1,0 +1,8 @@
+# 架构决策记录（ADR）
+
+涉及 L3/L4、持久化数据、应用身份、签名及自动更新策略的变更必须建立 ADR。
+
+模板：背景、目标、候选方案、选择与理由、上游合并影响、风险、测试、迁移与回滚、批准状态、复审日期。
+
+- [ADR-0005：按账号保存基础数据与清理退出](ADR-0005-account-local-cleanup.md)
+- [ADR-0006：整理 zws 二开历史并移除 Harness 接入](ADR-0006-zws-history-without-harness.md)
