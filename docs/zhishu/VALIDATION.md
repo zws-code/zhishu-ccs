@@ -75,3 +75,17 @@ Rust 每次执行都设置独立临时 `CC_SWITCH_TEST_HOME`；没有启动生�
 未运行 Windows/macOS 实机 CLI、安装、升级、生产签名、真实凭据库和双应用共存回归；本次为源码修复，没有真实账号和发布环境的验证。
 Rust doctest 由仓库现有 `doctest = false` 禁用。
 日志位于 `/tmp/zhishu-review-*.log`。本轮没有提交、推送或发布，原有未跟踪 `out/` 保留。
+
+
+## 平台地址校验放宽（2026-10-31）
+
+范围：`src-tauri/src/zhishu/services/platform_auth.rs` 及其同文件测试、平台登录文档。复用现有登录、会话恢复、HTTP 客户端和 SessionStore；L0 自有模块调整，无新增上游补丁，未修改 IPC 参数、返回类型、数据库或 CLI 配置。
+
+| 检查 | 本次结果 |
+|---|---|
+| `cargo fmt --check --manifest-path src-tauri/Cargo.toml` | 通过 |
+| `CC_SWITCH_TEST_HOME="$(mktemp -d /tmp/zhishu-platform-url-test.XXXXXX)" cargo test --locked --offline --manifest-path src-tauri/Cargo.toml --lib zhishu::services::platform_auth::tests -- --test-threads=1` | 38 项通过；覆盖远程 HTTP、完整地址规范化、实际本机 HTTP 登录请求和会话记录，以及既有 2FA、刷新、恢复与退出回归 |
+| `pnpm test:unit tests/zhishu/lib/platformAuth.test.ts tests/zhishu/components/PlatformLogin.test.tsx` | 2 文件、31 项通过 |
+| `git diff --check` | 通过 |
+
+测试只使用本机模拟平台、临时目录和模拟凭据库。未运行全量测试、Clippy、前端类型检查或构建，也未进行真实平台登录、真实凭据库、Windows/Linux 与安装包验证。HTTP 明文传输及地址附带内容的清除行为见 [平台登录文档](platform-login.md)。

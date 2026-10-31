@@ -254,40 +254,23 @@ pub enum LoginResult {
     Requires2fa,
 }
 
-fn normalize_base_url_with_policy(
-    input: &str,
-    allow_remote_http: bool,
-) -> Result<String, PlatformAuthError> {
+fn normalize_base_url(input: &str) -> Result<String, PlatformAuthError> {
     let mut url =
         Url::parse(input.trim()).map_err(|_| error("INVALID_URL", "请输入有效的平台地址"))?;
-    let local = matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"));
-    let http_allowed = url.scheme() == "http" && (local || allow_remote_http);
-    if (url.scheme() != "https" && !http_allowed)
-        || url.host_str().is_none()
-        || !url.username().is_empty()
-        || url.password().is_some()
-        || url.query().is_some()
-        || url.fragment().is_some()
-    {
-        return Err(error(
-            "INVALID_URL",
-            "平台地址必须使用 HTTPS；本机开发可使用 HTTP，且地址不能包含账号、查询参数或片段",
-        ));
+    if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
+        return Err(error("INVALID_URL", "请输入有效的平台地址"));
     }
+    // 接受完整地址，但账号、查询参数和片段不属于平台 API 基址，也不应进入会话记录。
+    url.set_username("")
+        .map_err(|_| error("INVALID_URL", "请输入有效的平台地址"))?;
+    url.set_password(None)
+        .map_err(|_| error("INVALID_URL", "请输入有效的平台地址"))?;
+    url.set_query(None);
+    url.set_fragment(None);
     let path = url.path().trim_end_matches('/');
     let path = path.strip_suffix("/api/v1").unwrap_or(path).to_string();
     url.set_path(&path);
     Ok(url.to_string().trim_end_matches('/').to_string())
-}
-
-fn normalize_base_url(input: &str) -> Result<String, PlatformAuthError> {
-    normalize_base_url_with_policy(
-        input,
-        matches!(
-            option_env!("ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP"),
-            Some("true")
-        ),
-    )
 }
 
 pub(crate) fn client() -> Result<Client, PlatformAuthError> {
@@ -1439,26 +1422,43 @@ mod tests {
     }
 
     #[test]
-    fn rejects_insecure_remote_and_ambiguous_urls() {
-        for url in [
-            "http://example.com",
-            "file:///tmp/auth",
-            "https://user:pass@example.com",
-            "https://example.com/?token=secret",
-            "https://example.com/#login",
-            "localhost:3000",
-        ] {
-            assert!(normalize_base_url(url).is_err(), "accepted {url}");
+    fn allows_remote_http_without_release_configuration() {
+        for url in ["http://example.com", "http://192.168.10.20:3000"] {
+            assert_eq!(normalize_base_url(url).unwrap(), url);
         }
     }
 
     #[test]
-    fn allows_plain_http_only_when_release_configuration_opts_in() {
+    fn normalizes_urls_with_credentials_query_or_fragment() {
+        for url in [
+            "https://user:pass@example.com",
+            "https://user@example.com",
+            "https://:pass@example.com",
+            "https://example.com/?token=secret",
+            "https://example.com/#login",
+            "https://user:pass@example.com/api/v1/?token=secret#login",
+        ] {
+            assert_eq!(normalize_base_url(url).unwrap(), "https://example.com");
+        }
         assert_eq!(
-            normalize_base_url_with_policy("http://192.168.10.20:3000", true).unwrap(),
-            "http://192.168.10.20:3000"
+            normalize_base_url("http://user:pass@example.com/sub/api/v1/?token=secret#login")
+                .unwrap(),
+            "http://example.com/sub"
         );
-        assert!(normalize_base_url_with_policy("http://192.168.10.20:3000", false).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_platform_addresses() {
+        for url in [
+            "",
+            "not a url",
+            "http://",
+            "file:///tmp/auth",
+            "ftp://example.com",
+            "localhost:3000",
+        ] {
+            assert_eq!(normalize_base_url(url).unwrap_err().code, "INVALID_URL");
+        }
     }
 
     #[test]
@@ -2192,6 +2192,53 @@ mod tests {
         assert!(discovery.catalogs[0].models.is_empty());
         assert!(discovery.catalogs[0].catalog_error.is_some());
         assert!(discovery.failed_group_ids.contains(&42));
+        server.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn login_uses_and_persists_only_the_normalized_platform_base_url() {
+        let (base, server) = mock_server(vec![
+            (
+                "GET /sub/api/v1/settings/public ",
+                200,
+                json!({"code":0,"data":{}}),
+            ),
+            (
+                "POST /sub/api/v1/auth/login ",
+                200,
+                json!({"code":0,"data":{"access_token":"access-secret","refresh_token":"refresh-secret"}}),
+            ),
+            ("GET /sub/api/v1/auth/me |access-secret", 200, profile()),
+        ]);
+        let expected_base = format!("{base}/sub");
+        let (_dir, store, _vault) =
+            crate::zhishu::storage::platform_session::tests::saved_store(&expected_base, now())
+                .await;
+        store.clear().await.unwrap();
+        let state = Mutex::new(AuthState {
+            store: Some(store.clone()),
+            ..AuthState::default()
+        });
+        let mut input = Url::parse(&format!("{base}/sub/api/v1/?token=url-secret#login")).unwrap();
+        input.set_username("url-user").unwrap();
+        input.set_password(Some("url-password")).unwrap();
+        let result = login(
+            &state,
+            input.to_string(),
+            "test@example.com".into(),
+            "password".into(),
+            None,
+        )
+        .await
+        .unwrap();
+        let LoginResult::Authenticated { account, .. } = result else {
+            panic!("expected authenticated login");
+        };
+        assert_eq!(account.base_url, expected_base);
+        assert_eq!(
+            store.load().await.unwrap().unwrap().0.base_url,
+            expected_base
+        );
         server.join().unwrap();
     }
 
