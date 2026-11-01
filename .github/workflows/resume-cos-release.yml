@@ -41,7 +41,7 @@ jobs:
       tag: ${{ steps.source.outputs.tag }}
       run_id: ${{ steps.source.outputs.run_id }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: scripts
       - uses: actions/setup-node@v6

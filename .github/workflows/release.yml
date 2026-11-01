@@ -44,7 +44,7 @@ jobs:
       tag: ${{ steps.config.outputs.tag }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # 推 tag 时先快速检查摘要；后续配置预检也会核对源码版本与摘要
       - name: Require this version's summary
@@ -143,7 +143,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -446,7 +446,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -519,7 +519,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -901,7 +901,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout release manifest tools
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           sparse-checkout: scripts
 
