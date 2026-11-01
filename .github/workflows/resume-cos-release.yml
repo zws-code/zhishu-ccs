@@ -90,7 +90,7 @@ jobs:
           assert.deepEqual(JSON.parse(readFileSync('cos-payload/latest.json')).platforms, platforms);
           console.log('Original payload signatures verified');
           NODE
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Validate original payload checksums
