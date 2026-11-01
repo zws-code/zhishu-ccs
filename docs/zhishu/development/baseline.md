@@ -36,7 +36,7 @@
 ## 当前能力与已知边界
 
 - 平台 HTTP 只允许 `/api/zhishu/v1/client` 的八个方法/路径组合；Key 唯一来源为 `POST /access`。客户端不创建或撤销共享模型 Key。
-- 登录或恢复成功后尝试一次目录同步，再自动同步全部支持工具；手动本地同步只读取快照。前后端平台白名单为 13 个应用，包含 `workbuddy` 和 `dsh`，不包含 `agy`。定义见 `src/zhishu/models/platformConfig.ts` 与 Rust Adapter 的 `AGENTS`。
+- 登录或恢复成功后只尝试一次目录快照同步，不改写供应商列表；接入由用户确认的「接入到工具」向导（模式应用可逐应用选择直连/路由/聚合）或手动本地同步执行，手动本地同步只读取快照。前后端平台白名单为 13 个应用，包含 `workbuddy` 和 `dsh`，不包含 `agy`。定义见 `src/zhishu/models/platformConfig.ts` 与 Rust Adapter 的 `AGENTS`。
 - 平台登录允许 HTTP(S)，移除 URL 用户信息、查询和片段；HTTP 不是加密传输。生产构建地址检查与登录输入校验分别执行，HTTPS 证书校验及拒绝重定向仍保留。
 - 普通退出保留本机模型 Key；显式清理退出仅处理当前账号目录、托管供应商和本次会话，安全保留项及其他账号不删除。没有多活动会话或未验证离线入口。
 - 发布工作流构建 macOS universal 与 Windows x64/ARM64 NSIS EXE；Linux 暂停新包。操作入口见 [发布指南](../releases/README.md)，历史验签与例外见各版本记录。

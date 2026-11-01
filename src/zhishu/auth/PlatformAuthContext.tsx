@@ -21,7 +21,6 @@ import {
   type PlatformCatalog,
 } from "@/zhishu/api/platformModels";
 import { toast } from "@/lib/toast";
-import { refreshPlatformProviders } from "@/zhishu/integrations/ccswitch/platformProviders";
 import { platformCatalogKeys } from "@/zhishu/models/query/platformCatalogKeys";
 
 interface PlatformAuthContextValue {
@@ -44,7 +43,7 @@ const PlatformAuthContext = createContext<PlatformAuthContextValue | null>(
   null,
 );
 
-/** 管理平台账户、启动恢复和登录后的两阶段同步；前端只持有账户摘要，不持有登录令牌。 */
+/** 管理平台账户、启动恢复和登录后的目录快照；前端只持有账户摘要，不持有登录令牌。 */
 export function PlatformAuthProvider({ children }: { children: ReactNode }) {
   const [account, setAccount] = useState<PlatformAccount | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,10 +60,9 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
     useState<PlatformCleanupReport | null>(null);
   // 登录/退出/身份变化时递增；异步请求只允许更新自己所属会话，防止迟到响应重建旧缓存。
   const generation = useRef(0);
-  const [autoSyncing, setAutoSyncing] = useState(false);
   const [catalogSyncing, setCatalogSyncing] = useState(false);
   const [catalogSyncError, setCatalogSyncError] = useState("");
-  // 同一会话的自动同步和手动重试复用进行中的目录请求，避免重复创建或管理分组 Key。
+  // 同一会话的自动拉取和手动重试复用进行中的目录请求，避免重复请求。
   const catalogRequest = useRef<{
     generation: number;
     promise: Promise<PlatformCatalog>;
@@ -117,7 +115,8 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
     return promise;
   }, [queryClient]);
 
-  // 每次验证成功的登录或恢复只自动尝试一次：先拉平台目录，再同步全部工具；轮询不重复触发。
+  // 每次验证成功的登录或恢复只自动拉取一次平台目录快照（只读），不改写任何工具供应商。
+  // 供应商接入由用户在「接入工具」向导中确认后执行；轮询不会重复触发。
   useEffect(() => {
     if (!account) {
       autoSynced.current = null;
@@ -127,29 +126,15 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
     if (autoSynced.current === identity) return;
     autoSynced.current = identity;
     const current = generation.current;
-    setAutoSyncing(true);
     void (async () => {
       try {
         await syncCatalog();
-        if (current !== generation.current) return;
-        const result = await platformModelsApi.sync();
-        if (current !== generation.current) return;
-        await refreshPlatformProviders(queryClient);
-        if (current !== generation.current) return;
-        if (result.warnings.length) {
-          toast.warning(result.warnings[0]);
-        }
       } catch (cause) {
         if (current !== generation.current) return;
         toast.error(platformAuthError(cause));
-        void queryClient.invalidateQueries({
-          queryKey: ["configChangeHistory"],
-        });
-      } finally {
-        if (current === generation.current) setAutoSyncing(false);
       }
     })();
-  }, [account?.baseUrl, account?.user.id, syncCatalog, queryClient]);
+  }, [account?.baseUrl, account?.user.id, syncCatalog]);
 
   const refresh = useCallback(async () => {
     if (refreshing.current || endingSession.current) return;
@@ -168,7 +153,6 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
             previous.user.id !== next.user.id)
         ) {
           current = ++generation.current;
-          setAutoSyncing(false);
           setCatalogSyncing(false);
           setCatalogSyncError("");
           await queryClient.cancelQueries();
@@ -216,7 +200,6 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
       setCleanupResult(null);
       generation.current += 1;
       autoSynced.current = null;
-      setAutoSyncing(false);
       setCatalogSyncError("");
       accountRef.current = result.account;
       setRecoveryPending(false);
@@ -235,7 +218,6 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
     // 先阻断旧请求并清空账户缓存，再由 Rust 执行对应的退出流程。
     const current = ++generation.current;
     accountRef.current = null;
-    setAutoSyncing(false);
     setCatalogSyncing(false);
     setCatalogSyncError("");
     setRecoveryPending(false);
@@ -287,7 +269,7 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
         logoutAndClear,
         cleanupResult,
         dismissCleanupResult: () => setCleanupResult(null),
-        catalogSyncing: catalogSyncing || autoSyncing,
+        catalogSyncing,
         catalogSyncError,
         syncCatalog,
       }}

@@ -263,7 +263,7 @@ describe("shared platform base data", () => {
     expect(toast.success).not.toHaveBeenCalled();
   });
 
-  it("disables repeated deletion and both sync actions while deleting", async () => {
+  it("disables repeated deletion and catalog sync while deleting", async () => {
     vi.mocked(platformModelsApi.catalog).mockResolvedValue(snapshot);
     let finish!: (value: PlatformDeleteSummary) => void;
     vi.mocked(platformModelsApi.deleteProviders).mockReturnValue(
@@ -282,9 +282,6 @@ describe("shared platform base data", () => {
     expect(
       screen.getByRole("button", { name: "同步平台基础数据" }),
     ).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: "全部同步平台供应商" }),
-    ).toBeDisabled();
     fireEvent.click(pending);
     expect(platformModelsApi.deleteProviders).toHaveBeenCalledTimes(1);
     await act(async () => finish(deletionSummary));
@@ -300,36 +297,6 @@ describe("shared platform base data", () => {
     expect(
       screen.getByRole("button", { name: "同步平台基础数据" }),
     ).toBeEnabled();
-    expect(
-      screen.getByRole("button", { name: "全部同步平台供应商" }),
-    ).toBeEnabled();
-  });
-
-  it("disables deletion while local providers are syncing", async () => {
-    vi.mocked(platformModelsApi.catalog).mockResolvedValue(snapshot);
-    let finish!: (
-      value: Awaited<ReturnType<typeof platformModelsApi.sync>>,
-    ) => void;
-    vi.mocked(platformModelsApi.sync).mockReturnValue(
-      new Promise((resolve) => {
-        finish = resolve;
-      }),
-    );
-    renderPage();
-    await screen.findByText("Shared group");
-    fireEvent.click(screen.getByRole("button", { name: "全部同步平台供应商" }));
-    await screen.findByRole("button", { name: "正在同步平台供应商…" });
-    expect(
-      screen.getByRole("button", { name: "一键删除平台供应商" }),
-    ).toBeDisabled();
-    await act(async () =>
-      finish({ added: 1, removed: 0, skipped: 0, warnings: [] }),
-    );
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "一键删除平台供应商" }),
-      ).toBeEnabled(),
-    );
   });
 
   it("disables deletion during automatic catalog sync and while signed out", async () => {
@@ -420,39 +387,6 @@ describe("shared platform base data", () => {
     expect(
       screen.queryByRole("dialog", { name: "供应商删除结果" }),
     ).not.toBeInTheDocument();
-  });
-
-  it("syncs all apps from local data without fetching platform data or usage", async () => {
-    vi.mocked(platformModelsApi.catalog).mockResolvedValue(snapshot);
-    vi.mocked(platformModelsApi.sync).mockResolvedValue({
-      added: 2,
-      removed: 0,
-      skipped: 0,
-      warnings: [],
-    });
-    const { invalidate } = renderPage();
-    await screen.findByText("Shared group");
-    fireEvent.click(screen.getByRole("button", { name: "全部同步平台供应商" }));
-    await waitFor(() =>
-      expect(platformModelsApi.sync).toHaveBeenCalledWith(undefined),
-    );
-    await waitFor(() => expect(toast.success).toHaveBeenCalled());
-    expect(platformModelsApi.syncCatalog).not.toHaveBeenCalled();
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["providers"] });
-    expect(invalidate).toHaveBeenCalledWith({
-      queryKey: ["configChangeHistory"],
-    });
-    expect(invalidate).not.toHaveBeenCalledWith({
-      queryKey: ["platformUsage"],
-    });
-  });
-
-  it("disables all-app sync until a local catalog is available", async () => {
-    renderPage();
-    await screen.findByText("尚无当前账号的基础数据，请先点击上方按钮同步。");
-    expect(
-      screen.getByRole("button", { name: "全部同步平台供应商" }),
-    ).toBeDisabled();
   });
 
   it("reads saved data on entry and only contacts the platform after a manual click", async () => {

@@ -2,6 +2,12 @@
 
 > 这是按基线/事件累积的补丁台账。222 项清单针对 2026-10-29 的 4.0.21 快照，后续变更按事件追加；旧路径、版本和分支描述仅适用于该段，不是当前 4.0.22 的完整重新统计。当前现状见 [代码基线](baseline.md)。
 
+## 2026-11-01：平台接入向导与语言包新增键
+
+复核 ZS-190（L1）：`src/i18n/locales/{zh,zh-TW,en,ja,tr}.json` 新增 `platformOnboarding.*` 键，并更新 `platformCatalog.description` / `platformCatalog.success` 文案，说明登录后不再自动写入供应商列表、改用「接入到工具」向导。共享语言包是运行时固定入口，新增文案无法只放在自有模块里；实现和接入逻辑在 `src/zhishu/onboarding/PlatformOnboarding.tsx`、`src/zhishu/auth/PlatformAuthContext.tsx` 与 `src/zhishu/models/components/PlatformCatalogPage.tsx`（均为自有文件）；`src/main.tsx` 仅新增 `PlatformOnboardingProvider` 包裹（L1 薄接线）。
+
+新增只读命令 `platform_preview_group_options({ agent })`（L2，自有模块 `zhishu/services/platform_models/mod.rs`），从本机快照列出某工具可用的分组，供接入向导选择分组；不写供应商、不联网。`src-tauri/src/lib.rs` 的 `generate_handler!` 仅新增这一行注册，属于上游薄接线；复用既有 `platform_sync_providers`、`switch_provider`、`set_proxy_takeover_for_app`、`set_proxy_stack_member` 和 `update_tray_menu`，未改 schema、凭据或存储。同时删除「全部同步平台供应商」入口和 `platform_sync_providers` 的 `agent: null` 分支，命令改为必须指定工具；各应用页的单工具同步按钮保留。语言包回归入口为 `tests/config/localeCoverage.test.ts`，接入向导回归为 `tests/zhishu/components/PlatformOnboarding.test.tsx`，Rust 分组预览用例在 `platform_models/mod.rs` 同文件测试。回退需删除新增键、命令和注册行，并恢复全部应用同步入口；不影响已保存的数据。
+
 ## 2026-11-01：macOS 发布 runner 迁移
 
 复核 ZS-003（L1）：`.github/workflows/release.yml` 的 `macos-binary` 和 `macos-release` 从 `macos-14` 固定迁移到 `macos-15`。GitHub 在退役前安排 macOS 14 brownout，2026-11-02 起停用该镜像，已导致 `v0.0.4` 的 macOS 作业无法启动；官方说明见 [runner-images #13518](https://github.com/actions/runner-images/issues/13518)。`runs-on` 是 Actions 调度入口，新增脚本或 Adapter 无法在作业启动前替换镜像，故必须修改既有工作流。

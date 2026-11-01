@@ -90,15 +90,11 @@ describe("platform synchronization IPC layers", () => {
     });
   });
 
-  it("keeps the Agent sync contract including the all-Agents scope", async () => {
+  it("keeps the Agent sync contract", async () => {
     await platformModelsApi.sync("codex");
     expect(invoke).toHaveBeenLastCalledWith("platform_sync_providers", {
       agent: "codex",
     });
-    await platformModelsApi.sync();
-    expect(invoke).toHaveBeenLastCalledWith("platform_sync_providers", {
-      agent: null,
-    });
-    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(invoke).toHaveBeenCalledTimes(1);
   });
 });

@@ -636,36 +636,29 @@ describe("platform login", () => {
 });
 
 describe("catalog sync after verified login", () => {
-  it("keeps the account usable when automatic provider sync fails", async () => {
+  it("does not attempt provider sync when catalog sync fails", async () => {
     vi.mocked(platformAuthApi.account).mockResolvedValue(account);
-    vi.mocked(platformModelsApi.sync).mockRejectedValue({
-      code: "CONFIG",
-      message: "工具配置失败",
+    vi.mocked(platformModelsApi.syncCatalog).mockRejectedValue({
+      code: "NETWORK",
+      message: "目录暂时不可用",
     });
     renderGate();
     await waitFor(() =>
-      expect(screen.getByTestId("catalog-status")).toHaveTextContent("idle"),
+      expect(toast.error).toHaveBeenCalledWith("目录暂时不可用"),
     );
-    expect(toast.error).toHaveBeenCalledWith("工具配置失败");
+    expect(platformModelsApi.sync).not.toHaveBeenCalled();
     expect(screen.getByText("工具主页")).toBeInTheDocument();
     expect(platformAuthApi.logout).not.toHaveBeenCalled();
   });
 
-  it("shows provider compatibility warnings only as a toast, not catalog errors", async () => {
+  it("does not write provider lists on restoration", async () => {
     vi.mocked(platformAuthApi.account).mockResolvedValue(account);
-    vi.mocked(platformModelsApi.sync).mockResolvedValue({
-      added: 1,
-      removed: 0,
-      skipped: 0,
-      warnings: ["Gemini CLI 不能使用该分组的 GPT/Claude 模型"],
-    });
     renderGate();
     await waitFor(() =>
-      expect(screen.getByTestId("catalog-status")).toHaveTextContent("idle"),
+      expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce(),
     );
-    expect(toast.warning).toHaveBeenCalledWith(
-      "Gemini CLI 不能使用该分组的 GPT/Claude 模型",
-    );
+    expect(platformModelsApi.sync).not.toHaveBeenCalled();
+    expect(toast.warning).not.toHaveBeenCalled();
     expect(screen.getByText("工具主页")).toBeInTheDocument();
   });
 
@@ -688,8 +681,7 @@ describe("catalog sync after verified login", () => {
       window.dispatchEvent(new Event("online"));
     });
     expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce();
-    expect(platformModelsApi.sync).toHaveBeenCalledOnce();
-    expect(platformModelsApi.sync).toHaveBeenCalledWith();
+    expect(platformModelsApi.sync).not.toHaveBeenCalled();
   });
   it("does not sync before the second authentication factor completes", async () => {
     vi.mocked(platformAuthApi.login).mockResolvedValue({

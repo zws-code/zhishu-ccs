@@ -1,15 +1,15 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Database, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { Database, Loader2, PlugZap, RefreshCw, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { AppPageHeader } from "@/components/shell/AppPageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetTrigger } from "@/components/ui/sheet";
-import { PlatformConnectButton } from "@/zhishu/models/components/PlatformConnectButton";
 import { PlatformCatalogDetails } from "@/zhishu/models/components/PlatformCatalogDetails";
 import { PlatformProviderDeletionDialog } from "@/zhishu/models/components/PlatformProviderDeletionDialog";
 import { usePlatformProviderDeletion } from "@/zhishu/models/usePlatformProviderDeletion";
 import { usePlatformAuth } from "@/zhishu/auth/PlatformAuthContext";
+import { usePlatformOnboarding } from "@/zhishu/onboarding/PlatformOnboarding";
 import { platformAuthError } from "@/zhishu/api/platformAuth";
 import { platformModelsApi } from "@/zhishu/api/platformModels";
 import {
@@ -34,6 +34,7 @@ function AccountCatalogPage() {
   const account = auth?.account;
   const queryClient = useQueryClient();
   const catalog = usePlatformCatalog();
+  const onboarding = usePlatformOnboarding();
   const deletion = usePlatformProviderDeletion(null, undefined, {
     notify: false,
   });
@@ -64,7 +65,7 @@ function AccountCatalogPage() {
         toast.success(
           t(
             "platformCatalog.success",
-            "平台基础数据已更新，请到各应用同步平台供应商",
+            "平台基础数据已更新，可用「接入到工具」应用到工具，或到各应用同步",
           ),
         );
       }
@@ -102,14 +103,25 @@ function AccountCatalogPage() {
                 ? t("platformCatalog.deletingProviders", "正在删除平台供应商…")
                 : t("platformCatalog.deleteProviders", "一键删除平台供应商")}
             </Button>
-            <PlatformConnectButton
-              disabled={
-                !data ||
-                deletion.pending ||
-                sync.isPending ||
-                auth?.catalogSyncing
-              }
-            />
+            {onboarding && (
+              <Button
+                variant="outline"
+                disabled={
+                  !data ||
+                  deletion.pending ||
+                  sync.isPending ||
+                  auth?.catalogSyncing
+                }
+                title={t(
+                  "platformOnboarding.buttonHint",
+                  "选择应用和接入方式，一次性创建平台供应商并完成接入",
+                )}
+                onClick={onboarding.open}
+              >
+                <PlugZap className="h-4 w-4" />
+                {t("platformOnboarding.button", "接入到工具")}
+              </Button>
+            )}
             <Button
               disabled={
                 !account ||
@@ -148,7 +160,7 @@ function AccountCatalogPage() {
           <p className="text-caption">
             {t(
               "platformCatalog.description",
-              "从智枢平台获取分组和模型目录，作为所有应用共用的基础数据。更新后，在各应用点击「同步平台供应商」生成本地供应商配置。",
+              "从智枢平台获取分组和模型目录，作为所有应用共用的基础数据。更新后，可用「接入到工具」一次性应用到已安装的应用，或在各应用单独同步。",
             )}
           </p>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-control bg-subtle px-3 py-2 text-caption">

@@ -24,7 +24,7 @@
 | 功能 | 前端 | Rust |
 | --- | --- | --- |
 | 平台登录、双重验证、会话 | `src/zhishu/auth/`、`src/zhishu/api/platformAuth.ts` | `src-tauri/src/zhishu/services/platform_auth.rs`、`src-tauri/src/zhishu/storage/platform_session.rs`、`platform_login_history.rs` |
-| 目录、订阅、供应商同步与删除 | `src/zhishu/models/`、`src/zhishu/api/platformModels.ts`、`platformUsage.ts` | `src-tauri/src/zhishu/services/platform_models/`、`platform_cleanup.rs`、`client_api.rs` |
+| 目录、订阅、供应商同步与删除 | `src/zhishu/models/`、`src/zhishu/onboarding/`、`src/zhishu/api/platformModels.ts`、`platformUsage.ts` | `src-tauri/src/zhishu/services/platform_models/`、`platform_cleanup.rs`、`client_api.rs` |
 | 上游能力适配 | `src/zhishu/integrations/ccswitch/` | `src-tauri/src/zhishu/integrations/ccswitch/` |
 | 配置历史、差异与还原 | `src/zhishu/config-history/` | `src-tauri/src/zhishu/storage/config_history.rs`、`src-tauri/src/zhishu/commands/config_history.rs` |
 | WorkBuddy | `src/zhishu/tools/workbuddy/` | `src-tauri/src/zhishu/integrations/ccswitch/workbuddy.rs`、`workbuddy_config.rs` |

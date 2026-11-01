@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { PlatformAuthProvider } from "@/zhishu/auth/PlatformAuthContext";
 import { PlatformAuthGate } from "@/zhishu/auth/PlatformLogin";
+import { PlatformOnboardingProvider } from "@/zhishu/onboarding/PlatformOnboarding";
 import { DatabaseUpgrade } from "./components/DatabaseUpgrade";
 import { UpdateProvider } from "./contexts/UpdateContext";
 import "./index.css";
@@ -143,7 +144,9 @@ async function bootstrap() {
                 <TooltipProvider delayDuration={0} skipDelayDuration={0}>
                   <PlatformAuthProvider>
                     <PlatformAuthGate>
-                      <App />
+                      <PlatformOnboardingProvider>
+                        <App />
+                      </PlatformOnboardingProvider>
                     </PlatformAuthGate>
                   </PlatformAuthProvider>
                 </TooltipProvider>

@@ -20,22 +20,18 @@ export function PlatformConnectButton({
   app,
   disabled = false,
 }: {
-  app?: AppId;
+  app: AppId;
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
   const auth = usePlatformAuth();
-  const captureScope = usePlatformOperationScope(auth?.account, app ?? "all");
+  const captureScope = usePlatformOperationScope(auth?.account, app);
   const queryClient = useQueryClient();
   const deleting = useIsMutating({ mutationKey: ["platformDeleteProviders"] });
   const sync = useMutation({
     mutationKey: ["platformSyncProviders"],
-    mutationFn: ({
-      agent,
-    }: {
-      agent: AppId | undefined;
-      isCurrent: () => boolean;
-    }) => platformModelsApi.sync(agent),
+    mutationFn: ({ agent }: { agent: AppId; isCurrent: () => boolean }) =>
+      platformModelsApi.sync(agent),
     onSuccess: async (result, { agent, isCurrent }) => {
       if (!isCurrent()) return;
       await refreshPlatformProviders(queryClient, agent);
@@ -84,7 +80,7 @@ export function PlatformConnectButton({
     },
   });
 
-  if (!auth?.account || (app && !PLATFORM_SYNC_APPS.has(app))) return null;
+  if (!auth?.account || !PLATFORM_SYNC_APPS.has(app)) return null;
 
   return (
     <Button
@@ -105,9 +101,7 @@ export function PlatformConnectButton({
       )}
       {sync.isPending
         ? t("platformCatalog.providersSyncing", "正在同步平台供应商…")
-        : app
-          ? t("platformCatalog.providersSync", "同步平台供应商")
-          : t("platformCatalog.providersSyncAll", "全部同步平台供应商")}
+        : t("platformCatalog.providersSync", "同步平台供应商")}
     </Button>
   );
 }

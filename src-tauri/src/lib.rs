@@ -1563,6 +1563,7 @@ pub fn run() {
             zhishu::commands::platform_delete_providers,
             zhishu::commands::platform_get_catalog,
             zhishu::commands::platform_get_catalog_key,
+            zhishu::commands::platform_preview_group_options,
             zhishu::commands::platform_sync_catalog,
             zhishu::commands::platform_logout,
             zhishu::commands::platform_logout_and_clear_account,

@@ -2,6 +2,24 @@
 
 > 本页保留各次任务的执行结果和未验证项；测试数量、代码路径、分支状态及临时资料均属于当时快照。本次文档整理没有重跑这些历史测试。当前行为以 [代码基线](../development/baseline.md)、功能说明和源码为准。
 
+## 平台接入向导重做（2026-11-01）
+
+范围：登录/会话恢复后不再自动调用 `platform_sync_providers`，只拉取一次平台目录快照；新增 `src/zhishu/onboarding/PlatformOnboarding.tsx`，在用户确认后对所选可见应用执行本地供应商同步；模式应用可选择分组（默认当前托管分组，否则目录首项），还可逐个选择直连、路由或聚合（聚合仅 Claude、Codex、Claude Desktop，进入聚合并把该应用全部平台供应商加入名单）；累加式应用不选分组，直接加入该应用的全部平台供应商。删除「全部同步平台供应商」入口，`platform_sync_providers` 改为必须指定工具；各应用页的单工具同步保留。新增只读命令 `platform_preview_group_options` 供向导列出模式应用可用分组。侵入等级 L2（新增自有命令与 `lib.rs` 一行注册；语言包新增键），无 schema、凭据或存储变更；实现复用既有 `platform_sync_providers`、`switch_provider`、`set_proxy_takeover_for_app`、`set_proxy_stack_member`、`update_tray_menu`。
+
+| 本次执行 | 结果 |
+|---|---|
+| `pnpm typecheck` | 通过 |
+| 修改源码与新增测试 Prettier | 通过；`pnpm format:check` 仍提示既有 `src/App.tsx` 未格式化，本次未改该文件 |
+| `vitest run tests/zhishu tests/config` | 53 文件、1269 项通过；含新增接入向导 7 项（分组选择、直连、路由、聚合、累加式全部添加、无可用模型、关闭后不自动打开）、登录目录同步回归 |
+| `pnpm test:unit` | 288 文件、3681 项通过 |
+| `pnpm build:renderer` | 通过；仅有既有 chunk 体积提示 |
+| `CC_SWITCH_TEST_HOME=<tmp> cargo test --lib ...group_options...` | 分组预览用例通过；完整 crate 编译包含新命令注册 |
+| `cargo fmt --check --manifest-path src-tauri/Cargo.toml` | 通过 |
+| `cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings` | 通过 |
+| `tests/config/localeCoverage.test.ts` | 五份语言包解析通过，新增键无缺失插值变量 |
+
+未执行：Rust 全量测试、真实平台 `/access`、真实 CLI 的直连/路由/聚合切换与安装升级验收。接入向导的安装检测依赖既有 `listToolInstallations`，未在 Windows/WSL、未安装工具或检测失败的真实环境中验收；登录后目录拉取失败时不会自动打开向导。聚合接入会调用既有 `set_proxy_takeover_for_app` / `set_proxy_stack_member`，未在真实代理运行、官方账号或多分组聚合场景下实测；分组预览只验证了单测，未接真实平台目录联调。
+
 ## DeepSeek 遗留分组补丁撤回（2026-10-31）
 
 用户确认撤回无效的 `deepseek-official` 分组特判，并保留供应商页“浏览目录”快捷入口。本次仅移除 `presetGroups.ts` 中一行二开代码，完整复用上游预设分组；DeepSeek API 和 DSH 账号登录分别沿用原有“模型厂商”和“账号登录”分类。侵入等级 L2 补丁撤回，补丁登记和本记录为 L0；无 IPC、数据库、凭据或 CLI 配置变更。

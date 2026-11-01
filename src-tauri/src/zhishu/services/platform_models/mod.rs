@@ -157,21 +157,74 @@ pub async fn platform_get_catalog_key(
     .await
 }
 
-/// 第二阶段：只用本机目录同步工具供应商，身份校验也不联网、不创建或撤销 Key。
-/// agent 为空表示全部已支持工具，保留既有 IPC 含义。
+/// 只读预览：当前账号目录中某个工具可用的分组。不写供应商、不联网。
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformGroupOption {
+    group_id: i64,
+    group_name: String,
+    platform: String,
+    model_count: usize,
+}
+
+fn group_options(
+    discovery: &GroupDiscovery,
+    app: &crate::app_config::AppType,
+) -> Vec<PlatformGroupOption> {
+    let mut options = Vec::new();
+    for catalog in &discovery.catalogs {
+        if catalog.catalog_error.is_some() {
+            continue;
+        }
+        let models = catalog::agent_models(
+            &catalog.credential.platform,
+            &catalog.models,
+            &[app.as_str()],
+        );
+        if models.is_empty() {
+            continue;
+        }
+        options.push(PlatformGroupOption {
+            group_id: catalog.group.id,
+            group_name: catalog.group.name.clone(),
+            platform: catalog.group.platform.clone(),
+            model_count: models.len(),
+        });
+    }
+    options
+}
+
+#[tauri::command]
+pub async fn platform_preview_group_options(
+    handle: tauri::AppHandle,
+    agent: String,
+) -> Result<Vec<PlatformGroupOption>, PlatformAuthError> {
+    let _operation = APPLY_LOCK.lock().await;
+    let app = adapter::app(&agent)?;
+    let store = base_data::CatalogStore::for_app(&handle)?;
+    let worker_handle = handle.clone();
+    let options = tauri::async_runtime::spawn_blocking(move || {
+        let auth = worker_handle.state::<PlatformAuthState>();
+        auth.with_local_identity_blocking(|origin, user_id| {
+            let cached = store
+                .read(origin, user_id)?
+                .ok_or_else(|| fail("CATALOG_REQUIRED", "请先同步当前账号的平台基础数据"))?;
+            Ok(group_options(&cached.discovery, &app))
+        })
+    })
+    .await
+    .map_err(|_| fail("CONFIG", "分组预览任务未能完成，请重试"))??;
+    Ok(options)
+}
+
+/// 第二阶段：只用本机目录同步指定工具的供应商，身份校验也不联网、不创建或撤销 Key。
 #[tauri::command]
 pub async fn platform_sync_providers(
     handle: tauri::AppHandle,
-    agent: Option<String>,
+    agent: String,
 ) -> Result<PlatformSyncSummary, PlatformAuthError> {
     let _operation = APPLY_LOCK.lock().await;
-    let apps = match agent.as_deref() {
-        Some(agent) => vec![adapter::app(agent)?],
-        None => adapter::AGENTS
-            .iter()
-            .map(|agent| adapter::app(agent))
-            .collect::<Result<Vec<_>, _>>()?,
-    };
+    let app = adapter::app(&agent)?;
     let store = base_data::CatalogStore::for_app(&handle)?;
     let worker_handle = handle.clone();
     // 适配器含同步 I/O 和切换锁的 block_on，必须放在阻塞线程；否则可能耗尽 Tokio
@@ -180,7 +233,7 @@ pub async fn platform_sync_providers(
         let state = worker_handle.state::<AppState>();
         let auth = worker_handle.state::<PlatformAuthState>();
         auth.with_local_identity_blocking(|origin, user_id| {
-            sync_account_providers(state.inner(), &apps, &store, origin, user_id)
+            sync_account_providers(state.inner(), &[app], &store, origin, user_id)
         })
     })
     .await?;
@@ -1561,6 +1614,25 @@ mod tests {
             subscription_group_ids,
             warnings: Vec::new(),
         }
+    }
+
+    #[test]
+    fn group_options_list_only_groups_with_models_for_the_agent() {
+        let group = crate::zhishu::services::platform_auth::AvailableGroup {
+            id: 42,
+            name: "Shared group".into(),
+            platform: "anthropic".into(),
+            status: "active".into(),
+            subscription_type: "standard".into(),
+        };
+        let discovery = test_discovery(vec![group]);
+
+        let options = group_options(&discovery, &crate::app_config::AppType::Claude);
+        assert_eq!(options.len(), 1);
+        assert_eq!(options[0].group_id, 42);
+        assert_eq!(options[0].group_name, "Shared group");
+        assert_eq!(options[0].model_count, 1);
+        assert!(group_options(&discovery, &crate::app_config::AppType::Gemini).is_empty());
     }
 
     #[test]

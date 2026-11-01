@@ -75,6 +75,14 @@ export interface PlatformCatalogModel {
   defaultReasoningLevel?: string | null;
 }
 
+/** 只读预览：当前账号目录中某个工具可用的分组；不写供应商、不联网。 */
+export interface PlatformGroupOption {
+  groupId: number;
+  groupName: string;
+  platform: string;
+  modelCount: number;
+}
+
 export const platformModelsApi = {
   // null 删除当前账户在全部已支持应用中的托管供应商。
   deleteProviders: (agent: AppId | null, baseUrl: string, userId: number) =>
@@ -94,8 +102,9 @@ export const platformModelsApi = {
     }),
   // 第一阶段通过客户端 access 接口更新目录，Key 生命周期由服务端管理；第二阶段仅按本机目录更新工具供应商。
   syncCatalog: () => invoke<PlatformCatalog>("platform_sync_catalog"),
-  sync: (agent?: AppId) =>
-    invoke<PlatformSyncSummary>("platform_sync_providers", {
-      agent: agent ?? null,
-    }),
+  // 只读预览：当前账号目录中某个工具可用的分组，不写供应商、不联网。
+  groupOptions: (agent: AppId) =>
+    invoke<PlatformGroupOption[]>("platform_preview_group_options", { agent }),
+  sync: (agent: AppId) =>
+    invoke<PlatformSyncSummary>("platform_sync_providers", { agent }),
 };
