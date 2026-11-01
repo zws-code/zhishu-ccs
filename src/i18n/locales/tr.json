@@ -5321,7 +5321,17 @@
     "restoreFailed": "Oturumunuz geri yüklenemedi",
     "restoreHint": "Bağlantınızı kontrol edin veya sistem kimlik bilgisi deposunun kilidini açıp yeniden deneyin. Kaydedilen oturumunuz korunur.",
     "retryRestore": "Oturumu geri yüklemeyi dene",
-    "sessionHint": "Yeniden başlatmalarda oturum açık kalır. 7 günden uzun süre kullanılmazsa yeniden giriş gerekir. Parolayı hatırla yalnızca bir sonraki girişte parolayı doldurur."
+    "oauthLogin": "Zhishu'ya giriş yap",
+    "oauthHint": "Tarayıcıda Zhishu yetkilendirme sayfası açılır. Onayladığınızda giriş otomatik tamamlanır.",
+    "oauthWaiting": "Tarayıcı yetkilendirmesi bekleniyor…",
+    "oauthCancel": "Yetkilendirmeyi iptal et",
+    "passwordLogin": "E-posta ve şifreyle giriş yap",
+    "backToOAuth": "Zhishu girişine dön",
+    "sessionHint": "Yeniden başlatmalarda oturum açık kalır. 7 günden uzun süre kullanılmazsa yeniden giriş gerekir. Parolayı hatırla yalnızca bir sonraki girişte parolayı doldurur.",
+    "advanced": "Gelişmiş ayarlar",
+    "showPassword": "Parolayı göster",
+    "hidePassword": "Parolayı gizle",
+    "or": "veya"
   },
   "clientQuota": {
     "noLimit": "Dönem sınırı ayarlanmamış",

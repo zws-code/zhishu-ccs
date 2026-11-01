@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 use tauri::{Manager, State};
-use tokio::sync::Mutex;
+use tokio::sync::{oneshot, Mutex};
 use url::Url;
 
 use crate::zhishu::services::platform_http_log::send_json;
@@ -127,6 +127,8 @@ struct AuthState {
     pending: Option<PendingLogin>,
     store: Option<SessionStore>,
     restoration_checked: bool,
+    // 浏览器授权等待期间持有；取消登录或流程结束时清除。
+    oauth_cancel: Option<oneshot::Sender<()>>,
 }
 
 #[derive(Deserialize)]
@@ -147,7 +149,7 @@ pub enum LoginResult {
     Requires2fa,
 }
 
-fn normalize_base_url(input: &str) -> Result<String, PlatformAuthError> {
+pub(crate) fn normalize_base_url(input: &str) -> Result<String, PlatformAuthError> {
     let mut url =
         Url::parse(input.trim()).map_err(|_| error("INVALID_URL", "请输入有效的平台地址"))?;
     if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
@@ -491,8 +493,45 @@ async fn login_2fa_with_preferences(
 pub async fn platform_cancel_login(
     state: State<'_, PlatformAuthState>,
 ) -> Result<(), PlatformAuthError> {
-    state.0.lock().await.pending = None;
+    let mut auth = state.0.lock().await;
+    auth.pending = None;
+    // 浏览器授权等待由独立通道取消；没有进行中的授权时为空操作。
+    if let Some(cancel) = auth.oauth_cancel.take() {
+        let _ = cancel.send(());
+    }
     Ok(())
+}
+
+/// 浏览器授权登录：配置校验、打开系统浏览器、等待回环回调并兑换令牌对。
+#[tauri::command]
+pub async fn platform_login_oauth(
+    handle: tauri::AppHandle,
+    state: State<'_, PlatformAuthState>,
+    base_url: String,
+) -> Result<LoginResult, PlatformAuthError> {
+    let _operation = crate::zhishu::services::platform_models::APPLY_LOCK
+        .lock()
+        .await;
+    let store_result = initialize_session_store(&state.0, &handle).await;
+    let (cancel, receiver) = oneshot::channel();
+    state.0.lock().await.oauth_cancel = Some(cancel);
+    let outcome = super::platform_oauth::login(&handle, base_url, receiver).await;
+    let mut auth = state.0.lock().await;
+    auth.oauth_cancel = None;
+    let (base, tokens) = outcome?;
+    auth.pending = None;
+    let client = client()?;
+    let mut result = finish_login(&mut auth, &client, base, tokens).await?;
+    if let Err(err) = store_result {
+        if let LoginResult::Authenticated {
+            persistence_warning,
+            ..
+        } = &mut result
+        {
+            *persistence_warning = Some(err.message);
+        }
+    }
+    Ok(result)
 }
 
 #[tauri::command]
@@ -559,7 +598,10 @@ async fn subscription_usage(
     })
 }
 
-async fn client_config(client: &Client, base: &str) -> Result<ClientConfig, PlatformAuthError> {
+pub(crate) async fn client_config(
+    client: &Client,
+    base: &str,
+) -> Result<ClientConfig, PlatformAuthError> {
     request::<ClientConfig>(client, base, Method::GET, "/config", None, None)
         .await?
         .validate(base)
@@ -1954,6 +1996,9 @@ mod tests {
         let mut value = config_response()["data"].clone();
         value["registration_enabled"] = json!(false);
         value["subscriptions_url"] = json!("javascript:alert(1)");
+        value["oauth_authorize_url"] = json!("https://portal.test/oauth/authorize");
+        value["oauth_client_id"] = json!(" zhishu-ccs ");
+        value["oauth_scopes"] = json!([" client ", ""]);
         let config: ClientConfig = serde_json::from_value(value).unwrap();
         let config = config.validate("https://platform.test/sub").unwrap();
         assert!(config.register_url.is_none());
@@ -1962,6 +2007,22 @@ mod tests {
             config.password_reset_url.as_deref(),
             Some("https://platform.test/forgot-password")
         );
+        assert_eq!(
+            config.oauth_authorize_url.as_deref(),
+            Some("https://portal.test/oauth/authorize")
+        );
+        assert_eq!(config.oauth_client_id, "zhishu-ccs");
+        assert_eq!(config.oauth_scopes, vec!["client"]);
+    }
+
+    #[test]
+    fn legacy_config_without_oauth_fields_still_parses() {
+        let config: ClientConfig =
+            serde_json::from_value(config_response()["data"].clone()).unwrap();
+        let config = config.validate("https://platform.test").unwrap();
+        assert!(config.oauth_authorize_url.is_none());
+        assert!(config.oauth_client_id.is_empty());
+        assert!(config.oauth_scopes.is_empty());
     }
     #[tokio::test]
     async fn successful_empty_access_and_usage_are_valid_snapshots() {

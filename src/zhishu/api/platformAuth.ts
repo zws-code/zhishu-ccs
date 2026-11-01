@@ -41,6 +41,10 @@ export interface PlatformClientConfig {
   turnstile_enabled: boolean;
   tencent_captcha_enabled: boolean;
   aliyun_captcha_enabled: boolean;
+  // 旧服务端可能没有浏览器授权字段；缺省时只保留账号密码登录。
+  oauth_authorize_url?: string | null;
+  oauth_client_id?: string;
+  oauth_scopes?: string[];
 }
 export interface SavedPlatformLogin {
   id: string;
@@ -84,6 +88,9 @@ export const platformAuthApi = {
     }),
   login2fa: (code: string) =>
     invoke<PlatformLoginResult>("platform_login_2fa", { code }),
+  // 打开系统浏览器完成平台授权；回调、令牌交换和持久化都在 Rust 侧完成。
+  loginOAuth: (baseUrl: string) =>
+    invoke<PlatformLoginResult>("platform_login_oauth", { baseUrl }),
   logout: () => invoke<void>("platform_logout"),
   logoutAndClear: (baseUrl: string, userId: number) =>
     invoke<PlatformCleanupReport>("platform_logout_and_clear_account", {

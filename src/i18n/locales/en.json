@@ -5317,7 +5317,17 @@
     "loginHistory": "Recent accounts",
     "otherAccount": "Use another account",
     "removeLogin": "Remove",
-    "rememberPassword": "Remember password"
+    "rememberPassword": "Remember password",
+    "oauthLogin": "Sign in to Zhishu",
+    "oauthHint": "A Zhishu authorization page will open in your browser. Sign-in completes automatically after you approve.",
+    "oauthWaiting": "Waiting for browser authorization…",
+    "oauthCancel": "Cancel authorization",
+    "passwordLogin": "Sign in with email and password",
+    "backToOAuth": "Back to Zhishu sign-in",
+    "advanced": "Advanced settings",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "or": "or"
   },
   "platformUsage": {
     "accountBalance": "Account balance",

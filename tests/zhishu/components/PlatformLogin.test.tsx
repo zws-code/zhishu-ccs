@@ -41,6 +41,7 @@ vi.mock("@/zhishu/api/platformAuth", async (original) => ({
     removeLogin: vi.fn(),
     cancelLogin: vi.fn(),
     login: vi.fn(),
+    loginOAuth: vi.fn(),
     login2fa: vi.fn(),
     logout: vi.fn(),
     logoutAndClear: vi.fn(),
@@ -96,6 +97,27 @@ const catalog: PlatformCatalog = {
   groups: [],
   warnings: [],
 };
+
+function oauthConfig() {
+  return {
+    schema_version: 1,
+    site_name: "Zhishu",
+    api_base_url: account.baseUrl,
+    login_methods: ["password", "oauth"],
+    totp_enabled: false,
+    registration_enabled: false,
+    password_reset_enabled: false,
+    register_url: null,
+    password_reset_url: null,
+    subscriptions_url: null,
+    turnstile_enabled: false,
+    tencent_captcha_enabled: false,
+    aliyun_captcha_enabled: false,
+    oauth_authorize_url: "https://portal.test/oauth/authorize",
+    oauth_client_id: "zhishu-ccs",
+    oauth_scopes: ["client"],
+  };
+}
 function CatalogStatus() {
   const auth = usePlatformAuth()!;
   return (
@@ -178,12 +200,58 @@ beforeEach(() => {
     .mockResolvedValue(undefined);
   vi.mocked(platformAuthApi.account).mockReset().mockResolvedValue(null);
   vi.mocked(platformAuthApi.login).mockReset();
+  vi.mocked(platformAuthApi.loginOAuth).mockReset();
   vi.mocked(platformAuthApi.login2fa).mockReset();
   vi.mocked(platformAuthApi.logout).mockReset().mockResolvedValue(undefined);
   vi.mocked(platformAuthApi.logoutAndClear).mockReset();
 });
 
 describe("platform login", () => {
+  it("defaults to the Zhishu browser login and keeps the password fallback", async () => {
+    vi.mocked(platformAuthApi.config).mockResolvedValue(oauthConfig());
+    renderGate();
+    await screen.findByRole("button", { name: "登录智枢" });
+    expect(screen.queryByLabelText("密码")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "账号密码登录" }));
+    await screen.findByLabelText("密码");
+    fireEvent.click(screen.getByRole("button", { name: "返回智枢登录" }));
+    await screen.findByRole("button", { name: "登录智枢" });
+    expect(screen.queryByLabelText("密码")).not.toBeInTheDocument();
+  });
+
+  it("completes login through the browser authorization result", async () => {
+    vi.mocked(platformAuthApi.config).mockResolvedValue(oauthConfig());
+    vi.mocked(platformAuthApi.loginOAuth).mockResolvedValue({
+      status: "authenticated",
+      account,
+    });
+    renderGate();
+    fireEvent.click(await screen.findByRole("button", { name: "登录智枢" }));
+    await screen.findByText("工具主页");
+    expect(platformAuthApi.loginOAuth).toHaveBeenCalledWith(account.baseUrl);
+  });
+
+  it("cancels an in-flight browser authorization without an error", async () => {
+    vi.mocked(platformAuthApi.config).mockResolvedValue(oauthConfig());
+    let rejectLogin!: (reason: unknown) => void;
+    vi.mocked(platformAuthApi.loginOAuth).mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectLogin = reject;
+        }),
+    );
+    vi.mocked(platformAuthApi.cancelLogin).mockImplementation(async () => {
+      rejectLogin({ code: "OAUTH_CANCELLED", message: "已取消授权登录" });
+    });
+    renderGate();
+    fireEvent.click(await screen.findByRole("button", { name: "登录智枢" }));
+    fireEvent.click(await screen.findByRole("button", { name: "取消授权" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "登录智枢" })).toBeEnabled(),
+    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("uses configured web entries and hides them when disabled", async () => {
     const config = await platformAuthApi.config(account.baseUrl);
     vi.mocked(platformAuthApi.config).mockResolvedValue({

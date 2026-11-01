@@ -372,6 +372,13 @@ pub struct ClientConfig {
     #[serde(default)]
     pub tencent_captcha_app_id: String,
     pub aliyun_captcha_enabled: bool,
+    // 浏览器授权登录由平台下发；旧服务端缺少这些字段时保持密码登录可用。
+    #[serde(default)]
+    pub oauth_authorize_url: Option<String>,
+    #[serde(default)]
+    pub oauth_client_id: String,
+    #[serde(default)]
+    pub oauth_scopes: Vec<String>,
 }
 
 impl ClientConfig {
@@ -406,6 +413,24 @@ impl ClientConfig {
         if !self.password_reset_enabled {
             self.password_reset_url = None;
         }
+        self.oauth_authorize_url = self
+            .oauth_authorize_url
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+            .and_then(|value| origin.join(value).ok())
+            .filter(|url| {
+                matches!(url.scheme(), "http" | "https")
+                    && url.username().is_empty()
+                    && url.password().is_none()
+            })
+            .map(|url| url.to_string());
+        self.oauth_client_id = self.oauth_client_id.trim().to_string();
+        self.oauth_scopes = self
+            .oauth_scopes
+            .into_iter()
+            .map(|scope| scope.trim().to_string())
+            .filter(|scope| !scope.is_empty())
+            .collect();
         Ok(self)
     }
 }

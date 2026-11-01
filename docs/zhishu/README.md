@@ -12,6 +12,7 @@
 | 开发环境 | [隔离开发](development/dev-isolation.md)、[macOS 开发签名](development/macos-dev-signing.md) | 启动入口、隔离范围与签名准备 |
 | 功能 | [平台登录与会话](features/platform-login.md)、[平台基础数据与供应商](features/platform-managed-models.md) | 当前用户流程、凭据边界与本地同步 |
 | 接口 | [客户端专用 API 契约](api/client-api.md) | HTTP 路由、DTO、字段映射和失败语义 |
+| 浏览器授权 | [OAuth2 授权登录接入说明](api/oauth-login.md) | 授权码 + PKCE 契约、错误码与已知问题 |
 | 发布 | [打包、发布与更新](releases/README.md) | 唯一发布操作入口；含各版本证据索引 |
 | 架构决策 | [ADR 索引](adr/README.md) | 决策背景、范围、替代方案与回退 |
 | 上游同步 | [同步报告](upstream-sync/README.md) | 各次合并来源、冲突、验证与风险 |
@@ -23,7 +24,7 @@
 
 | 功能 | 前端 | Rust |
 | --- | --- | --- |
-| 平台登录、双重验证、会话 | `src/zhishu/auth/`、`src/zhishu/api/platformAuth.ts` | `src-tauri/src/zhishu/services/platform_auth.rs`、`src-tauri/src/zhishu/storage/platform_session.rs`、`platform_login_history.rs` |
+| 平台登录、浏览器授权、双重验证、会话 | `src/zhishu/auth/`、`src/zhishu/api/platformAuth.ts` | `src-tauri/src/zhishu/services/platform_auth.rs`、`platform_oauth.rs`、`src-tauri/src/zhishu/storage/platform_session.rs`、`platform_login_history.rs` |
 | 目录、订阅、供应商同步与删除 | `src/zhishu/models/`、`src/zhishu/onboarding/`、`src/zhishu/api/platformModels.ts`、`platformUsage.ts` | `src-tauri/src/zhishu/services/platform_models/`、`platform_cleanup.rs`、`client_api.rs` |
 | 上游能力适配 | `src/zhishu/integrations/ccswitch/` | `src-tauri/src/zhishu/integrations/ccswitch/` |
 | 配置历史、差异与还原 | `src/zhishu/config-history/` | `src-tauri/src/zhishu/storage/config_history.rs`、`src-tauri/src/zhishu/commands/config_history.rs` |

@@ -24,6 +24,7 @@ fn sensitive_field(name: &str) -> bool {
         .collect();
     normalized.ends_with("key")
         || normalized.ends_with("token")
+        || normalized.ends_with("verifier")
         || normalized == "tokens"
         || normalized.contains("password")
         || normalized.contains("secret")

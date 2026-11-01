@@ -5317,7 +5317,17 @@
     "loginHistory": "登录账号记录",
     "otherAccount": "使用其他账号",
     "removeLogin": "删除记录",
-    "rememberPassword": "记住密码"
+    "rememberPassword": "记住密码",
+    "oauthLogin": "登录智枢",
+    "oauthHint": "将在浏览器中打开智枢授权页面，完成授权后自动返回登录。",
+    "oauthWaiting": "等待浏览器授权…",
+    "oauthCancel": "取消授权",
+    "passwordLogin": "账号密码登录",
+    "backToOAuth": "返回智枢登录",
+    "advanced": "高级设置",
+    "showPassword": "显示密码",
+    "hidePassword": "隐藏密码",
+    "or": "或"
   },
   "platformUsage": {
     "accountBalance": "账户余额",

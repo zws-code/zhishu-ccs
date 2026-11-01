@@ -5297,7 +5297,17 @@
     "restoreFailed": "暫時無法恢復登入",
     "restoreHint": "請檢查網路或解鎖系統憑證庫後重試，已儲存的登入憑證會保留。",
     "retryRestore": "重試恢復登入",
-    "sessionHint": "登入後自動保持登入；連續超過 7 天未使用需要重新登入。「記住密碼」僅用於下次填寫密碼。"
+    "oauthLogin": "登入智樞",
+    "oauthHint": "將在瀏覽器中開啟智樞授權頁面，完成授權後自動返回登入。",
+    "oauthWaiting": "等待瀏覽器授權…",
+    "oauthCancel": "取消授權",
+    "passwordLogin": "帳號密碼登入",
+    "backToOAuth": "返回智樞登入",
+    "sessionHint": "登入後自動保持登入；連續超過 7 天未使用需要重新登入。「記住密碼」僅用於下次填寫密碼。",
+    "advanced": "進階設定",
+    "showPassword": "顯示密碼",
+    "hidePassword": "隱藏密碼",
+    "or": "或"
   },
   "platformUsage": {
     "accountBalance": "帳戶餘額",

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -9,6 +9,54 @@ export const projectRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../..",
 );
+
+const devPort = 1420;
+
+function cleanupOrphanedVite() {
+  if (process.platform === "win32") return;
+  let output;
+  try {
+    output = execFileSync(
+      "lsof",
+      [`-tiTCP:${devPort}`, "-sTCP:LISTEN"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    );
+  } catch {
+    return;
+  }
+  for (const value of output.split(/\s+/)) {
+    if (!/^\d+$/.test(value)) continue;
+    let command;
+    try {
+      command = execFileSync("ps", ["-p", value, "-o", "command="], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+    } catch {
+      continue;
+    }
+    const isProjectVite =
+      command.includes(`${projectRoot}/node_modules/.bin/../vite/bin/vite.js`) ||
+      (command.includes(`${projectRoot}/node_modules/.pnpm/`) &&
+        command.includes("/vite/bin/vite.js"));
+    if (!isProjectVite)
+      continue;
+    try {
+      process.kill(Number(value), "SIGTERM");
+      console.warn(`[DEV] Cleaned orphaned Vite process ${value} on port ${devPort}`);
+    } catch {}
+  }
+}
+
+function stopChild(child) {
+  if (process.platform !== "win32" && child.pid) {
+    try {
+      process.kill(-child.pid, "SIGTERM");
+    } catch {}
+  }
+  child.kill("SIGTERM");
+  cleanupOrphanedVite();
+}
 
 function canonicalPath(target) {
   if (fs.existsSync(target)) return fs.realpathSync(target);
@@ -146,16 +194,18 @@ async function main(args) {
     console.log(JSON.stringify({ action: "app", ...launch }, null, 2));
     return;
   }
+  cleanupOrphanedVite();
   prepareEnvironment(environment);
   const child = spawn(launch.command, launch.args, {
     cwd: projectRoot,
     env: environment.env,
     stdio: "inherit",
     shell: process.platform === "win32",
+    detached: process.platform !== "win32",
   });
   // Forward termination so an interrupted dev launcher does not leave a proxy behind.
-  const onInterrupt = () => child.kill("SIGINT");
-  const onTerminate = () => child.kill("SIGTERM");
+  const onInterrupt = () => stopChild(child);
+  const onTerminate = () => stopChild(child);
   process.on("SIGINT", onInterrupt);
   process.on("SIGTERM", onTerminate);
   child.on("error", (error) => {
@@ -163,6 +213,7 @@ async function main(args) {
     process.exitCode = 1;
   });
   child.on("exit", (code, signal) => {
+    stopChild(child);
     process.removeListener("SIGINT", onInterrupt);
     process.removeListener("SIGTERM", onTerminate);
     process.exitCode = code ?? (signal === "SIGINT" ? 130 : 1);

@@ -77,7 +77,24 @@ Content-Type: application/json
 
 刷新成功后保存新 refresh token，后续不要继续使用旧值。退出尝试撤销对应刷新会话，不删除多个客户端共用的模型 Key；具体兼容语义见下文。
 
-/config 返回 `schema_version`、`site_name`、`api_base_url`、`login_methods`、`totp_enabled`、注册和找回密码开关与网页入口，以及验证码启用信息。首版客户端实现邮箱密码与 TOTP；平台启用验证码时仍须满足现有登录校验，不能通过客户端接口绕过。浏览器授权与验证码交互不属于本次 CCS 实施范围。
+### 浏览器授权登录（OAuth 2.0，RFC 8252 + RFC 7636）
+
+桌面客户端默认展示「登录智枢」入口，邮箱密码登录保留为回退方式。授权服务器与客户端代码分别位于服务端 `internal/zhishu/clientoauth` 和客户端 `platform_oauth.rs`，网关已于 2026-11-02 实现；完整契约与已知问题见 [oauth-login.md](oauth-login.md)（注意其中默认 CSP 会拦截平台成功页 iframe 回传的 P0）。
+
+/config 额外返回 `oauth_authorize_url`、`oauth_client_id`（旧字段，固定为 `zhishu-ccs`）、`oauth_scopes`（当前为 `client`）和 `oauth_clients`（已注册的公共客户端列表；客户端应使用自己的 ID，不要依赖 `oauth_client_id`）。仅当 `login_methods` 包含 `oauth` 且授权地址非空时，客户端展示浏览器授权入口；旧服务端不返回这些字段时自动回退账号密码登录。
+
+流程：
+
+1. 客户端生成 PKCE `code_verifier`/`code_challenge`（仅 S256）和随机 `state`。
+2. 绑定 `127.0.0.1` 临时端口，以 `http://127.0.0.1:<port>/callback` 作为 `redirect_uri`（服务端要求 http、回环主机、显式端口、无查询和片段）。
+3. 在系统浏览器打开 `oauth_authorize_url`，附带 `response_type=code`、`client_id`、`redirect_uri`、`code_challenge`、`code_challenge_method=S256`、`state`、`scope`。
+4. 用户在浏览器登录并同意授权；平台回跳回环地址。客户端校验 `state`、最多等待 5 分钟，并支持用户取消。
+5. 客户端调用 `POST /api/zhishu/v1/oauth/token`（JSON）：`grant_type=authorization_code`、`client_id`、`code`、`redirect_uri`、`code_verifier`，成功外壳同其他接口，data 包含 `access_token`、`refresh_token`、`expires_in`、`token_type`、`scope`。
+6. 客户端使用 access token 调 `/account`，按成功登录处理：refresh token 交给系统凭据库，后续恢复与刷新路径和邮箱密码登录一致。
+
+授权码与 verifier 只驻 Rust 侧，不写入前端、普通日志或持久化文件；token 端点与其他客户端接口一样返回 `Cache-Control: no-store`。浏览器拒绝授权时回跳带 `error=access_denied`，客户端提示重新登录，不把拒绝视为凭证错误。
+
+/config 返回 `schema_version`、`site_name`、`api_base_url`、`login_methods`、`totp_enabled`、注册和找回密码开关与网页入口，以及验证码启用信息。客户端实现邮箱密码、TOTP 与浏览器授权（OAuth 2.0）；平台启用验证码时账号密码入口仍须满足现有登录校验，不能通过客户端接口绕过。浏览器授权页由平台负责登录、验证码和二次验证。
 
 
 ### /config、账户与认证字段补充
@@ -314,6 +331,7 @@ CCS 修改位置与映射：
 | 职责 | 文件 |
 | --- | --- |
 | HTTP 白名单、登录、续期、账户、access 和 usage 请求 | `src-tauri/src/zhishu/services/platform_auth.rs` |
+| 浏览器授权、PKCE、回环回调和 token 交换 | `src-tauri/src/zhishu/services/platform_oauth.rs` |
 | 响应 DTO、版本与模型字段校验 | `src-tauri/src/zhishu/services/client_api.rs` |
 | 账号快照 v2 与旧文件迁移 | `src-tauri/src/zhishu/services/platform_models/base_data.rs` |
 | 本地协调与格式适配 | `src-tauri/src/zhishu/services/platform_models/`、`src-tauri/src/zhishu/integrations/ccswitch/platform_models.rs` |
