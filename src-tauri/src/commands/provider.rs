@@ -1075,6 +1075,11 @@ pub fn import_workbuddy_providers_from_live(state: State<'_, AppState>) -> Resul
 }
 
 #[tauri::command]
+pub fn get_workbuddy_installed() -> bool {
+    crate::workbuddy_config::is_installed()
+}
+
+#[tauri::command]
 pub fn get_opencode_live_provider_ids() -> Result<Vec<String>, String> {
     crate::opencode_config::get_providers()
         .map(|providers| providers.keys().cloned().collect())

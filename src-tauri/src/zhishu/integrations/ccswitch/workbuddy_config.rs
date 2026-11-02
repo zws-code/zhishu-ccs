@@ -47,6 +47,28 @@ pub fn get_workbuddy_models_path() -> PathBuf {
     get_workbuddy_home().join("models.json")
 }
 
+/// WorkBuddy 没有可执行的 CLI，只能按数据目录或 macOS 应用包推断是否装了。
+pub fn is_installed() -> bool {
+    is_installed_at(&get_workbuddy_home(), &app_bundle_candidates())
+}
+
+fn is_installed_at(home: &Path, app_bundles: &[PathBuf]) -> bool {
+    home.is_dir() || app_bundles.iter().any(|bundle| bundle.is_dir())
+}
+
+#[cfg(target_os = "macos")]
+fn app_bundle_candidates() -> Vec<PathBuf> {
+    vec![
+        PathBuf::from("/Applications/WorkBuddy.app"),
+        get_home_dir().join("Applications").join("WorkBuddy.app"),
+    ]
+}
+
+#[cfg(not(target_os = "macos"))]
+fn app_bundle_candidates() -> Vec<PathBuf> {
+    Vec::new()
+}
+
 fn read_document_from(path: &Path) -> Result<Value, AppError> {
     if !path.exists() {
         return Ok(Value::Array(Vec::new()));
@@ -654,6 +676,22 @@ mod tests {
                 {"id": "model-b", "name": "Model B"}
             ]
         })
+    }
+
+    #[test]
+    fn detects_installed_from_data_dir_or_app_bundle() {
+        let temp = TempDir::new().expect("temp dir");
+        let home = temp.path().join(".workbuddy");
+        let bundle = temp.path().join("WorkBuddy.app");
+
+        assert!(!is_installed_at(&home, std::slice::from_ref(&bundle)));
+
+        fs::create_dir_all(&bundle).unwrap();
+        assert!(is_installed_at(&home, std::slice::from_ref(&bundle)));
+        fs::remove_dir_all(&bundle).unwrap();
+
+        fs::create_dir_all(&home).unwrap();
+        assert!(is_installed_at(&home, &[]));
     }
 
     #[test]

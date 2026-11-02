@@ -206,18 +206,21 @@ function PlatformOnboardingDialog({
   );
 
   const detection = useQuery({
-    queryKey: ["platform-onboarding-installs", toolApps.join(",")],
+    queryKey: ["platform-onboarding-installs", apps.join(",")],
     queryFn: async () => {
       const tools = toolApps
         .map((app) => TOOL_BY_APP[app])
         .filter((tool): tool is ToolName => Boolean(tool));
-      const [reports, desktop] = await Promise.all([
+      const [reports, desktop, workbuddyInstalled] = await Promise.all([
         tools.length
           ? settingsApi.listToolInstallations(tools)
           : Promise.resolve([]),
         apps.includes("claude-desktop")
           ? providersApi.getClaudeDesktopStatus().catch(() => null)
           : Promise.resolve(null),
+        apps.includes("workbuddy")
+          ? providersApi.getWorkBuddyInstalled().catch(() => false)
+          : Promise.resolve(false),
       ]);
       const installed = new Set<AppId>();
       for (const report of reports) {
@@ -226,6 +229,7 @@ function PlatformOnboardingDialog({
         if (app) installed.add(app);
       }
       if (desktop?.installed) installed.add("claude-desktop");
+      if (workbuddyInstalled) installed.add("workbuddy");
       return installed;
     },
     enabled: apps.length > 0,

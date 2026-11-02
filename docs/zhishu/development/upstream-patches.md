@@ -2,6 +2,19 @@
 
 > 这是按基线/事件累积的补丁台账。222 项清单针对 2026-10-29 的 4.0.21 快照，后续变更按事件追加；旧路径、版本和分支描述仅适用于该段，不是当前 4.0.22 的完整重新统计。当前现状见 [代码基线](baseline.md)。
 
+## 2026-11-02：接入向导识别本机 WorkBuddy
+
+修复「接入到工具」向导把所有非 CLI 应用误判为未安装的问题。WorkBuddy 是桌面应用，没有可执行的 CLI，原检测只调用 `listToolInstallations`（CLI 工具）和 `getClaudeDesktopStatus`，因此即使本机已安装也始终显示「未安装」。
+
+| ID | 上游文件 | 原因 | 为什么不能仅新增/包装 | 级别 | 对应测试 | 最后复核 |
+|---|---|---|---|---|---|---|
+| WKB-20261102-01 | `src-tauri/src/commands/provider.rs`、`src-tauri/src/lib.rs` | 新增只读 `get_workbuddy_installed` 命令并注册 | Tauri 命令必须加入固定 `generate_handler!`，不能由自有模块替代 | L1 | Rust `workbuddy_config` 同文件测试 | 2026-11-02 |
+| WKB-20261102-02 | `src/lib/api/providers.ts` | 增加 `getWorkBuddyInstalled` IPC 封装 | 复用上游统一 `invoke` 入口 | L1 | PlatformOnboarding 测试、typecheck | 2026-11-02 |
+
+检测实现位于自有 `src-tauri/src/zhishu/integrations/ccswitch/workbuddy_config.rs`（按 `.workbuddy` 数据目录或 macOS `WorkBuddy.app` 推断，复用 `get_workbuddy_home()` 的覆盖与环境变量优先级），接线位于自有 `src/zhishu/onboarding/PlatformOnboarding.tsx`。只读探测，不写配置、不联网、不改 Provider 或平台目录；只在向导同时勾选 WorkBuddy 时调用。回退需删除新命令、注册、前端封装和向导分支。
+
+本轮验证（2026-11-02）：`pnpm typecheck`、`tests/zhishu/components/PlatformOnboarding.test.tsx` 8 项、`cargo fmt --check`、`cargo clippy -D warnings` 及 `workbuddy_config` 6 项 Rust 测试通过；未在 macOS 真机自动化中复验向导 UI，未覆盖 Windows/Linux 仅凭数据目录的识别。
+
 ## 2026-11-01：平台接入向导与语言包新增键
 
 复核 ZS-190（L1）：`src/i18n/locales/{zh,zh-TW,en,ja,tr}.json` 新增 `platformOnboarding.*` 键，并更新 `platformCatalog.description` / `platformCatalog.success` 文案，说明登录后不再自动写入供应商列表、改用「接入到工具」向导。共享语言包是运行时固定入口，新增文案无法只放在自有模块里；实现和接入逻辑在 `src/zhishu/onboarding/PlatformOnboarding.tsx`、`src/zhishu/auth/PlatformAuthContext.tsx` 与 `src/zhishu/models/components/PlatformCatalogPage.tsx`（均为自有文件）；`src/main.tsx` 仅新增 `PlatformOnboardingProvider` 包裹（L1 薄接线）。

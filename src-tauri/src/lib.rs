@@ -1890,6 +1890,7 @@ pub fn run() {
             // OpenCode specific
             commands::import_opencode_providers_from_live,
             commands::import_workbuddy_providers_from_live,
+            commands::get_workbuddy_installed,
             commands::get_opencode_live_provider_ids,
             commands::get_opencode_default_model,
             commands::set_opencode_default_model,

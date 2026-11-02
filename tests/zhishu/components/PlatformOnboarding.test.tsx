@@ -59,6 +59,7 @@ vi.mock("@/lib/api/providers", () => ({
     switch: vi.fn(),
     updateTrayMenu: vi.fn(),
     getClaudeDesktopStatus: vi.fn(),
+    getWorkBuddyInstalled: vi.fn(),
   },
 }));
 vi.mock("@/lib/api/proxy", () => ({
@@ -244,6 +245,7 @@ beforeEach(() => {
   vi.mocked(proxyApi.setProxyStackMember).mockResolvedValue(null);
   vi.mocked(providersApi.updateTrayMenu).mockResolvedValue(true);
   vi.mocked(providersApi.getClaudeDesktopStatus).mockResolvedValue({} as never);
+  vi.mocked(providersApi.getWorkBuddyInstalled).mockResolvedValue(false);
   vi.mocked(refreshPlatformProviders).mockResolvedValue(undefined);
 });
 
@@ -427,6 +429,21 @@ describe("platform onboarding", () => {
         "已加入聚合：智枢平台 · Shared group（共 2 个平台供应商）",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("detects an installed WorkBuddy desktop app", async () => {
+    settingsState.visibleApps = { workbuddy: true };
+    settingsState.appOrder = ["workbuddy"];
+    vi.mocked(settingsApi.listToolInstallations).mockResolvedValue([] as never);
+    vi.mocked(providersApi.getWorkBuddyInstalled).mockResolvedValue(true);
+    renderOnboarding();
+
+    await screen.findByText("接入工具");
+    await waitFor(() =>
+      expect(screen.getByRole("checkbox", { name: "WorkBuddy" })).toBeChecked(),
+    );
+    expect(screen.getByText("已安装")).toBeInTheDocument();
+    expect(providersApi.getWorkBuddyInstalled).toHaveBeenCalledTimes(1);
   });
 
   it("adds every platform provider for an additive app", async () => {

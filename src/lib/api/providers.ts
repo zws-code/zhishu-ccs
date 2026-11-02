@@ -180,6 +180,10 @@ export const providersApi = {
     return await invoke("get_claude_desktop_status");
   },
 
+  async getWorkBuddyInstalled(): Promise<boolean> {
+    return await invoke("get_workbuddy_installed");
+  },
+
   async getClaudeDesktopDefaultRoutes(): Promise<ClaudeDesktopDefaultRoute[]> {
     return await invoke("get_claude_desktop_default_routes");
   },
