@@ -154,6 +154,11 @@ export function tagRelease({
   const pushUrl = verifyRemote();
   log(`${current} → ${version}；tag: ${tag}；发布分支: ${branch}`);
   log(`版本文件：${files.join("、")}`);
+  const localAccelerate = process.env.COS_UPLOAD_ACCELERATE;
+  if (localAccelerate !== undefined && localAccelerate !== "")
+    log(
+      `注意：本地 COS_UPLOAD_ACCELERATE=${localAccelerate} 不会传给 GitHub Actions；上传是否加速只由仓库变量 COS_UPLOAD_ACCELERATE 控制，单次加速请用恢复工作流。`,
+    );
   if (options.dryRun) {
     log(
       "仅预览：正式执行会检查工作区和远程 tag，运行 Cargo、类型/发布/公告回归，再提交并原子推送分支与 tag。",

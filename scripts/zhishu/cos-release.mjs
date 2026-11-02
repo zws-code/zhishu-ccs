@@ -21,6 +21,12 @@ import {
 } from "./release-artifacts.mjs";
 import { productionUrl, readReleaseConfig } from "./release-config.mjs";
 
+export function parseAccelerate(value) {
+  if (value === undefined || value === "" || value === "false") return false;
+  if (value === "true") return true;
+  throw new Error("COS_UPLOAD_ACCELERATE 必须是 true 或 false");
+}
+
 export function cosConfig(env = process.env) {
   const bucket = env.COS_BUCKET;
   const region = env.COS_REGION;
@@ -31,6 +37,7 @@ export function cosConfig(env = process.env) {
     throw new Error("请配置 COS_REGION，例如 ap-guangzhou");
   if (!/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(prefix))
     throw new Error("COS_PREFIX 必须是桶内相对目录");
+  parseAccelerate(env.COS_UPLOAD_ACCELERATE);
   const base = productionUrl(
     env.COS_PUBLIC_BASE_URL,
     "COS_PUBLIC_BASE_URL",

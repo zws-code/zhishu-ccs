@@ -87,7 +87,7 @@
 - `pnpm release:check` 校验 COS 配置（不连接云端）；`pnpm test:release` 运行 Node 发布回归；`pnpm test:release-cos` 运行 Python 模拟上传回归。底层 `build` 仅用于本机构建验证。
 - GitHub Repository Variables 配置平台与 CDN 地址、公钥及 COS 桶/地域/前缀；更新私钥放 Repository Secrets，COS 凭据可放 `cos-production` Environment Secrets。不提交或输出密钥。
 - 正式构建已保存原 payload、上传脚本需要修复时，可用 `resume-cos-release.yml` 恢复：核对原正式 tag/提交/产物来源并再次验签与校验哈希，不重编译、不移动 tag；该工作流的手动运行会实际发布。后台专用分支 `codex/cos-resume` 需提交说明带 `Resume-Release-Run: <原正式run_id>`。
-- 历史发布和验签事实见 `docs/zhishu/releases/0.0.1.md`、`0.0.2.md`、`0.0.3.md`；各次 Latest 状态、验收例外仅适用于当时，源码当前为 0.0.3，跨版本实机升级仍按记录待验收。上传器四路并发，`COS_UPLOAD_ACCELERATE` 默认关闭；仅显式启用时使用已开启的桶全球加速，累计上传读取上限 3 GB/次（含重试），不改变客户端更新地址。
+- 历史发布和验签事实见 `docs/zhishu/releases/0.0.1.md`、`0.0.2.md`、`0.0.3.md`；各次 Latest 状态、验收例外仅适用于当时，源码当前为 0.0.3，跨版本实机升级仍按记录待验收。上传器四路并发，`COS_UPLOAD_ACCELERATE` 默认关闭且只读仓库变量（本机环境变量不生效）；仅显式启用时使用已开启的桶全球加速，累计上传读取上限 3 GB/次（含重试），不改变客户端更新地址。
 - COS 版本目录不可覆盖，全部文件与签名校验并通过公网检查后才发布稳定清单；禁止降版本或遗漏已发布平台。失败重试复用原产物，不重新编译覆盖同版本。两个清单逐个发布，不宣称对象存储支持跨对象事务。
 - 默认 macOS 使用 Developer ID 签名/公证；显式 `adhoc` 模式跳过公证，不能称已公证。Tauri 更新签名始终独立保留。
 - 当前 Git remote 仍须核对：`origin` 是上游，`zhishu-origin` 是二开 GitLab，`zhishu-git` 是自己的 GitHub；发布 tag 推到 `zhishu-git`，不推上游。

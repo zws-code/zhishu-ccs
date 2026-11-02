@@ -19,7 +19,12 @@ import {
   legacyTargets,
   targets,
 } from "./release-artifacts.mjs";
-import { checkVersion, cosConfig, prepareCosPayload } from "./cos-release.mjs";
+import {
+  checkVersion,
+  cosConfig,
+  parseAccelerate,
+  prepareCosPayload,
+} from "./cos-release.mjs";
 
 function fixture(fn) {
   const dir = mkdtempSync(join(tmpdir(), "zhishu-cos-test-"));
@@ -104,8 +109,17 @@ test("COS configuration requires a dedicated HTTPS prefix and matching update en
     { COS_PUBLIC_BASE_URL: "https://download.zhishu.cn/another" },
     { ZHISHU_UPDATE_URL: "https://download.zhishu.cn/old/latest.json" },
     { COS_PUBLIC_BASE_URL: "https://dl.ccswitch.io/ccs/stable" },
+    { COS_UPLOAD_ACCELERATE: "yes" },
   ])
     assert.throws(() => cosConfig({ ...env, ...change }));
+});
+
+test("COS upload acceleration is a strict repository-variable boolean", () => {
+  assert.equal(parseAccelerate(undefined), false);
+  assert.equal(parseAccelerate(""), false);
+  assert.equal(parseAccelerate("false"), false);
+  assert.equal(parseAccelerate("true"), true);
+  assert.throws(() => parseAccelerate("1"), /true or false|true 或 false/);
 });
 
 test("tag must match all three committed versions and an existing summary", () =>

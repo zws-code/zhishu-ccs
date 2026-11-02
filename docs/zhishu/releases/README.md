@@ -142,6 +142,8 @@ git push zhishu-git v0.0.4
 
 GitHub 的海外构建机直传广州桶可能很慢；0.0.2 的普通上传曾出现这一情况，见对应发布记录。若希望以后每次正式 tag 发布也加速，可自行在 Repository Variables 设置 `COS_UPLOAD_ACCELERATE=true`；不设置则默认 `false`。上传才使用 `cos.accelerate.myqcloud.com`，桶检查与客户端更新/下载地址继续使用原域名。此选项需要桶已开启全球加速，并会额外按流量计费；实际费用以[腾讯云控制台与定价](https://buy.cloud.tencent.com.cn/price/cos)为准。
 
+本机执行 `COS_UPLOAD_ACCELERATE=true pnpm release:tag` **不会**把开关传给 GitHub Actions：`release:tag` 只改版本、提交、打 tag 并推送，构建和上传都在 Actions 中按仓库变量执行；预检会校验该变量只接受 `true`/`false`。
+
 也可只在下面的恢复工作流中勾选一次 `accelerate`，不改变后续发布默认行为。当前实现对每次加速运行限制累计上传读取量 3 GB（包含 SDK 重试）；触及上限时终止，不切换清单。这个保护限制本次上传的数据量，不是整个腾讯云账户的账单限额。
 
 ### 第五步：失败时如何处理
@@ -231,7 +233,7 @@ COS 桶
 | `ZHISHU_UPDATE_PUBLIC_KEY` | 更新公钥 `.pub` 文件的完整 base64 内容 |
 | `COS_BUCKET` | 完整桶名，例如 `zhishu-downloads-1234567890` |
 | `COS_REGION` | 实际地域，例如 `ap-guangzhou` |
-| `COS_UPLOAD_ACCELERATE` | 可选，默认 `false`；显式 `true` 仅加速上传，会产生额外流量费，须先开启桶全球加速 |
+| `COS_UPLOAD_ACCELERATE` | 可选，默认 `false`；显式 `true` 仅加速上传，会产生额外流量费，须先开启桶全球加速；只读仓库变量，本机环境变量不生效 |
 | `COS_PREFIX` | `ccs/stable`，未设置也使用此值 |
 | `COS_PUBLIC_BASE_URL` | `https://下载域名/ccs/stable`，不带末尾斜杠 |
 | `ZHISHU_MACOS_SIGNING_MODE` | 默认 `developer-id`；显式设置 `adhoc` 可构建未公证包 |
