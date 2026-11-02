@@ -273,7 +273,7 @@ fn runtime_log_level_allows(level: log::Level, max_level: log::LevelFilter) -> b
 /// 统一处理 zhishu-ccswitch:// 及兼容的 ccswitch:// 深链接 URL
 ///
 /// - 解析 URL，把结果（或错误）暂存为待处理深链接，再发 `deeplink-pending` 通知前端来读
-///   （前端可能还没挂载，见 `deeplink::PendingDeepLink`）
+///   （前端可能还没挂载，见 `deeplink::PendingDeepLink`）；平台 OAuth 唤醒链接只聚焦窗口
 /// - 可选：聚焦主窗口
 fn handle_deeplink_url(
     app: &tauri::AppHandle,
@@ -290,30 +290,39 @@ fn handle_deeplink_url(
         url_for_log(url_str)
     );
 
-    let pending = match crate::deeplink::parse_deeplink_url(url_str) {
-        Ok(request) => {
-            log::info!(
-                "✓ Successfully parsed deep link: resource={}, app={:?}, name={:?}",
-                request.resource,
-                request.app,
-                request.name
-            );
-            crate::deeplink::PendingDeepLink::Import {
-                request: Box::new(request),
+    let pending = if crate::deeplink::is_oauth_wakeup(url_str) {
+        // 授权码由本地回环监听接收；深链只负责把客户端拉到前台，不能当导入请求。
+        log::info!("✓ OAuth wake-up link accepted; waiting for loopback callback");
+        None
+    } else {
+        Some(match crate::deeplink::parse_deeplink_url(url_str) {
+            Ok(request) => {
+                log::info!(
+                    "✓ Successfully parsed deep link: resource={}, app={:?}, name={:?}",
+                    request.resource,
+                    request.app,
+                    request.name
+                );
+                crate::deeplink::PendingDeepLink::Import {
+                    request: Box::new(request),
+                }
             }
-        }
-        Err(e) => {
-            log::error!("✗ Failed to parse deep link URL: {e}");
-            crate::deeplink::PendingDeepLink::Error {
-                url: url_str.to_string(),
-                error: e.to_string(),
+            Err(e) => {
+                log::error!("✗ Failed to parse deep link URL: {e}");
+                crate::deeplink::PendingDeepLink::Error {
+                    url: url_str.to_string(),
+                    error: e.to_string(),
+                }
             }
-        }
+        })
     };
-    crate::deeplink::set_pending_deeplink(pending);
 
-    if let Err(e) = app.emit("deeplink-pending", ()) {
-        log::error!("✗ Failed to emit deeplink-pending event: {e}");
+    if let Some(pending) = pending {
+        crate::deeplink::set_pending_deeplink(pending);
+
+        if let Err(e) = app.emit("deeplink-pending", ()) {
+            log::error!("✗ Failed to emit deeplink-pending event: {e}");
+        }
     }
 
     if focus_main_window {

@@ -142,9 +142,9 @@ curl -sI https://<gateway>/oauth/authorize | grep -i content-security-policy
 - 后果：dsh 登录时同意页显示“智枢客户端”，授权码绑定 `zhishu-ccs`。当前能登录成功（两端一致），但客户端身份错误；后续按客户端做权限、审计或回调限制时会直接失效。
 - 修复：dsh 插件在授权与换 token 时使用 `client_id=dsh`。网关无需改动；zhishu-ccs 不受影响。
 
-### P2：app 深链自动拉起尚无客户端支持（仓库内待提交改动）
+### P2：app 深链只作为唤醒信号（zhishu-ccs 已处理）
 
-授权响应新增 `app_url`，成功页会先尝试深链、再投递 loopback。但两个客户端目前都没有注册/处理 `zhishu-ccswitch://v1/oauth` 与 `dsh://auth/callback`：未处理的 scheme 可能触发浏览器提示或错误页，个别浏览器还可能中断随后的 iframe 投递。建议客户端实现前不要把深链作为自动动作；至少先投递 loopback，深链只放到“打开应用”按钮或客户端明确的 opt-in 字段之后。
+授权响应新增 `app_url`，成功页会先尝试深链、再投递 loopback。`zhishu-ccs` 现在识别 `zhishu-ccswitch://v1/oauth`（兼容 legacy `ccswitch://`）：只聚焦主窗口并继续等待 loopback，不会再把唤醒链接当成导入请求弹出解析错误。授权码仍只从 loopback 接收；dsh 仍未处理 `dsh://auth/callback`。建议 dsh 实现前不要把深链作为自动动作，至少先投递 loopback。
 
 ### P2：插件文档仍声明不支持网页授权
 

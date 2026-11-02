@@ -15,6 +15,19 @@
 
 本轮验证（2026-11-02）：`pnpm typecheck`、`tests/zhishu/components/PlatformOnboarding.test.tsx` 8 项、`cargo fmt --check`、`cargo clippy -D warnings` 及 `workbuddy_config` 6 项 Rust 测试通过；未在 macOS 真机自动化中复验向导 UI，未覆盖 Windows/Linux 仅凭数据目录的识别。
 
+## 2026-11-02：处理平台 OAuth 唤醒深链接
+
+平台授权成功页会先尝试打开 `zhishu-ccswitch://v1/oauth` 拉起客户端，再向本地回环地址投递授权码。原深链接处理只接受 `/import`，会把唤醒链接当成导入请求解析并弹出「Invalid path: expected '/import', got '/oauth'」。本次在深链接入口识别该唤醒链接：只聚焦主窗口，不生成待处理导入；授权码仍只从回环接收，不改变 OAuth 的 state/PKCE 校验。
+
+| ID | 上游文件 | 原因 | 为什么不能仅新增/包装 | 级别 | 对应测试 | 最后复核 |
+|---|---|---|---|---|---|---|
+| OAUTH-20261102-01 | `src-tauri/src/deeplink/parser.rs`、`src-tauri/src/deeplink/mod.rs` | 新增 `is_oauth_wakeup` 识别 `v1/oauth` 唤醒链接 | 深链接解析是上游固定入口，自有模块无法在解析前拦截 | L1 | `deeplink` 同模块测试 | 2026-11-02 |
+| OAUTH-20261102-02 | `src-tauri/src/lib.rs` | `handle_deeplink_url` 对唤醒链接跳过导入暂存与事件 | 深链接分发位于上游固定处理函数，Tauri 注册表无法替换 | L1 | Rust `deeplink` 测试、clippy | 2026-11-02 |
+
+复用现有深链接注册、窗口聚焦和 OAuth 回环监听；不新增 IPC、不写配置、不记录 code/state。回退需删除识别函数和分支，恢复按导入解析。
+
+本轮验证（2026-11-02）：`cargo fmt --check`、`cargo clippy -D warnings`、`deeplink` 解析测试通过；未在真实浏览器中重跑平台授权链路，未覆盖 Safari 等对 loopback/深链更严格的浏览器。
+
 ## 2026-11-01：平台接入向导与语言包新增键
 
 复核 ZS-190（L1）：`src/i18n/locales/{zh,zh-TW,en,ja,tr}.json` 新增 `platformOnboarding.*` 键，并更新 `platformCatalog.description` / `platformCatalog.success` 文案，说明登录后不再自动写入供应商列表、改用「接入到工具」向导。共享语言包是运行时固定入口，新增文案无法只放在自有模块里；实现和接入逻辑在 `src/zhishu/onboarding/PlatformOnboarding.tsx`、`src/zhishu/auth/PlatformAuthContext.tsx` 与 `src/zhishu/models/components/PlatformCatalogPage.tsx`（均为自有文件）；`src/main.tsx` 仅新增 `PlatformOnboardingProvider` 包裹（L1 薄接线）。
