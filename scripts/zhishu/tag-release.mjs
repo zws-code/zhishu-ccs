@@ -9,7 +9,7 @@ import { parse as parseToml } from "smol-toml";
 import { checkVersion } from "./cos-release.mjs";
 import { versionNumber } from "./release-artifacts.mjs";
 
-const remote = "zhishu-git";
+const remote = "origin";
 const versionFiles = [
   "package.json",
   "src-tauri/tauri.conf.json",
@@ -24,7 +24,7 @@ export const help = `用法：pnpm release:tag [patch|minor|major|vX.Y.Z] [--dry
 默认递增 patch；--bump patch|minor|major 也可指定递增方式。
 --dry-run 只预览，不修改文件、不联网、不提交或推送。
 正式执行要求先提交现有改动；随后自动同步版本、检查、提交并推送。
-推送目标固定为 zhishu-git（zws-code/zhishu-ccs），会触发正式发布。`;
+推送目标固定为 origin（zws-code/zhishu-ccs），会触发正式发布。`;
 
 export function parseArgs(args) {
   const options = { bump: "patch", dryRun: false, help: false };
@@ -145,7 +145,7 @@ export function tagRelease({
       ].includes(urls[0])
     )
       throw new Error(
-        "zhishu-git 必须只有一个 push URL，指向 zws-code/zhishu-ccs；请核对 remote",
+        "origin 必须只有一个 push URL，指向 zws-code/zhishu-ccs；请核对 remote",
       );
     return urls[0];
   };

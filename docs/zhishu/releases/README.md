@@ -48,7 +48,7 @@ pnpm release:tag v0.1.0 --dry-run        # 预览指定版本
 
 脚本位于 `scripts/zhishu/tag-release.mjs`，复用既有版本校验和 Actions 发布链路，依次执行：
 
-1. 核对三个源码版本及 Cargo.lock、工作区、Git 操作状态、已有本地 tag 和远程 tag/发布分支。固定核对 `zhishu-git` 的唯一 push URL 必须属于 `zws-code/zhishu-ccs`，不会使用 `origin` 或修改 remote。
+1. 核对三个源码版本及 Cargo.lock、工作区、Git 操作状态、已有本地 tag 和远程 tag/发布分支。固定核对 `origin` 的唯一 push URL 必须属于 `zws-code/zhishu-ccs`；不向 `upstream` 或 `gitlab` 发布，也不修改 remote。
 2. 更新三个源码版本；通过 `cargo update --workspace --offline --manifest-path src-tauri/Cargo.toml` 同步锁文件，拒绝应用版本以外的锁文件语义变化。需要事先安装仓库指定的 Rust 工具链及所需本地依赖；离线同步失败时不会自动改为联网更新依赖。
 3. 没有 `src/whats-new/<版本>.json` 时生成 `items: []`；如已提前编写并提交该版本公告，保留原内容。需展示更新内容时，应先写好公告并提交。
 4. 执行 `pnpm typecheck`、`pnpm test:release`、`pnpm test:release-cos`、公告格式回归和 `git diff --check`。不读取本机生产签名或 COS 凭据；Actions 仍负责正式配置、签名和云端校验。这些检查不替代完整前后端回归和跨平台安装/升级验收。
@@ -98,7 +98,7 @@ git diff --check
 git remote -v
 ```
 
-确认 `zhishu-git` 指向 `git@github.com:zws-code/zhishu-ccs.git`。本机 `origin` 是上游，不能用它发布二开代码。前端单元测试使用 `pnpm test:unit`。
+确认 `origin` 指向 `git@github.com:zws-code/zhishu-ccs.git`。`upstream` 是官方上游，不能用它发布二开代码；`gitlab` 保留内网 GitLab 地址。前端单元测试使用 `pnpm test:unit`。
 
 先用 `git add <具体源码文件>` 加入本次需要发布的代码，再加入版本文件和新公告。执行 `git diff --cached` 审查本次暂存内容后，再继续提交和推送：
 
@@ -106,7 +106,7 @@ git remote -v
 git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock src/whats-new/0.0.4.json
 git diff --cached
 git commit -m "chore(release): prepare 0.0.4"
-git push zhishu-git HEAD:refs/heads/codex/release-0.0.4
+git push origin HEAD:refs/heads/codex/release-0.0.4
 ```
 
 如需先演练，可到 [Actions 发布工作流](https://github.com/zws-code/zhishu-ccs/actions/workflows/release.yml) 点击 **Run workflow**，选择 `codex/release-0.0.4`。**Run workflow 只演练，不会正式上传 COS，也不会创建 GitHub Release。**
@@ -117,7 +117,7 @@ git push zhishu-git HEAD:refs/heads/codex/release-0.0.4
 
 ```sh
 git tag v0.0.4
-git push zhishu-git v0.0.4
+git push origin v0.0.4
 ```
 
 推送 tag 才是正式发布开关。之后在 [Actions](https://github.com/zws-code/zhishu-ccs/actions) 打开 `v0.0.4` 对应运行，等待构建、COS 发布和 **Publish GitHub Release after COS** 全部成功。如环境显示 **Review deployments**，由已配置的审核者批准本次部署。
@@ -287,12 +287,12 @@ GitHub Release 使用工作流自动提供的 `GITHUB_TOKEN`，无需新增个�
 
 ## 4. 首次演练
 
-先把源码与工作流推到自己的 GitHub 仓库。`origin` 仍可能指向上游，**不要用默认 origin 推送二开代码**：
+先把源码与工作流推到自己的 GitHub 仓库。2026-11-03 已统一为 `origin`（智枢 GitHub）、`upstream`（官方）、`gitlab`（内网 GitLab）；其他克隆须先核对地址，脚本也会验证 `origin` 的唯一 push URL：
 
 ```sh
 git remote -v
-# 本机已存在 zhishu-git → git@github.com:zws-code/zhishu-ccs.git
-git push zhishu-git <你的发布分支>
+# 本机已存在 origin → git@github.com:zws-code/zhishu-ccs.git
+git push origin <你的发布分支>
 ```
 
 版本必须在 `package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 保持一致；Rust 构建会更新 Cargo.lock，提交版本变更时也应同步核对。新增 `src/whats-new/<版本>.json`，无应用内公告时使用真实版本与 `items: []`。
@@ -300,7 +300,7 @@ git push zhishu-git <你的发布分支>
 也可以通过专用分支启动相同演练，无需操作浏览器：
 
 ```sh
-git push zhishu-git HEAD:refs/heads/codex/cos-validation
+git push origin HEAD:refs/heads/codex/cos-validation
 ```
 
 该分支推送使用 `release-validation` 环境；COS 上传和 SDK 安装步骤仍要求 `push` 事件且 `ref_type=tag`，分支推送不会发布 COS 或创建 GitHub Release。只在需要演练时推送该专用分支。
@@ -325,7 +325,7 @@ git push zhishu-git HEAD:refs/heads/codex/cos-validation
 
 ```sh
 git tag v<新版本号>
-git push zhishu-git v<新版本号>
+git push origin v<新版本号>
 ```
 
 工作流会：

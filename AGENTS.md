@@ -90,7 +90,7 @@
 - 历史发布和验签事实见 `docs/zhishu/releases/0.0.1.md`、`0.0.2.md`、`0.0.3.md`；各次 Latest 状态、验收例外仅适用于当时，源码当前为 0.0.3，跨版本实机升级仍按记录待验收。上传器四路并发，`COS_UPLOAD_ACCELERATE` 默认关闭且只读仓库变量（本机环境变量不生效）；仅显式启用时使用已开启的桶全球加速，累计上传读取上限 3 GB/次（含重试），不改变客户端更新地址。
 - COS 版本目录不可覆盖，全部文件与签名校验并通过公网检查后才发布稳定清单；禁止降版本或遗漏已发布平台。失败重试复用原产物，不重新编译覆盖同版本。两个清单逐个发布，不宣称对象存储支持跨对象事务。
 - 默认 macOS 使用 Developer ID 签名/公证；显式 `adhoc` 模式跳过公证，不能称已公证。Tauri 更新签名始终独立保留。
-- 当前 Git remote 仍须核对：`origin` 是上游，`zhishu-origin` 是二开 GitLab，`zhishu-git` 是自己的 GitHub；发布 tag 推到 `zhishu-git`，不推上游。
+- Git remote 已于 2026-11-03 统一：`origin` 是智枢 GitHub（`git@github.com:zws-code/zhishu-ccs.git`），`upstream` 是官方 CC Switch（`git@github.com:farion1231/cc-switch.git`），`gitlab` 是内网 GitLab（`http://172.16.32.4:8929/hunanzs/zhishu-ccs.git`）。操作前仍须核对；发布 tag 仅推到 `origin`，不推上游。
 - 云端资源与真实平台验收状态以文档和本次实测为准，不以工作流存在推断桶、CDN、证书、Secrets 已配置或安装/升级已验收。
 
 ## 4. 主干禁区
@@ -209,11 +209,11 @@
 - 改 Tauri command 必须同步前后端契约、注册、类型和测试，不以“前端暂时没报错”替代验证。
 - 涉及配置文件写入必须保留原始备份及既有恢复路径；新路径缺少备份时先补齐，禁止直接覆盖真实用户配置试验。
 - 测试使用隔离目录；不要通过修改 `HOME` 或 `CODEX_HOME` 来挪用当前智能体/用户的工作环境，也不要删除 pending、备份来掩盖失败。
-- 根目录 `AGENTS.md` 已被 Git 跟踪，虽然 `.gitignore` 仍有同名规则；修改会正常进入 diff，不要再当成仅本机未跟踪文件。当前 `origin` 指向上游，`zhishu-origin` 指向二开仓库；推送/发布前核对目标 remote，不按默认 `origin` 推送二开改动。
+- 根目录 `AGENTS.md` 已被 Git 跟踪，虽然 `.gitignore` 仍有同名规则；修改会正常进入 diff，不要再当成仅本机未跟踪文件。当前 `origin` 指向智枢 GitHub，`upstream` 指向官方，`gitlab` 指向内网 GitLab；推送/发布前核对目标 remote 及 push URL，正式发布只使用 `origin`。当前 `ccs-dev` 跟踪 `origin/ccs-dev`，`main` 仍跟踪 `upstream/main`；操作前核对实际跟踪关系和分歧，不得把旧 `main` 当作产品主线。
 
 ## 待人工确认项
 
-- 当前已合入上游 4.0.22 / `b76426741ef93069e2f374ac01ca7ef5760e1d0e`，见代码基线；后续同步前重新核对。`origin` 仍是上游，不能仅凭目录判断文件归属。
+- 截至 2026-11-03，本地已合入上游 4.0.23 / `66d530d6efb68e57f51a97217b0146684f1990bd`，见代码基线；后续同步前重新核对。官方 remote 为 `upstream`，不能仅凭目录判断文件归属。
 - 当前登录失效返回登录页，恢复暂时失败进入重试页；未实现未经验证的离线入口。若改变产品策略须另行确认与评审。
 - 客户端协议以 `docs/zhishu/api/client-api.md` 和 ADR-0004 为准；真实多设备共享 Key、系统凭据库和 CLI 端到端验收仍待执行。
 - TODO：补充 WorkBuddy 目标版本与真实 `models.json` 的运行验收；平台同步已实现，不能再列为尚未接入。

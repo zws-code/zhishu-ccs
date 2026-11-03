@@ -45,7 +45,7 @@ function fixture(t) {
   git("config", "tag.gpgsign", "false");
   git("config", "core.hooksPath", join(dir, "no-hooks"));
   git("init", "--bare", bare);
-  git("remote", "add", "zhishu-git", github);
+  git("remote", "add", "origin", github);
   write(
     root,
     "package.json",
@@ -190,7 +190,7 @@ test("explicit tag updates only release files, commits and atomically pushes mat
     "push",
     "--atomic",
     "--no-follow-tags",
-    "zhishu-git",
+    "origin",
     `${result.commit}:refs/heads/codex/release-0.1.0`,
     "refs/tags/v0.1.0:refs/tags/v0.1.0",
   ]);
@@ -227,17 +227,17 @@ for (const mode of [
       f.git(
         "remote",
         "set-url",
-        "zhishu-git",
+        "origin",
         "git@github.com:farion1231/cc-switch.git",
       );
     if (mode === "multiple-push-urls") {
-      f.git("remote", "set-url", "--add", "--push", "zhishu-git", github);
+      f.git("remote", "set-url", "--add", "--push", "origin", github);
       f.git(
         "remote",
         "set-url",
         "--add",
         "--push",
-        "zhishu-git",
+        "origin",
         "git@github.com:other/repo.git",
       );
     }
@@ -327,7 +327,7 @@ test("atomic push rejection preserves the local commit/tag and prints exact retr
   assert.equal(f.remoteRefs(), "");
   assert.match(
     f.logs.join("\n"),
-    /仅需重试推送时：git push --atomic --no-follow-tags zhishu-git/,
+    /仅需重试推送时：git push --atomic --no-follow-tags origin/,
   );
 });
 

@@ -247,10 +247,11 @@ Adapter 的具体调用需由当期上游源码确认。明确区分 TS 前端�
 
 ### 5.1 仓库和分支
 
-以下为目标命名与示例。当前 `origin` 是官方、`zhishu-git` 是自有 GitHub、`zhishu-origin` 是自有 GitLab，且没有 `upstream`；先核对 [真实远程](baseline.md)，不得照抄示例改 remote 或推送。
+2026-11-03 已按本标准统一本地远程命名，地址保持原值：`origin` 为智枢 GitHub，`upstream` 为官方 CC Switch，`gitlab` 为内网 GitLab。地址与旧名映射见 [真实远程](baseline.md)。发布脚本固定使用 `origin` 并校验唯一 push URL；历史报告中的旧名仅反映当时事实。
 
-- `origin`：公司自己的 Zhishu CCS 仓库；主分支 `main` 是受保护、可发布的智枢代码。
-- `upstream`：官方 CC Switch 仓库，保持只读，不在其上直接开发。
+- `origin`：自己的 Zhishu CCS GitHub 仓库（`git@github.com:zws-code/zhishu-ccs.git`），用于产品协作和正式发布。目标主分支 `main` 应受保护且可发布；当前产品开发仍在 `ccs-dev`，本次不迁移分支或修改保护规则。
+- `upstream`：官方 CC Switch 仓库（`git@github.com:farion1231/cc-switch.git`），仅用于获取上游，不推送智枢代码；本地 URL 不是服务端只读权限保证。
+- `gitlab`：内网 GitLab（`http://172.16.32.4:8929/hunanzs/zhishu-ccs.git`），保留既有访问方式，本次不做仓库镜像、推送或分歧合并。
 - `feat/<scope>-<description>`：正常功能分支。
 - `fix/<scope>-<description>`：缺陷修复。
 - `sync/upstream-<version-or-date>`：一次上游同步专用分支。
@@ -258,7 +259,9 @@ Adapter 的具体调用需由当期上游源码确认。明确区分 TS 前端�
 
 **默认策略**：长期同步使用 `merge upstream/main`，保留祖先关系；不要对共享/已发布的 `main` 进行反复 rebase。若选择同步上游稳定 tag，则在合并记录中注明 tag 与 SHA。
 
-### 5.2 首次建立 upstream
+### 5.2 首次核对与初始化 upstream
+
+本工作区已完成 remote 改名；以下添加命令仅适用于尚未配置的其他克隆。改名前后的 URL 不变，不能新增重复远程或把现有 `origin` 覆盖为上游。
 
 ```bash
 # 确认 origin 和当前工作树，先提交或暂存自己的改动
@@ -279,6 +282,8 @@ git log --oneline upstream/main..main
 **如果现有代码是无历史关联的源码复制**，不可直接假设 `git merge` 有公共祖先。先确认 `git merge-base upstream/main main`；无公共祖先应制定“恢复 Fork 历史/迁移差异”专项方案，禁止直接 `--allow-unrelated-histories` 硬拼。
 
 ### 5.3 每次上游同步 SOP
+
+以下是目标主线为 `main` 的模板。当前 `main` 仍跟踪 `upstream/main`，`ccs-dev` 跟踪 `origin/ccs-dev`。本轮远程改名先保留了原跟踪目标，最终复核发现并行操作调整了 `ccs-dev` 的跟踪配置，已保留该变更。当前同步应从核实后的产品 `ccs-dev` 创建独立同步分支，不得直接照抄模板在旧 `main` 上开发。
 
 ```bash
 # 0. 确认本地修改已提交，且 main 受保护

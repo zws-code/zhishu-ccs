@@ -2,6 +2,12 @@
 
 > 这是按基线/事件累积的补丁台账。222 项清单针对 2026-10-29 的 4.0.21 快照，后续变更按事件追加；旧路径、版本和分支描述仅适用于该段，不是当前 4.0.22 的完整重新统计。当前现状见 [代码基线](baseline.md)。
 
+## 2026-11-03：按二开标准统一 Git 远程命名
+
+用户授权整理远程名称和地址。旧 `origin` → `upstream`（官方）、旧 `zhishu-git` → `origin`（智枢 GitHub）、旧 `zhishu-origin` → `gitlab`（内网 GitLab），URL 保持原值。复用 Git 原生 `remote rename`、既有发布脚本和 URL 白名单；发布脚本/回归位于自有 `scripts/zhishu/`，L0，仍校验唯一 push URL、原子推送独立分支与 tag。根 `AGENTS.md` 仅更新固定维护入口中的远程说明（L1），新增旁路文档无法消除该入口中的过期指令；其他修订为自有标准、基线、发布指南及验证记录（L0）。没有上游运行时代码补丁，无需新增 L3 ADR。
+
+远程改名保留分支与 tag、HEAD、历史祖先关系和原分支跟踪目标。最终复核发现并行操作将 `ccs-dev` 改为跟踪 `origin/ccs-dev` 并更新该缓存引用，已保留并记录。本任务未联网、推送、发布、处理 GitLab 分歧或变更凭据/应用数据；历史发布和同步报告保留当时旧名。回退命令及当前地址见 [基线](baseline.md)，验证与未执行项见 [验证记录](../history/validation.md)。
+
 ## 2026-11-02：接入向导识别本机 WorkBuddy
 
 修复「接入到工具」向导把所有非 CLI 应用误判为未安装的问题。WorkBuddy 是桌面应用，没有可执行的 CLI，原检测只调用 `listToolInstallations`（CLI 工具）和 `getClaudeDesktopStatus`，因此即使本机已安装也始终显示「未安装」。

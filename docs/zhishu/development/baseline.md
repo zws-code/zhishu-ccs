@@ -1,20 +1,26 @@
 # Zhishu CCS 当前代码基线与限制
 
-> 核对日期：2026-10-31。依据本地工作区、Git 引用和配置文件；未联网 fetch 或重新核验生产发布状态。
+> Git、版本与远程核对：2026-11-03；其余模块说明沿用 2026-10-31 的核对范围，具体实现以当前代码为准。依据本地工作区、Git 引用和配置文件；未联网 fetch 或重新核验生产发布状态。
 
 ## 版本、上游与远程
 
 | 项目 | 当前本地事实 | 依据 |
 | --- | --- | --- |
-| 产品版本 | `0.0.3` | `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json` |
-| 分支 / 核对时 HEAD | `ccs-dev` / `2fea90d7eb5d215bea390d041d3ef47aee4e1f9c`；含未提交改动 | `git branch --show-current`、`git rev-parse HEAD`、`git status --short` |
-| 已合入上游 | `4.0.22` / `b76426741ef93069e2f374ac01ca7ef5760e1d0e` | 本地 tag；`git merge-base HEAD 4.0.22` 等于该提交 |
-| 官方 remote | `origin` → `git@github.com:farion1231/cc-switch.git` | `git remote -v` |
-| 自有 GitHub | `zhishu-git` → `git@github.com:zws-code/zhishu-ccs.git` | 同上；发布 tag 使用此 remote |
-| 自有 GitLab | `zhishu-origin` → `http://172.16.32.4:8929/hunanzs/zhishu-ccs.git` | 同上 |
+| 产品版本 | `0.0.6` | `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json` |
+| 分支 / 核对时 HEAD | `ccs-dev` / `c5d3f2c99b4748c6041135c8ba35835e94675ddc`；远程整理前工作区干净，整理后的文档/脚本改动未提交 | `git branch --show-current`、`git rev-parse HEAD`、`git status --short` |
+| 已合入上游 | `4.0.23` / `66d530d6efb68e57f51a97217b0146684f1990bd` | 本地版本分支；`git merge-base HEAD 4.0.23` 等于该提交，合并提交 `2092b400` |
+| 官方 remote | `upstream` → `git@github.com:farion1231/cc-switch.git` | `git remote -v` |
+| 自有 GitHub | `origin` → `git@github.com:zws-code/zhishu-ccs.git` | 同上；发布 tag 使用此 remote |
+| 自有 GitLab | `gitlab` → `http://172.16.32.4:8929/hunanzs/zhishu-ccs.git` | 同上 |
 | Rust / pnpm | Rust `1.95`；pnpm `10.12.3` | `rust-toolchain.toml`、`package.json` |
 
-当前无 `upstream` remote。标准中的 `origin=自有仓库 / upstream=官方` 是目标命名，不能原样套用其示例推送命令；本次保留真实远程和历史不变。上游合并依据见 [4.0.22 同步报告](../upstream-sync/2026-10-31.md) 与 [ADR-0007](../adr/ADR-0007-merge-4.0.22.md)。
+2026-11-03 按用户授权执行 `git remote rename`：旧 `origin` → `upstream`、旧 `zhishu-git` → `origin`、旧 `zhishu-origin` → `gitlab`。fetch/push 地址不变，远程跟踪引用随改名迁移；本地分支、tag 和 HEAD 保持不变。本任务未 fetch、pull、push 或修改服务器配置。
+
+重命名后的初检保留原目标：`main` → `upstream/main`，`ccs-dev` → `gitlab/ccw-dev`。最终复核发现并行操作将 `ccs-dev` 改为跟踪 `origin/ccs-dev`，并将该远程缓存引用从 `59b437af` 更新至当前 HEAD `c5d3f2c9`；已保留，不能据此声称本任务已核验远端同步。当前本地缓存显示 `ccs-dev` 与 `origin/ccs-dev` 一致，相比 `gitlab/ccw-dev` 仍领先 210、落后 9；改名不解决 GitLab 分歧。发布脚本只接受指向 `zws-code/zhishu-ccs` 的 `origin` 唯一 push URL，仍拒绝官方地址和多个 push URL。
+
+其他克隆应先核对旧配置再按上述顺序迁移，脚本与文档须一起更新。回退顺序：`git remote rename origin zhishu-git` → `git remote rename upstream origin` → `git remote rename gitlab zhishu-origin`，并恢复本轮发布脚本/当前操作文档；无需改动提交历史或真实用户数据。
+
+历史 [4.0.22 同步报告](../upstream-sync/2026-10-31.md)、[ADR-0007](../adr/ADR-0007-merge-4.0.22.md) 及版本发布证据中的远程旧名保留原事实，不表示当前配置。
 
 ## 身份、目录与凭据
 
