@@ -44,7 +44,8 @@ pub async fn restore_config_change_history(
 }
 
 /// 按平台操作锁、工具切换锁的顺序获取锁，先完成 pending 恢复，再还原该组文件。
-/// 直连模式的供应商指针仅在仍指向本次历史切换目标时回退，保留用户后续切换的选择。
+/// 直连模式的供应商指针仅在仍指向本次历史切换目标时回退，保留用户后续切换的选择；
+/// 切换前没有供应商时清除选择，切换前的供应商已被删除时保留当前选择。
 fn restore_group(
     state: &crate::store::AppState,
     ids: &[String],
@@ -65,17 +66,43 @@ fn restore_group(
             &app_type,
             crate::mode::current::Purpose::Direct,
         )?;
-        if let Some(from) = pointer.from.as_deref() {
-            // Only move the selection back while it still points at the
-            // provider this switch selected; a later switch keeps its choice.
-            if current.as_deref() == Some(pointer.to.as_str()) {
-                crate::settings::set_current_provider(&app_type, Some(from))?;
-                state.db.set_current_provider(&plan.app, from)?;
-                pointer_restored = true;
+        // Only move the selection back while it still points at the provider
+        // this switch selected; a later switch keeps its choice.
+        if let Some(target) = pointer_restore_target(pointer, current.as_deref()) {
+            match target {
+                Some(from) => {
+                    // The provider the switch started from may have been
+                    // deleted since (e.g. 一键删除平台供应商); selecting a
+                    // missing row would leave files and selection inconsistent.
+                    if state.db.get_provider_by_id(from, &plan.app)?.is_some() {
+                        crate::settings::set_current_provider(&app_type, Some(from))?;
+                        state.db.set_current_provider(&plan.app, from)?;
+                        pointer_restored = true;
+                    }
+                }
+                None => {
+                    // The switch started with no direct provider, so restoring
+                    // it clears the selection. `set_current_provider` has no
+                    // clear form, and an empty id matches no provider row, so
+                    // this only zeroes `is_current` for the app.
+                    crate::settings::set_current_provider(&app_type, None)?;
+                    state.db.set_current_provider(&plan.app, "")?;
+                    pointer_restored = true;
+                }
             }
         }
     }
     Ok(summary(files, pointer_restored))
+}
+
+/// The direct selection a restored switch should move back to while the app
+/// still points at the provider that switch chose. `Some(None)` means the
+/// switch started with no current provider, so restoring clears the selection.
+fn pointer_restore_target<'a>(
+    pointer: &'a config_history::SwitchPointer,
+    current: Option<&str>,
+) -> Option<Option<&'a str>> {
+    (current == Some(pointer.to.as_str())).then_some(pointer.from.as_deref())
 }
 
 fn summary(
@@ -87,5 +114,42 @@ fn summary(
         files,
         changed,
         pointer_restored,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config_history::SwitchPointer;
+
+    fn switch(from: Option<&str>, to: &str) -> SwitchPointer {
+        SwitchPointer {
+            from: from.map(str::to_owned),
+            to: to.to_owned(),
+        }
+    }
+
+    #[test]
+    fn pointer_restore_only_moves_back_from_the_switched_provider() {
+        let pointer = switch(Some("provider-a"), "provider-b");
+        assert_eq!(
+            pointer_restore_target(&pointer, Some("provider-b")),
+            Some(Some("provider-a"))
+        );
+        // A later switch (or a missing selection) keeps its own choice.
+        assert_eq!(pointer_restore_target(&pointer, Some("provider-c")), None);
+        assert_eq!(pointer_restore_target(&pointer, None), None);
+    }
+
+    #[test]
+    fn first_switch_restores_to_no_selection() {
+        // The switch started with no current provider; restoring must clear
+        // it instead of leaving the switched-to provider selected.
+        let pointer = switch(None, "provider-b");
+        assert_eq!(
+            pointer_restore_target(&pointer, Some("provider-b")),
+            Some(None)
+        );
+        assert_eq!(pointer_restore_target(&pointer, Some("provider-c")), None);
     }
 }

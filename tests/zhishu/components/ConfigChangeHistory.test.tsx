@@ -369,16 +369,58 @@ describe("app configuration history", () => {
     ).toBeInTheDocument();
   });
 
-  it("labels platform deletion separately from synchronization", async () => {
+  it("labels a platform deletion report separately from synchronization", async () => {
     i18n.addResource(
       "zh",
       "translation",
       "platformCatalog.deleteAction",
       "平台供应商删除",
     );
-    records = [{ ...group, action: "platform_delete" }];
+    const sync = {
+      added: 0,
+      updated: 0,
+      removed: 2,
+      unchanged: 1,
+      changedFiles: [],
+      backupPath: null,
+      warnings: [],
+    };
+    const item: ConfigChangeGroup = {
+      ...group,
+      action: "platform_delete",
+      sensitive: false,
+      sync,
+      files: [{ ...singleFile, beforeExists: false, afterExists: false }],
+    };
+    records = [item];
+    details = {
+      id: item.id,
+      app: item.app,
+      path: item.path,
+      changedAt: item.changedAt,
+      action: item.action,
+      before: null,
+      after: null,
+      sensitive: false,
+      sync,
+    };
     mount(<ConfigChangeHistoryPanel app="codex" />);
-    expect(await screen.findByText("平台供应商删除")).toBeInTheDocument();
+    const row = await screen.findByRole("button", { name: /删除结果/ });
+    expect(row).toHaveTextContent("平台供应商删除");
+    expect(row).not.toHaveTextContent("供应商同步结果");
+    await userEvent.click(row);
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Codex · 删除结果");
+    expect(
+      within(dialog).getByText(
+        "查看本次删除结果、原生配置文件变化与备份位置。",
+      ),
+    ).toBeInTheDocument();
+    // A deletion report never creates a sync backup, so that section is hidden.
+    expect(within(dialog).queryByText("同步前备份")).not.toBeInTheDocument();
+    expect(
+      within(dialog).queryByText("本次没有覆盖冲突，未创建额外的同步备份。"),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("platform_delete")).not.toBeInTheDocument();
   });
 
@@ -515,6 +557,11 @@ describe("app configuration history", () => {
           description: undefined,
         },
       ),
+    );
+    // The restored diff would be historical; the detail dialog closes so the
+    // remaining "还原到修改前" action cannot mislead.
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
   });
   it("keeps the confirmation open and reports restore conflicts", async () => {

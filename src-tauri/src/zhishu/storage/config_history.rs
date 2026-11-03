@@ -774,8 +774,9 @@ fn restore_record_at(device_dir: &Path, id: &str) -> Result<ConfigChangeRecord, 
 }
 
 /// Load and validate every record of the group. All records must belong to
-/// one app; when several records touch the same path only the newest is
-/// restorable, so older ones are dropped instead of failing later.
+/// one app. A file written several times in one operation has chained
+/// snapshots (`S0→S1`, `S1→S2`), so every record is kept: restoring newest
+/// first walks the file back through each step to the operation's start.
 fn restore_plan_at(device_dir: &Path, ids: &[String]) -> Result<RestorePlan, AppError> {
     if ids.is_empty() {
         return Err(AppError::Message("没有选择要还原的记录".into()));
@@ -787,9 +788,9 @@ fn restore_plan_at(device_dir: &Path, ids: &[String]) -> Result<RestorePlan, App
     plan_records(records)
 }
 
-/// Pure planning over already-validated records: one app per restore, newest
-/// record first, only the newest record per path, and the group's switch
-/// pointer to move back.
+/// Pure planning over already-validated records: one app per restore, every
+/// record newest first (see [`restore_plan_at`] for repeated writes), and the
+/// group's switch pointer to move back.
 fn plan_records(records: Vec<ConfigChangeRecord>) -> Result<RestorePlan, AppError> {
     let mut records = records;
     let app = records[0].app.clone();
@@ -797,20 +798,15 @@ fn plan_records(records: Vec<ConfigChangeRecord>) -> Result<RestorePlan, AppErro
         return Err(AppError::Message("一次只能还原同一个应用的一次修改".into()));
     }
     records.sort_by(|left, right| right.id.cmp(&left.id));
-    let mut newest_per_path: Vec<ConfigChangeRecord> = Vec::new();
-    let mut seen_paths: HashSet<String> = HashSet::new();
-    for record in records {
-        if seen_paths.insert(record.path.clone()) {
-            newest_per_path.push(record);
-        }
-    }
-    let pointer = newest_per_path
+    // The oldest pointer is the state before the operation; later stamps in
+    // the same group would move the selection only part of the way back.
+    let pointer = records
         .iter()
         .rev()
         .find_map(|record| record.switch_pointer.clone());
     Ok(RestorePlan {
         app,
-        records: newest_per_path,
+        records,
         pointer,
     })
 }
@@ -1089,7 +1085,7 @@ fn app_for_path(path: &Path) -> Option<String> {
         return Some("claude-desktop".into());
     }
 
-    let rules: [(&str, PathBuf, &[&str]); 11] = [
+    let rules: [(&str, PathBuf, &[&str]); 14] = [
         (
             "codex",
             crate::codex_config::get_codex_config_dir(),
@@ -1125,19 +1121,52 @@ fn app_for_path(path: &Path) -> Option<String> {
             crate::pi_config::get_pi_agent_dir()
                 .ok()
                 .unwrap_or_default(),
-            &["models.json", "settings.json", "auth.json"],
+            &["models.json", "settings.json", "auth.json", "mcp.json"],
         ),
         (
             "workbuddy",
             crate::workbuddy_config::get_workbuddy_home(),
             &["models.json"],
         ),
-        ("mcode", crate::mcode_config::data_dir(), &["config.yaml"]),
-        ("kimi", crate::kimi_config::data_dir(), &["config.toml"]),
+        (
+            "mcode",
+            crate::mcode_config::data_dir(),
+            &["config.yaml", "mcp.json"],
+        ),
+        (
+            "kimi",
+            crate::kimi_config::data_dir(),
+            &["config.toml", "mcp.json"],
+        ),
         (
             "agy",
             crate::agy_config::agy_dir(),
             &["settings.json", "auth.json", ".env"],
+        ),
+        // Antigravity's MCP file lives in the shared customizations dir, not
+        // under `agy_dir()`.
+        (
+            "agy",
+            crate::agy_config::customizations_dir(),
+            &["mcp_config.json"],
+        ),
+        (
+            "dsh",
+            crate::dsh_config::data_dir(),
+            &["cordis.patch.yml", ".credentials.yaml"],
+        ),
+        (
+            "omp",
+            crate::omp_config::get_omp_agent_dir()
+                .ok()
+                .unwrap_or_default(),
+            &[
+                "models.yml",
+                "models.yaml",
+                "config.yml",
+                "config.yaml",
+                "mcp.json",
+            ],
         ),
     ];
 
@@ -1500,7 +1529,7 @@ mod tests {
     }
 
     #[test]
-    fn plan_records_keeps_the_newest_record_per_path_and_the_switch_pointer() {
+    fn plan_records_keeps_every_record_newest_first_and_the_switch_pointer() {
         let mut old_config = record("0001", "2026-10-25T10:00:00+08:00", "a", "b");
         old_config.path = "/tmp/config.toml".into();
         old_config.operation_id = Some("op-1".into());
@@ -1515,12 +1544,19 @@ mod tests {
         auth.path = "/tmp/auth.json".into();
         auth.operation_id = Some("op-1".into());
 
-        // Same path twice: only the newest record stays restorable.
+        // Same path twice keeps both chained snapshots so the restore can walk
+        // the file back through each write of the operation.
         let plan = plan_records(vec![old_config, auth.clone(), new_config]).unwrap();
         assert_eq!(plan.app, "codex");
-        assert_eq!(plan.records.len(), 2);
-        assert_eq!(plan.records[0].id, "0003", "records restore newest first");
-        assert_eq!(plan.records[1].id, "0002");
+        assert_eq!(plan.records.len(), 3);
+        assert_eq!(
+            plan.records
+                .iter()
+                .map(|record| record.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["0003", "0002", "0001"],
+            "records restore newest first"
+        );
         assert_eq!(
             plan.pointer,
             Some(SwitchPointer {
@@ -1590,6 +1626,51 @@ mod tests {
         assert_eq!(
             fs::read_to_string(&second_path).unwrap(),
             "token='external'\n"
+        );
+    }
+
+    #[test]
+    fn restore_records_walks_repeated_writes_of_the_same_file_back_to_the_start() {
+        let dir = tempfile::tempdir().unwrap();
+        let app = format!(
+            "history-{}",
+            dir.path().file_name().unwrap().to_string_lossy()
+        );
+        let path = dir.path().join("config.toml");
+        fs::write(&path, "model='step-2'\n").unwrap();
+        let store = DeviceStore::at(dir.path().join("device"));
+        let item = |id: &str, before: &str, after: &str| ConfigChangeRecord {
+            id: id.into(),
+            app: app.clone(),
+            path: path.to_string_lossy().into_owned(),
+            changed_at: "2026-10-25T12:00:00+08:00".into(),
+            action: "switch".into(),
+            before: Some(before.into()),
+            after: Some(after.into()),
+            sensitive: false,
+            operation_id: Some("op-1".into()),
+            operation_action: None,
+            switch_pointer: None,
+            sync: None,
+            summary: None,
+        };
+        // One operation wrote the same file twice: step-0 -> step-1 -> step-2.
+        // Keeping only the newest record would stop at step-1.
+        let plan = RestorePlan {
+            app: app.clone(),
+            records: vec![
+                item("0002", "model='step-1'\n", "model='step-2'\n"),
+                item("0001", "model='step-0'\n", "model='step-1'\n"),
+            ],
+            pointer: None,
+        };
+        let files = restore_records(&plan, &store).unwrap();
+        assert_eq!(files.len(), 2);
+        assert!(files.iter().all(|file| file.changed));
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            "model='step-0'\n",
+            "every write of the operation is undone, not just the last"
         );
     }
 
@@ -1744,5 +1825,40 @@ mod tests {
         assert!(validate_restore_path(&item).is_err());
         item.path = "/tmp/../config.toml".into();
         assert!(validate_restore_path(&item).is_err());
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn history_tracks_dsh_omp_and_per_app_mcp_files() {
+        let app = |path: PathBuf| app_for_path(&path);
+        assert_eq!(
+            app(crate::dsh_config::profile_path("web")),
+            Some("dsh".into())
+        );
+        assert_eq!(
+            app(crate::dsh_config::credentials_path()),
+            Some("dsh".into())
+        );
+        assert_eq!(
+            app(crate::agy_config::customizations_dir().join("mcp_config.json")),
+            Some("agy".into())
+        );
+        assert_eq!(
+            app(crate::kimi_config::data_dir().join("mcp.json")),
+            Some("kimi".into())
+        );
+        assert_eq!(
+            app(crate::mcode_config::data_dir().join("mcp.json")),
+            Some("mcode".into())
+        );
+        assert_eq!(
+            app(crate::pi_config::get_pi_agent_dir()
+                .unwrap()
+                .join("mcp.json")),
+            Some("pi".into())
+        );
+        let omp = crate::omp_config::get_omp_agent_dir().unwrap();
+        assert_eq!(app(omp.join("models.yml")), Some("omp".into()));
+        assert_eq!(app(omp.join("mcp.json")), Some("omp".into()));
     }
 }

@@ -12,13 +12,18 @@ import { extractErrorMessage } from "@/utils/errorUtils";
 
 export function ProviderSyncReportView({
   id,
+  action,
   report,
 }: {
   id: string;
+  action: string;
   report: ProviderSyncReport;
 }) {
   const { t } = useTranslation();
   const [opening, setOpening] = useState(false);
+  // Deletion reports reuse the sync report shape but never create a sync
+  // backup; without one there is nothing to show in the backup section.
+  const showBackup = report.backupPath !== null || action !== "platform_delete";
   const openBackup = async () => {
     setOpening(true);
     try {
@@ -70,44 +75,46 @@ export function ProviderSyncReportView({
           </p>
         )}
       </section>
-      <section className="space-y-2 rounded-control border border-border p-3">
-        <h3 className="font-medium">
-          {t("platformCatalog.syncBackup", "同步前备份")}
-        </h3>
-        {report.backupPath ? (
-          <>
-            <code className="block select-text break-all text-caption text-fg-2">
-              {report.backupPath}
-            </code>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="neutral"
-                size="compact"
-                disabled={opening}
-                onClick={() => void openBackup()}
-              >
-                <FolderOpen className="h-4 w-4" />
-                {t("platformCatalog.openBackup", "打开备份目录")}
-              </Button>
-              <Button
-                variant="quiet"
-                size="compact"
-                onClick={() => void copyBackup()}
-              >
-                <Copy className="h-4 w-4" />
-                {t("platformCatalog.copyBackupPath", "复制备份路径")}
-              </Button>
-            </div>
-          </>
-        ) : (
-          <p className="text-fg-2">
-            {t(
-              "platformCatalog.noSyncBackup",
-              "本次没有覆盖冲突，未创建额外的同步备份。",
-            )}
-          </p>
-        )}
-      </section>
+      {showBackup && (
+        <section className="space-y-2 rounded-control border border-border p-3">
+          <h3 className="font-medium">
+            {t("platformCatalog.syncBackup", "同步前备份")}
+          </h3>
+          {report.backupPath ? (
+            <>
+              <code className="block select-text break-all text-caption text-fg-2">
+                {report.backupPath}
+              </code>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="neutral"
+                  size="compact"
+                  disabled={opening}
+                  onClick={() => void openBackup()}
+                >
+                  <FolderOpen className="h-4 w-4" />
+                  {t("platformCatalog.openBackup", "打开备份目录")}
+                </Button>
+                <Button
+                  variant="quiet"
+                  size="compact"
+                  onClick={() => void copyBackup()}
+                >
+                  <Copy className="h-4 w-4" />
+                  {t("platformCatalog.copyBackupPath", "复制备份路径")}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <p className="text-fg-2">
+              {t(
+                "platformCatalog.noSyncBackup",
+                "本次没有覆盖冲突，未创建额外的同步备份。",
+              )}
+            </p>
+          )}
+        </section>
+      )}
       {report.warnings.map((warning, index) => (
         <p key={index} role="status" className="text-warning-text">
           {warning}

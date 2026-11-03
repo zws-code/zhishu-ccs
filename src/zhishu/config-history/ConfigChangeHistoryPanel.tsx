@@ -46,7 +46,13 @@ import { toast } from "@/lib/toast";
 import { extractErrorMessage } from "@/utils/errorUtils";
 import type { AppId } from "@/lib/api/types";
 import { useQueryClient } from "@tanstack/react-query";
-import { useConfigChangeHistory } from "@/zhishu/config-history/query/configHistory";
+import {
+  configHistoryKeys,
+  useConfigChangeHistory,
+} from "@/zhishu/config-history/query/configHistory";
+import { providersApi } from "@/lib/api";
+import { openclawKeys } from "@/hooks/useOpenClaw";
+import { invalidateHermesProviderCaches } from "@/hooks/useHermes";
 import { copyText } from "@/lib/clipboard";
 import {
   configUnifiedDiff,
@@ -60,6 +66,11 @@ type AppFilter = "all" | AppId;
 
 function fileName(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
+}
+
+/** A file written several times in one operation has one record per write. */
+function distinctFilePaths(files: ConfigChangeFileSummary[]): string[] {
+  return [...new Set(files.map((file) => file.path))];
 }
 
 export function formatChangeTime(value: string): string {
@@ -84,6 +95,7 @@ export function ConfigChangeHistoryPanel({
   );
   const items = history.data ?? [];
   const loading = history.isPending;
+  const refreshing = history.isFetching;
   const load = async () => {
     await history.refetch();
   };
@@ -125,7 +137,7 @@ export function ConfigChangeHistoryPanel({
             }),
           );
           setSelected(null);
-          void client.invalidateQueries({ queryKey: ["configChangeHistory"] });
+          void client.invalidateQueries({ queryKey: configHistoryKeys.all });
         } else setDetail(value);
       })
       .catch((error) => {
@@ -145,6 +157,50 @@ export function ConfigChangeHistoryPanel({
       active = false;
     };
   }, [selected, selectedFileId, revealSensitive, detailAttempt, client, t]);
+
+  /**
+   * A restore only touches this app's native files and direct pointer, so
+   * refresh the same local caches a provider switch does. A blanket
+   * invalidation would also refetch platform catalog/usage over the network.
+   */
+  const invalidateAfterRestore = async (restoredApp: AppId) => {
+    await client.invalidateQueries({ queryKey: configHistoryKeys.all });
+    await client.invalidateQueries({ queryKey: ["providers", restoredApp] });
+    if (restoredApp === "opencode") {
+      await client.invalidateQueries({
+        queryKey: ["opencodeLiveProviderIds"],
+      });
+      await client.invalidateQueries({
+        queryKey: ["opencode", "runtime-models"],
+      });
+      await client.invalidateQueries({
+        queryKey: ["omo", "current-provider-id"],
+      });
+      await client.invalidateQueries({
+        queryKey: ["omo-slim", "current-provider-id"],
+      });
+    }
+    if (restoredApp === "openclaw") {
+      await client.invalidateQueries({
+        queryKey: openclawKeys.liveProviderIds,
+      });
+      await client.invalidateQueries({ queryKey: openclawKeys.defaultModel });
+      await client.invalidateQueries({ queryKey: openclawKeys.health });
+    }
+    if (restoredApp === "hermes") {
+      await invalidateHermesProviderCaches(client);
+    }
+    if (restoredApp === "claude-desktop") {
+      await client.invalidateQueries({ queryKey: ["claudeDesktopStatus"] });
+    }
+  };
+
+  const closeDetail = () => {
+    setSelected(null);
+    setSelectedFileId(null);
+    setDetail(null);
+    setRevealSensitive(false);
+  };
 
   const openRecord = (record: ConfigChangeGroup) => {
     setDetail(null);
@@ -179,15 +235,31 @@ export function ConfigChangeHistoryPanel({
   };
   const handleRestore = async () => {
     if (!selected || restoring) return;
+    const restoredApp = selected.app;
     setRestoring(true);
     try {
       const ids = selected.files.map((file) => file.id);
       const result = await configHistoryApi.restore(ids);
       setRestoreOpen(false);
+      await invalidateAfterRestore(restoredApp);
+      if (result.pointerRestored) {
+        // The tray shows the current provider; a moved pointer must reach it.
+        try {
+          await providersApi.updateTrayMenu();
+        } catch (trayError) {
+          console.error("Failed to update tray menu after restore", trayError);
+        }
+      }
       if (result.changed) {
         toast.success(
           t("settings.configHistory.restoredFiles", {
-            count: result.files.filter((file) => file.changed).length,
+            // A file written several times restores in several steps but is
+            // still one file to the user.
+            count: new Set(
+              result.files
+                .filter((file) => file.changed)
+                .map((file) => file.path),
+            ).size,
             defaultValue: "已还原 {{count}} 个文件，当前配置已备份",
           }),
           {
@@ -205,10 +277,17 @@ export function ConfigChangeHistoryPanel({
           }),
         );
       }
-      await client.invalidateQueries();
+      // The diff shown for this record is now historical; closing avoids an
+      // enabled restore action that would only report "already restored".
+      closeDetail();
     } catch (error) {
+      // A multi-file restore keeps files it already restored before the
+      // failing one; refresh so those are visible even though this failed.
+      await invalidateAfterRestore(restoredApp);
       toast.error(
-        t("settings.configHistory.restoreFailed", { defaultValue: "还原失败" }),
+        t("settings.configHistory.restoreFailed", {
+          defaultValue: "还原失败",
+        }),
         { description: extractErrorMessage(error) },
       );
     } finally {
@@ -236,7 +315,7 @@ export function ConfigChangeHistoryPanel({
       setSelected(null);
       setSelectedFileId(null);
       setDetail(null);
-      await client.invalidateQueries({ queryKey: ["configChangeHistory"] });
+      await client.invalidateQueries({ queryKey: configHistoryKeys.all });
       toast.success(
         t("settings.configHistory.cleared", {
           count: removed,
@@ -281,6 +360,19 @@ export function ConfigChangeHistoryPanel({
     [t],
   );
 
+  /** 供应商同步报告与删除报告共用 `sync` 字段，标题必须按动作区分。 */
+  const reportLabel = useCallback(
+    (action: string) =>
+      action === "platform_delete"
+        ? t("platformCatalog.deleteResultStatus", {
+            defaultValue: "删除结果",
+          })
+        : t("platformCatalog.syncResult", {
+            defaultValue: "供应商同步结果",
+          }),
+    [t],
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -310,12 +402,12 @@ export function ConfigChangeHistoryPanel({
           variant="neutral"
           size="compact"
           onClick={() => void load()}
-          disabled={loading}
+          disabled={refreshing}
           aria-label={t("settings.configHistory.refresh", {
             defaultValue: "刷新",
           })}
         >
-          <RefreshCw className={loading ? "animate-spin" : undefined} />
+          <RefreshCw className={refreshing ? "animate-spin" : undefined} />
           {t("settings.configHistory.refresh", {
             defaultValue: "刷新",
           })}
@@ -391,7 +483,7 @@ export function ConfigChangeHistoryPanel({
                   <div className="mt-0.5 truncate font-mono text-caption text-fg-2">
                     {record.sync ? (
                       <>
-                        {t("platformCatalog.syncResult", "供应商同步结果")}
+                        {reportLabel(record.action)}
                         <span className="ms-2 font-sans text-fg-3">
                           {t("platformCatalog.syncStats", {
                             defaultValue:
@@ -400,18 +492,18 @@ export function ConfigChangeHistoryPanel({
                           })}
                         </span>
                       </>
-                    ) : record.files.length > 1 ? (
+                    ) : distinctFilePaths(record.files).length > 1 ? (
                       <TooltipProvider delayDuration={0} skipDelayDuration={0}>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span className="block truncate">
                               {t("settings.configHistory.changedFiles", {
-                                count: record.files.length,
+                                count: distinctFilePaths(record.files).length,
                                 defaultValue: "修改了 {{count}} 个文件",
                               })}
                               <span className="ms-2 font-sans text-fg-3">
-                                {record.files
-                                  .map((file) => fileName(file.path))
+                                {distinctFilePaths(record.files)
+                                  .map((path) => fileName(path))
                                   .join("、")}
                               </span>
                             </span>
@@ -421,7 +513,7 @@ export function ConfigChangeHistoryPanel({
                             align="start"
                             className="max-w-[480px] whitespace-pre-wrap break-all rounded-panel text-left font-mono leading-5"
                           >
-                            {record.files.map((file) => file.path).join("\n")}
+                            {distinctFilePaths(record.files).join("\n")}
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -455,7 +547,7 @@ export function ConfigChangeHistoryPanel({
                         ? t("settings.configHistory.viewSummary", {
                             defaultValue: "查看详情",
                           })
-                        : record.files.length > 1
+                        : distinctFilePaths(record.files).length > 1
                           ? t("settings.configHistory.viewChanges", {
                               defaultValue: "查看前后内容",
                             })
@@ -482,10 +574,7 @@ export function ConfigChangeHistoryPanel({
         open={!!selected}
         onOpenChange={(open) => {
           if (!open && !restoring && !restoreOpen) {
-            setSelected(null);
-            setSelectedFileId(null);
-            setDetail(null);
-            setRevealSensitive(false);
+            closeDetail();
           }
         }}
       >
@@ -499,12 +588,12 @@ export function ConfigChangeHistoryPanel({
               {selected
                 ? ` · ${
                     selected.sync
-                      ? t("platformCatalog.syncResult", "供应商同步结果")
+                      ? reportLabel(selected.action)
                       : selected.summary
                         ? actionLabel(selected.action)
-                        : selected.files.length > 1
+                        : distinctFilePaths(selected.files).length > 1
                           ? t("settings.configHistory.changedFiles", {
-                              count: selected.files.length,
+                              count: distinctFilePaths(selected.files).length,
                               defaultValue: "修改了 {{count}} 个文件",
                             })
                           : fileName(selected.files[0].path)
@@ -513,10 +602,15 @@ export function ConfigChangeHistoryPanel({
             </DialogTitle>
             <DialogDescription className="break-all font-mono">
               {selected?.sync
-                ? t(
-                    "platformCatalog.syncResultDescription",
-                    "查看本次同步结果、原生配置文件变化与备份位置。",
-                  )
+                ? selected.action === "platform_delete"
+                  ? t(
+                      "platformCatalog.deleteResultDescription",
+                      "查看本次删除结果、原生配置文件变化与备份位置。",
+                    )
+                  : t(
+                      "platformCatalog.syncResultDescription",
+                      "查看本次同步结果、原生配置文件变化与备份位置。",
+                    )
                 : selectedFile?.path}
             </DialogDescription>
           </DialogHeader>
@@ -581,7 +675,11 @@ export function ConfigChangeHistoryPanel({
               </div>
             ) : detail?.sync ? (
               <div className="min-h-0 flex-1 overflow-auto">
-                <ProviderSyncReportView id={detail.id} report={detail.sync} />
+                <ProviderSyncReportView
+                  id={detail.id}
+                  action={detail.action}
+                  report={detail.sync}
+                />
               </div>
             ) : detail?.summary ? (
               <div className="min-h-0 flex-1 overflow-auto">
@@ -721,10 +819,7 @@ export function ConfigChangeHistoryPanel({
             <Button
               variant="neutral"
               onClick={() => {
-                setSelected(null);
-                setSelectedFileId(null);
-                setDetail(null);
-                setRevealSensitive(false);
+                closeDetail();
               }}
               disabled={restoring}
             >
@@ -761,18 +856,19 @@ export function ConfigChangeHistoryPanel({
             </DialogDescription>
           </DialogHeader>
           <div className="px-6 text-caption text-fg-2">
-            {selected && selected.files.length > 1 && (
+            {selected && distinctFilePaths(selected.files).length > 1 && (
               <div className="mb-1">
                 {t("settings.configHistory.restoreFilesIntro", {
-                  count: selected.files.length,
+                  count: distinctFilePaths(selected.files).length,
                   defaultValue: "将还原 {{count}} 个文件：",
                 })}
               </div>
             )}
             <ul className="m-0 list-none break-all p-0 font-mono">
-              {selected?.files.map((file) => (
-                <li key={file.id}>{file.path}</li>
-              ))}
+              {selected &&
+                distinctFilePaths(selected.files).map((path) => (
+                  <li key={path}>{path}</li>
+                ))}
             </ul>
             {selected && formatChangeTime(selected.changedAt)}
             {selected?.files.some((file) => !file.beforeExists) && (
