@@ -307,7 +307,7 @@ requires_openai_auth = true
 
     assert_eq!(
         parsed.get("model_provider").and_then(|v| v.as_str()),
-        Some("custom"),
+        Some("zhishu"),
         "every third-party route is written as the custom table"
     );
 
@@ -317,7 +317,7 @@ requires_openai_auth = true
         .expect("model_providers table exists");
     assert_eq!(
         model_providers
-            .get("custom")
+            .get("zhishu")
             .and_then(|v| v.get("base_url"))
             .and_then(|v| v.as_str()),
         Some("https://aihubmix.example/v1"),
@@ -328,8 +328,8 @@ requires_openai_auth = true
         "the row's own table id is not written"
     );
     assert!(
-        model_providers.get("rightcode").is_none(),
-        "the old version's table for old-provider (same id and address as its row) is retired"
+        model_providers.get("rightcode").is_some(),
+        "a matching database row cannot prove ownership of an unmarked external table"
     );
 
     let providers = state
@@ -472,13 +472,13 @@ requires_openai_auth = true
     let parsed_live: toml::Value = toml::from_str(&live_config).expect("parse live config");
     assert_eq!(
         parsed_live.get("model_provider").and_then(|v| v.as_str()),
-        Some("custom"),
+        Some("zhishu"),
         "third-party routes are always written as the custom table"
     );
     assert_eq!(
         parsed_live
             .get("model_providers")
-            .and_then(|v| v.get("custom"))
+            .and_then(|v| v.get("zhishu"))
             .and_then(|v| v.get("experimental_bearer_token"))
             .and_then(|v| v.as_str()),
         Some("bridge-key"),
@@ -487,20 +487,19 @@ requires_openai_auth = true
     assert_eq!(
         parsed_live
             .get("model_providers")
-            .and_then(|v| v.get("custom"))
+            .and_then(|v| v.get("zhishu"))
             .and_then(|v| v.get("requires_openai_auth"))
             .and_then(|v| v.as_bool()),
         Some(true)
     );
 
-    // 旧版按行的 id 写进 live 的表（id 和地址都对得上 legacy-provider 的投影）被清掉，
-    // 里面的真实 Key 不再留在 live 里。
+    // 同名同地址不足以证明产品归属；保留未知来源的旧表及其中的用户字段。
     assert!(
         parsed_live
             .get("model_providers")
             .and_then(|v| v.get("rightcode"))
-            .is_none(),
-        "the table an old version wrote for legacy-provider is retired: {live_config}"
+            .is_some(),
+        "an unmarked external table is preserved: {live_config}"
     );
 
     ProviderService::switch(&state, AppType::Codex, "plain-provider")
@@ -643,7 +642,7 @@ wire_api = "responses"
         "enabling takeover should point Codex config.toml at the local proxy"
     );
     assert!(
-        config_after_takeover.contains("PROXY_MANAGED"),
+        config_after_takeover.contains("ZHISHU_CCS_PROXY_MANAGED"),
         "enabling takeover should move the proxy placeholder into config.toml"
     );
     assert!(
@@ -670,7 +669,7 @@ wire_api = "responses"
         "disabling takeover should restore the selected DeepSeek live config"
     );
     assert!(
-        !restored_config.contains("PROXY_MANAGED"),
+        !restored_config.contains("ZHISHU_CCS_PROXY_MANAGED"),
         "restored live config must not keep the proxy placeholder"
     );
 }
@@ -926,7 +925,7 @@ openai_base_url = "https://relay.example/v1"
         "the top-level reroute must be rewritten away; got:\n{live_config}"
     );
     assert!(
-        live_config.contains("[model_providers.custom]")
+        live_config.contains("[model_providers.zhishu]")
             && live_config.contains("base_url = \"https://relay.example/v1\"")
             && live_config.contains("experimental_bearer_token = \"third-party-key\""),
         "routing and key must move into the custom provider table; got:\n{live_config}"
@@ -991,7 +990,7 @@ experimental_bearer_token = "config-carried-key"
         "the top-level reroute must be rewritten away; got:\n{live_config}"
     );
     assert!(
-        live_config.contains("[model_providers.custom]"),
+        live_config.contains("[model_providers.zhishu]"),
         "the custom provider table must be created; got:\n{live_config}"
     );
     assert_eq!(
@@ -1048,7 +1047,7 @@ openai_base_url = "https://relay.example/v1"
         std::fs::read_to_string(cc_switch_lib::get_codex_config_path()).expect("read config.toml");
     assert!(
         !live_config.contains("openai_base_url")
-            && live_config.contains("[model_providers.custom]")
+            && live_config.contains("[model_providers.zhishu]")
             && live_config.contains("experimental_bearer_token = \"third-party-key\""),
         "routing and key must move into the custom provider table; got:\n{live_config}"
     );
@@ -1068,10 +1067,10 @@ fn provider_service_switch_codex_preserved_login_rejects_keyless_official_auth_f
     let _home = ensure_test_home();
     enable_codex_official_auth_preservation();
 
-    let header_auth_with_fallback = r#"model_provider = "custom"
+    let header_auth_with_fallback = r#"model_provider = "zhishu"
 model = "gpt-5.4"
 
-[model_providers.custom]
+[model_providers.zhishu]
 name = "Custom"
 base_url = "https://relay.example/v1"
 wire_api = "responses"
@@ -1152,10 +1151,10 @@ fn provider_service_switch_codex_preserved_login_allows_keyless_header_auth_prov
     let _home = ensure_test_home();
     enable_codex_official_auth_preservation();
 
-    let header_auth_config = r#"model_provider = "custom"
+    let header_auth_config = r#"model_provider = "zhishu"
 model = "gpt-5.4"
 
-[model_providers.custom]
+[model_providers.zhishu]
 name = "Custom"
 base_url = "https://relay.example/v1"
 wire_api = "responses"
@@ -1504,9 +1503,9 @@ fn reapply_codex_official_live_rewrites_only_the_session_routing() {
     assert!(cc_switch_lib::reapply_current_codex_official_live(&state).expect("reapply"));
     let unified = read_live();
     let doc: toml::Value = toml::from_str(&unified).expect("parse");
-    assert_eq!(doc["model_provider"].as_str(), Some("custom"), "{unified}");
+    assert_eq!(doc["model_provider"].as_str(), Some("zhishu"), "{unified}");
     assert_eq!(
-        doc["model_providers"]["custom"]["requires_openai_auth"].as_bool(),
+        doc["model_providers"]["zhishu"]["requires_openai_auth"].as_bool(),
         Some(true),
         "the unified bucket is the official mirror: {unified}"
     );
@@ -2016,7 +2015,7 @@ model = "deepseek-chat"
 name = "DeepSeek"
 base_url = "http://127.0.0.1:15721/v1"
 wire_api = "responses"
-experimental_bearer_token = "PROXY_MANAGED"
+experimental_bearer_token = "ZHISHU_CCS_PROXY_MANAGED"
 "#;
     write_codex_live_atomic(&oauth_auth, Some(proxy_live_config))
         .expect("seed taken-over Codex live config");
@@ -2081,7 +2080,7 @@ wire_api = "responses"
         std::fs::read_to_string(cc_switch_lib::get_codex_config_path()).expect("read config.toml");
     assert!(
         live_config.contains("https://new.deepseek.example/v1")
-            && !live_config.contains("PROXY_MANAGED"),
+            && !live_config.contains("ZHISHU_CCS_PROXY_MANAGED"),
         "a direct switch replaces leftover proxy placeholders: {live_config}"
     );
     let old_row = state
@@ -2093,7 +2092,7 @@ wire_api = "responses"
         !old_row
             .settings_config
             .to_string()
-            .contains("PROXY_MANAGED"),
+            .contains("ZHISHU_CCS_PROXY_MANAGED"),
         "leftover placeholders must not be backfilled into the outgoing provider"
     );
 }
@@ -2210,7 +2209,7 @@ fn switch_packycode_gemini_updates_security_selected_type() {
     ProviderService::switch(&state, AppType::Gemini, "packy-gemini")
         .expect("switching to PackyCode Gemini should succeed");
 
-    // Gemini security settings are written to ~/.gemini/settings.json, not ~/.cc-switch/settings.json
+    // Gemini security settings are written to ~/.gemini/settings.json, not ~/.zhishu-ccs/settings.json
     let settings_path = home.join(".gemini").join("settings.json");
     assert!(
         settings_path.exists(),
@@ -2265,7 +2264,7 @@ fn packycode_partner_meta_triggers_security_flag_even_without_keywords() {
     ProviderService::switch(&state, AppType::Gemini, "packy-meta")
         .expect("switching to partner meta provider should succeed");
 
-    // Gemini security settings are written to ~/.gemini/settings.json, not ~/.cc-switch/settings.json
+    // Gemini security settings are written to ~/.gemini/settings.json, not ~/.zhishu-ccs/settings.json
     let settings_path = home.join(".gemini").join("settings.json");
     assert!(
         settings_path.exists(),
@@ -3014,23 +3013,14 @@ fn recover_from_crash_without_backup_cleans_placeholder_instead_of_writing_it_ba
         .set_current_provider(AppType::Claude.as_str(), "default")
         .expect("set current provider");
 
-    // 启动时处理旧版遗留的接管态：没开代理（enabled=0），写回直连。
+    // 无归属证据时，启动不再认领来自原版的通用占位符。
     futures::executor::block_on(cc_switch_lib::mode::controller::startup(&state));
 
     let live_after: serde_json::Value =
         read_json_file(&settings_path).expect("read live settings after recovery");
-    let env = live_after.get("env").cloned().unwrap_or_else(|| json!({}));
-    assert_ne!(
-        env.get("ANTHROPIC_AUTH_TOKEN").and_then(|v| v.as_str()),
-        Some("PROXY_MANAGED"),
-        "recovery must not write the placeholder back to live"
-    );
-    assert!(
-        env.get("ANTHROPIC_BASE_URL")
-            .and_then(|v| v.as_str())
-            .map(|url| !url.starts_with("http://127.0.0.1"))
-            .unwrap_or(true),
-        "recovery must drop the local proxy base URL"
+    assert_eq!(
+        live_after, taken_over_live,
+        "unknown upstream takeover must not be rewritten without ownership"
     );
 }
 
@@ -3094,7 +3084,7 @@ fn switch_writes_credential_files_owner_only() {
                 "Relay".to_string(),
                 json!({
                     "auth": { "OPENAI_API_KEY": "sk-relay" },
-                    "config": "model_provider = \"custom\"\n\n[model_providers.custom]\nname = \"Relay\"\nbase_url = \"https://relay.example/v1\"\nwire_api = \"responses\"\n"
+                    "config": "model_provider = \"zhishu\"\n\n[model_providers.zhishu]\nname = \"Relay\"\nbase_url = \"https://relay.example/v1\"\nwire_api = \"responses\"\n"
                 }),
                 None,
             ),
@@ -3228,7 +3218,7 @@ fn claude_editor_global_settings_reach_account_dirs() {
     );
 
     // 本机账号表里有一个账号，目录已经建好
-    let app_dir = home.join(".cc-switch");
+    let app_dir = home.join(".zhishu-ccs");
     let local_id = "0123456789abcdef0123456789abcdef";
     let config_dir = app_dir
         .join("claude-accounts")
@@ -3672,7 +3662,7 @@ fn claude_editor_never_leaves_the_row_and_live_apart() {
     let (row, base) = open_claude_editor(&state, "a");
     let mut edited = base.clone();
     edited["env"]["ANTHROPIC_AUTH_TOKEN"] = json!("sk-new");
-    let db = rusqlite::Connection::open(home.join(".cc-switch/cc-switch.db")).expect("open db");
+    let db = rusqlite::Connection::open(home.join(".zhishu-ccs/cc-switch.db")).expect("open db");
     db.execute_batch(
         "CREATE TRIGGER fail_edit BEFORE UPDATE OF settings_config ON providers \
          BEGIN SELECT RAISE(ABORT, 'injected save failure'); END;",

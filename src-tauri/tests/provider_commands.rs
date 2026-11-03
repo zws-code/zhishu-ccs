@@ -16,7 +16,7 @@ use support::{
 };
 
 fn settings_path(home: &Path) -> PathBuf {
-    home.join(".cc-switch").join("settings.json")
+    home.join(".zhishu-ccs").join("settings.json")
 }
 
 #[test]
@@ -750,7 +750,7 @@ fn switch_provider_updates_claude_live_and_state() {
     // 验证数据已持久化到数据库
     let home_dir = std::env::var("HOME").expect("HOME should be set by ensure_test_home");
     let db_path = std::path::Path::new(&home_dir)
-        .join(".cc-switch")
+        .join(".zhishu-ccs")
         .join("cc-switch.db");
     assert!(
         db_path.exists(),
@@ -824,8 +824,8 @@ fn import_refuses_live_config_under_proxy_takeover() {
     reset_test_fs();
     ensure_test_home();
 
-    // 接管态 Codex Live：auth 是 PROXY_MANAGED 占位符，不是用户真实配置
-    let auth = json!({"OPENAI_API_KEY": "PROXY_MANAGED"});
+    // 接管态 Codex Live：auth 是 ZHISHU_CCS_PROXY_MANAGED 占位符，不是用户真实配置
+    let auth = json!({"OPENAI_API_KEY": "ZHISHU_CCS_PROXY_MANAGED"});
     let config = r#"model = "gpt-5"
 "#;
     write_codex_live_atomic(&auth, Some(config)).expect("seed taken-over codex live");
