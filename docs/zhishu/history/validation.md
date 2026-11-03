@@ -1,0 +1,512 @@
+# 历史验证记录
+
+> 本页保留各次任务的执行结果和未验证项；测试数量、代码路径、分支状态及临时资料均属于当时快照。本次文档整理没有重跑这些历史测试。当前行为以 [代码基线](../development/baseline.md)、功能说明和源码为准。
+
+## 合并上游 v4.0.25（2026-11-03）
+
+从干净产品 HEAD `1da9fa8b` 在独立同步分支合入官方 v4.0.25 / `a3eafa40`；联网获取并核验 tag，保留智枢 0.0.6、OAuth2、平台两阶段同步、WorkBuddy、配置历史及共存隔离。最高 L3，依据 [ADR-0011](../adr/ADR-0011-merge-4.0.25.md)，冲突、依赖和回退详见[同步报告](../upstream-sync/2026-11-03.md)。
+
+本轮实际执行：
+
+- `pnpm install --frozen-lockfile`、`pnpm typecheck`、`pnpm format:check` 通过；两处既存 App.tsx 格式问题只修正换行。
+- `pnpm test:unit --maxWorkers=4 --minWorkers=1 --silent`：292 文件、3742 项通过。
+- `pnpm build:renderer` 通过，仍有现有大 chunk 提示。
+- Rust fmt、check、`cargo clippy --locked --offline --manifest-path src-tauri/Cargo.toml -- -D warnings` 通过。
+- 临时 `CC_SWITCH_TEST_HOME` 下串行 `cargo test --locked --offline --manifest-path src-tauri/Cargo.toml -- --test-threads=1`：4820 通过（4602 库 + 218 集成）、11 忽略；金标 44 项通过，没有生成或手改快照。Cargo 清单关闭 doctest，未执行文档测试。
+- `pnpm test:release`：57 通过；`pnpm test:release-cos`：23 项，21 通过、2 跳过，均为本机模拟。
+- 产品版本、清单解析、当前修改范围 81 处本地文档链接、冲突标记与索引、无文件删除和 `git diff --check` 核对通过。
+
+未运行桌面应用、真实 CLI 请求或真实系统 keyring；Windows/Linux 编译、UI、安装升级与真实平台/共存端到端待验收。未修改真实配置或凭据，未推送/发布或处理 `origin/ccs-dev` 既有历史分歧。本机回归不替代目标平台发布验收。
+
+## 移除 macOS 开发签名辅助（2026-11-03，后续要求）
+
+用户要求删除自有 macOS 开发签名三件套，同时保留 OAuth2 自动恢复。删除开发启动签名脚本、签名 helper、对应测试与专用操作文档；移除 `package.json` 的 `test:dev-signing`，同步 AGENTS、开发入口、维护索引和 ADR-0010。上游 Tauri CLI 继续管理开发启动；Rust `platform_session` 保持系统 keyring 存储与恢复。自有脚本/文档 L0，固定 package/维护入口 L1，补丁及回退见[登记](../development/upstream-patches.md)。
+
+本轮实际执行：
+
+- `node node_modules/@tauri-apps/cli/tauri.js dev --help`：通过，仅查看帮助，不启动应用。
+- `package.json` Prettier 与 JSON 解析：通过。
+- 静态检查确认 `dev` 仍为 `tauri dev`、旧签名测试命令与四份目标文件均已移除，活跃源码、脚本、CI、package 与 AGENTS 无已删脚本或开发签名变量调用。
+- 修改文档的 63 处本地链接及 `git diff --check`：通过。
+
+未启动真实应用、重编译 macOS 开发版或进行系统钥匙串实测；未运行已删除的签名测试，也未重跑前端/Rust 测试、构建或正式发布。macOS 临时签名产物变化后，首次访问钥匙串可能再次要求系统授权，不能保证每次重编译均免提示；OAuth2 token 存储与会话恢复代码未改动。正式发行签名流程继续沿用发布配置，不依赖本次删除的开发脚本。未访问或修改真实凭据及 CLI 配置。以下记录保留前轮当时结果。
+
+## 本地账号密码脚本清理（2026-11-03，补充）
+
+用户要求删除各平台本地账号密码保存相关脚本与代码，并明确确认保留 OAuth2 自动恢复。删除 macOS 钥匙串 C 探针、签名回归中的真实凭据读写/删除流程、相关 opt-in 入口及未使用 import；保留代码签名与模拟回归。检查确认 Windows/Linux 旧平台密码存储已随前轮历史模块删除，现有平台 keyring 调用只用于 OAuth2 refresh token。修正五语清理说明和当前开发/功能文档中遗漏的历史账号、记住密码描述。自有脚本/文档 L0，共享字典与维护入口 L1；复用既有 OAuth2 会话和签名能力，补丁及回退见[登记](../development/upstream-patches.md)。
+
+本轮实际执行：
+
+- `node --test scripts/zhishu/macos-dev-sign.test.mjs`：7 项通过，0 跳过，全部使用模拟命令，不访问真实钥匙串。
+- `node node_modules/typescript/bin/tsc --noEmit`：通过。
+- 本地 Vitest 执行 `PlatformLogin.test.tsx`、`PlatformUsageFooter.test.tsx`、`platformAuth.test.ts`：60 项通过，覆盖登录、恢复、清理与授权接口。
+- 修改的 Node 测试及五语 JSON Prettier、Node/shell 语法、`git diff --check`：通过。首次格式检查指出删除后的 import/空行需整理，格式化后复查通过。
+- 活跃源码、脚本、测试与 CI 中的旧密码 service/历史模块、密码 IPC、钥匙串探针及入口残留检索：无匹配。
+
+未重跑 Rust 测试、Clippy、renderer 构建或全量测试；本补充未修改 Rust 或前端业务逻辑。未进行真实系统凭据库、真实签名或 macOS/Windows/Linux 桌面端到端验收，不宣称已在各平台运行验证。未修改或删除真实账号凭据、CLI 配置或供应商数据；OAuth2 持久化与恢复保持原有语义。
+
+## 彻底清理密码登录遗留代码（2026-11-03，后续要求）
+
+用户要求将账号/邮箱密码登录相关代码全部删除，替代上一轮保留旧密码兼容层的边界。本轮删除 `platform_login_history.rs`、账号历史选择 UI、密码凭据兼容读写/清理及测试辅助、历史/遗忘/删除记录 IPC、前后端密码/TOTP/验证码配置字段和五种语言中的废弃平台登录文案。OAuth2 保留授权、服务器地址、会话恢复与刷新；通用敏感字段脱敏、账户邮箱展示及授权中心独立认证继续按各自职责使用。
+
+本轮实际执行：
+
+- `node node_modules/typescript/bin/tsc --noEmit` 通过。
+- 本地 Vitest 执行 `PlatformLogin.test.tsx`、`platformAuth.test.ts`、`PlatformUsageFooter.test.tsx`：60 项通过。
+- 修改的前端、翻译与测试文件 Prettier 检查通过；没有重跑完整 `src/` 格式检查，上轮记录的 `App.tsx` 格式问题未在本轮处理。
+- `node node_modules/vite/bin/vite.js build` 通过，仍有大 chunk 提示。
+- `cargo fmt --check --manifest-path src-tauri/Cargo.toml`、`cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings` 通过。
+- 使用临时 `CC_SWITCH_TEST_HOME`，经权限审查允许本机模拟回环端口后执行 `cargo test --manifest-path src-tauri/Cargo.toml --lib platform_ -- --test-threads=1`：146 项通过。数量较上一轮少 4 项，对应已随历史模块删除的旧密码/账号历史测试。
+- 活跃源码、测试与翻译中已无登录历史模块、密码存取/清理 IPC、旧账号历史类型和密码/TOTP/验证码配置字段的实现或引用；保留的旧登录 API 名称仅用于拒绝调用/无旧方法的负向回归。
+- 修改文档相对链接、当前实现路径和 `git diff --check` 通过。
+
+仍未执行真实平台浏览器授权、真实系统凭据库及 macOS/Windows/Linux 桌面端到端验收；未运行全量前端/Rust 测试或正式发布。旧版历史文件和密码 keyring 条目保留原处，本程序不再访问；本次没有迁移或删除真实数据。OAuth2 会话元数据 schema 与 refresh token keyring service 不变。L0 自有模块清理 + L1 注册/文案/维护入口，变更及回退边界见[补丁登记](../development/upstream-patches.md)。
+
+## 平台仅保留 OAuth2 登录（2026-11-03）
+
+范围：删除密码表单、客户端 TOTP、记住密码与回退入口，撤销对应登录/密码读取 IPC 及 HTTP 白名单；只复用既有 OAuth2 PKCE/state/loopback 授权与会话恢复。OAuth2 更新账号/服务器历史，不读写旧密码凭据；删除记录仍清理旧凭据。自有模块 L0，固定 IPC 注册、共享翻译与维护入口 L1，补丁见[登记](../development/upstream-patches.md)。
+
+本轮实际执行：
+
+- `pnpm` 启动尝试无法从 npm registry 解析 `pnpm@10.12.3`（网络/代理沙箱限制），改用已安装依赖的 Node 执行入口，没有安装或变更依赖。
+- `node node_modules/typescript/bin/tsc --noEmit` 通过。
+- `node node_modules/vitest/vitest.mjs run tests/zhishu/components/PlatformLogin.test.tsx tests/zhishu/lib/platformAuth.test.ts`：43 项通过。覆盖 OAuth2 唯一入口、缺字段/旧平台/配置失败、重试、授权成功/失败/取消/迟到结果、服务器编辑、历史清理、会话恢复及平台目录两阶段边界。
+- 修改的前端与测试文件 Prettier 检查通过。完整 `src/` 检查未通过，仅报告本轮未修改的 `src/App.tsx` 格式问题，未顺带格式化。
+- `node node_modules/vite/bin/vite.js build` 通过；仍有大 chunk 提示。
+- `cargo fmt --check --manifest-path src-tauri/Cargo.toml` 与 `cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings` 通过。
+- 隔离 `CC_SWITCH_TEST_HOME` 后执行 `cargo test --manifest-path src-tauri/Cargo.toml --lib platform_ -- --test-threads=1`：150 项通过。因模拟服务器与 OAuth2 回环需要绑定临时本机端口，该次测试经沙箱权限审查后执行；包含授权 state/PKCE/拒绝/令牌交换、刷新轮换、恢复/闲置、凭据库失败、账号清理及旧历史兼容。
+- 较早一次沙箱内 `--lib zhishu::` 广范围尝试为 142 通过、30 失败，包含本机端口绑定被拒及一个上传器身份测试；未把该次计为全量通过。后续 `platform_` 重跑覆盖本次登录改动，未重跑其余非平台范围。
+- `git diff --check` 通过；修改文档相对链接与实现路径已核对。
+
+未执行：真实平台浏览器授权、macOS/Windows/Linux 桌面流程及真实系统凭据库的端到端验收；未运行全量前端/Rust 测试或正式打包发布。未触碰真实账号、密码、供应商/CLI 配置或发布资源。旧平台未提供 OAuth2 时将无法登录，只能重试或更换/升级平台；这是本次明确要求的行为。回退恢复本次代码即可，历史 schema 与 keyring service 保持兼容，不迁移数据。
+
+## 平台接入向导重做（2026-11-01）
+
+范围：登录/会话恢复后不再自动调用 `platform_sync_providers`，只拉取一次平台目录快照；新增 `src/zhishu/onboarding/PlatformOnboarding.tsx`，在用户确认后对所选可见应用执行本地供应商同步；模式应用可选择分组（默认当前托管分组，否则目录首项），还可逐个选择直连、路由或聚合（聚合仅 Claude、Codex、Claude Desktop，进入聚合并把该应用全部平台供应商加入名单）；累加式应用不选分组，直接加入该应用的全部平台供应商。删除「全部同步平台供应商」入口，`platform_sync_providers` 改为必须指定工具；各应用页的单工具同步保留。新增只读命令 `platform_preview_group_options` 供向导列出模式应用可用分组。侵入等级 L2（新增自有命令与 `lib.rs` 一行注册；语言包新增键），无 schema、凭据或存储变更；实现复用既有 `platform_sync_providers`、`switch_provider`、`set_proxy_takeover_for_app`、`set_proxy_stack_member`、`update_tray_menu`。
+
+| 本次执行 | 结果 |
+|---|---|
+| `pnpm typecheck` | 通过 |
+| 修改源码与新增测试 Prettier | 通过；`pnpm format:check` 仍提示既有 `src/App.tsx` 未格式化，本次未改该文件 |
+| `vitest run tests/zhishu tests/config` | 53 文件、1269 项通过；含新增接入向导 7 项（分组选择、直连、路由、聚合、累加式全部添加、无可用模型、关闭后不自动打开）、登录目录同步回归 |
+| `pnpm test:unit` | 288 文件、3681 项通过 |
+| `pnpm build:renderer` | 通过；仅有既有 chunk 体积提示 |
+| `CC_SWITCH_TEST_HOME=<tmp> cargo test --lib ...group_options...` | 分组预览用例通过；完整 crate 编译包含新命令注册 |
+| `cargo fmt --check --manifest-path src-tauri/Cargo.toml` | 通过 |
+| `cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings` | 通过 |
+| `tests/config/localeCoverage.test.ts` | 五份语言包解析通过，新增键无缺失插值变量 |
+
+未执行：Rust 全量测试、真实平台 `/access`、真实 CLI 的直连/路由/聚合切换与安装升级验收。接入向导的安装检测依赖既有 `listToolInstallations`，未在 Windows/WSL、未安装工具或检测失败的真实环境中验收；登录后目录拉取失败时不会自动打开向导。聚合接入会调用既有 `set_proxy_takeover_for_app` / `set_proxy_stack_member`，未在真实代理运行、官方账号或多分组聚合场景下实测；分组预览只验证了单测，未接真实平台目录联调。
+
+## DeepSeek 遗留分组补丁撤回（2026-10-31）
+
+用户确认撤回无效的 `deepseek-official` 分组特判，并保留供应商页“浏览目录”快捷入口。本次仅移除 `presetGroups.ts` 中一行二开代码，完整复用上游预设分组；DeepSeek API 和 DSH 账号登录分别沿用原有“模型厂商”和“账号登录”分类。侵入等级 L2 补丁撤回，补丁登记和本记录为 L0；无 IPC、数据库、凭据或 CLI 配置变更。
+
+已执行：`pnpm typecheck`、修改文件的 Prettier 检查和 `git diff --check` 通过；`pnpm test:unit tests/components/ProviderPresetSelector.test.tsx tests/components/DshAddProviderDialog.test.tsx src/config/dshProviderPresets.test.ts` 共 3 文件、26 项通过。另以 `git diff --exit-code b7642674 -- src/components/providers/forms/presetGroups.ts` 确认该文件与上游 4.0.22 逐字节一致。测试保留既有浏览器兼容数据库过旧提示。
+
+未执行全仓测试、renderer/桌面构建、Rust 或真实 CLI/平台验收；本次只涉及展示分类中的无效分支，不操作真实账号或配置。未创建提交、推送或发布，保留已有 `out/`。
+
+## 平台与上游边界收敛（2026-10-31）
+
+范围：[ADR-0008](../adr/ADR-0008-upstream-patch-convergence.md)。基于 `2fea90d7` 工作区实施，保留任务开始前已有的文档整理、开发签名及 Vite 配置修改。文档整理已独立提交为 `5f70b01a`；本次收敛仅作本地提交，不推送或发布。
+
+| 本次执行 | 结果 |
+|---|---|
+| `./node_modules/.bin/tsc --noEmit` | 通过；直接执行仓库 TypeScript，避开只读沙箱下 pnpm 版本管理锁 |
+| 受影响前端文件及新增测试 Prettier | 通过 |
+| `vitest run tests/zhishu` 加 Add/Update mutation、GeneralSection 和两套 SettingsDialog | 22 文件、240 项通过；含 WorkBuddy 四类操作成功/失败仅刷新一次的 8 项新增回归 |
+| 隔离 Rust `--lib zhishu::` | 156 项通过；含历史还原、平台会话、全应用同步、WorkBuddy、DSH 和新增元数据/Claude 回归 |
+| 隔离 Rust `--lib services::provider::` | 212 项通过；含手动 Claude 不补齐及编辑预览 |
+| 隔离 Rust `--lib mode::` | 184 项通过；含退出代理/聚合恢复、pending、并发与历史摘要 |
+| 隔离 Rust `--test golden` | 44 项通过；未更新金标快照 |
+| `cargo fmt --check --manifest-path src-tauri/Cargo.toml` | 通过 |
+| `cargo clippy --locked --offline --manifest-path src-tauri/Cargo.toml -- -D warnings` | 通过（项目规定的常规严格检查） |
+| `cargo clippy --locked --offline --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | 未通过：原有上游 `src-tauri/src/dsh_config.rs:2018` 的 `&[web.clone()]` 命中 `cloned_ref_to_slice_refs`；已核对该文件与 4.0.22 无差异，本次不增加无关核心修复 |
+| `vite build --mode development --outDir /tmp/zhishu-convergence-renderer-build` | 通过，独立构建输出；存在既有浏览器数据、Tailwind 歧义、静态/动态导入和大 chunk 提示。没有执行正式发行构建或验签 |
+| 上游差异与文档链接 | 10 个撤回文件逐字节等同 `b7642674`；相对该基线的已有源码文件修改数 Rust 45→39、前端 46→43（净减少包含新增通用 DAO 补丁，不含新增自有文件）；收敛文档相对链接均有效 |
+| `git diff --check` | 通过 |
+
+Rust 使用独立 `CC_SWITCH_TEST_HOME`/`DSH_HOME`，智枢测试夹具进一步隔离 Pi、Hermes、MCode、WorkBuddy、Kimi 等目录；未修改智能体 `HOME`/`CODEX_HOME`，未用真实 CLI 配置试验。新增元数据用例验证账号/平台/分组归属、最新元数据、未知字段、删除后不重建、回调失败不落盘、等待应用锁与原生文件不变。
+
+未执行：全量前后端测试、真实平台请求、真实 CLI 启动、macOS/Windows/Linux keyring 和重启恢复实测、安装升级与发布验证。保留历史功能的模拟回归不替代这些验收。
+
+## 目录与功能提交整理（2026-10-29）
+
+日期：2026-10-29；环境：本机 macOS，使用仓库现有 node_modules 与 Rust 缓存。
+范围：ADR-0002 的文件归位、调用边界、脚本路径及功能提交压缩；不代表批准发布。
+
+| 检查 | 结果 |
+|---|---|
+| 整理前 `pnpm typecheck` / `pnpm format:check` | 均通过，建立基线 |
+| 最终 `pnpm typecheck` | 通过 |
+| 最终 `pnpm format:check` | 通过 |
+| `pnpm test:unit` | 283 文件、3580 项通过 |
+| 最后菜单提取回归 | App 与删除 Hook，2 文件、36 项通过 |
+| 最后集成层路径调整回归 | `tests/zhishu` + App，22 文件、232 项通过 |
+| 最终 `pnpm build:renderer` | 通过，仍有既有大 chunk 提示 |
+| `cargo fmt --all -- --check` | 通过 |
+| `cargo clippy -- -D warnings` | 未通过：原 `commands/misc.rs` 两个未使用平台启动函数；原合并报告已记录，未以 allow 忽略 |
+| 全量 Rust 首轮串行测试 | 4359 通过、11 忽略，1 个原有 OAuth keep-alive 用例失败（IncompleteMessage） |
+| 最终 Rust 串行回归，排除上述 1 项 | 4359 单测通过、11 忽略；212 个集成测试通过 |
+| 上述 OAuth 单项复测 | 1 项通过；仍保留完整执行时的偶发失败记录 |
+| Rust 文档测试 | 仓库 `Cargo.toml` 已设置 `doctest = false`，本次没有执行文档测试 |
+| `pnpm test:release` | 32 项通过 |
+| `pnpm test:dev-isolation` | 3 项通过 |
+| `pnpm test:dev-signing` | 6 项通过、1 项忽略（真实 Keychain 重建访问） |
+| `pnpm test:release-cos` | unittest 21 项，19 通过、2 忽略 |
+| 路径审查 | 100 项目标均存在，旧位置均移除，无遗留 TS 旧导入；保留原执行权限 |
+| 有限机密模式审查 | 检查 31 个自有 first-parent 提交新增内容：未命中私钥 PEM/GitHub token/live key/AWS ID 高置信模式；不是完整安全审计 |
+| 提交压缩等价性 | 平台、发行两个分组与上游合并节点的 tree ID 均与原组末节点相同 |
+| 补丁覆盖 | 222 个已有上游文件差异逐项登记；新增自有文件不作为已有上游补丁计数 |
+
+## 命令与隔离
+
+Rust 每轮使用独立临时 `CC_SWITCH_TEST_HOME`，不启动客户端或写真实 CLI 配置。
+最终完整覆盖按两轮完成：
+
+```bash
+CC_SWITCH_TEST_HOME="$(mktemp -d)" cargo test --manifest-path src-tauri/Cargo.toml -- --test-threads=1 --skip replacement_closes_the_previous_keep_alive_connection
+CC_SWITCH_TEST_HOME="$(mktemp -d)" cargo test --manifest-path src-tauri/Cargo.toml replacement_closes_the_previous_keep_alive_connection -- --test-threads=1
+```
+
+源文件移动中发现的 IPC 重复前缀、旧脚本导入、测试访问私有 live 模块均已修复。
+修复测试调用时使用 `services::provider::sync_additive_app_to_live` 已有再导出，没有扩大 live 模块可见性。
+前端全量测试在菜单提取前通过；最后局部变更由相关 232 项覆盖，不声称再次运行了全量 3580 项。
+
+## 未执行与保留限制
+
+- Windows/macOS 实机安装、生产签名/公证、自动更新和双应用共存：本轮是源码组织任务，没有部署/发布或操作真实账号。
+- 真实系统凭据库交互及 COS 真实网络发布测试：现有套件要求额外环境/显式启用，保持跳过。
+- 历史每个中间提交未逐一编译；压缩只断言相应完整树等价，最终树执行本页验证。
+- 原便携更新 URL TODO、正式远程命名/主线治理另行处理，不借目录整理改变既有运行协议。
+- 自动审批拒绝删除无调用平台启动实现及迁移持久化元数据类型；采用保留方案，完整记录 clippy 基线缺陷。
+
+日志保存在本机 `/tmp/zhishu-structure-20261029/`，为临时辅助资料；长期结果以本文和提交映射为准。
+
+## 二开审查修复（2026-10-29，fix/zhishu-review-20261029）
+
+审查起点为 `bf9228e3`，固定基线 4.0.21；以下合并原二开审查报告的有效结论，不覆盖上面目录整理阶段的结果。
+
+- 修复批量写入、同步回调在退出、换账号或离开页面后继续执行的问题；已提交的单次原子 IPC 不强制中断。
+- 读取本机成员名单失败不再按成功空列表处理；修正 `claudeDesktopStatus` 缓存键，并复用统一刷新适配器。
+- 当时修复旧 Key 替换失败仍使用已拒绝凭证的缺陷；该客户端建 Key 链路随后由 ADR-0004 专用 `/access` 协议整体取代，不能据此恢复旧逻辑。
+- 当时清理的 `commands/misc.rs` 两个函数为无调用方的二开补丁，消除了 dead-code 基线错误；保留上游受控终端功能和便携更新 TODO。
+- 原报告建议的 v1 凭据库迁移未实施；当前实际是账号独立 v2 明文目录，见 [代码基线](../development/baseline.md)。本次没有新增凭据迁移或生产安全验收。
+
+| 检查 | 结果 |
+|---|---|
+| 修复前全量前端测试 | 283 文件、3580 项通过 |
+| 修复前新增回归 | 前端 6 项失败；Rust Key 替换用例失败，确认原代码会保留被拒绝的 Key |
+| 最终 `pnpm typecheck` / `pnpm format:check` | 均通过 |
+| 最终 `pnpm test:unit` | 283 文件、3591 项通过；同步/批量操作两个文件共 27 项 |
+| 最终 `pnpm build:renderer` | 通过，保留既有大 chunk 提示 |
+| `cargo fmt --all -- --check` | 通过 |
+| `cargo clippy -- -D warnings` | 通过，删除无调用的二开平台启动函数后消除此前两个 dead-code 错误 |
+| 隔离目录全量 Rust 串行测试 | 4360 项通过、11 项忽略；1 个既有 OAuth keep-alive 用例失败（IncompleteMessage），不能表述为单轮全量通过 |
+| 上述 OAuth 用例单独复测 | 1 项通过；未修改或忽略该用例，保留其整套运行不稳定性记录 |
+| Rust 集成测试补跑 | `cargo test --test '*' -- --test-threads=1`：16 个目标、212 项通过；前轮单测失败导致集成目标未执行，已补齐 |
+| Node 开发/发布脚本测试 | `node --test scripts/zhishu/*.test.mjs`：41 项通过、1 项真实 Keychain 测试忽略 |
+| Python COS 单测 | 21 项：19 通过、2 项依赖真实环境的用例忽略；使用模拟存储，不是实际上传 |
+| `git diff --check` | 通过 |
+
+Rust 每次执行都设置独立临时 `CC_SWITCH_TEST_HOME`；没有启动生产客户端、访问真实账户或覆写真实 CLI 配置。
+未运行 Windows/macOS 实机 CLI、安装、升级、生产签名、真实凭据库和双应用共存回归；本次为源码修复，没有真实账号和发布环境的验证。
+Rust doctest 由仓库现有 `doctest = false` 禁用。
+日志位于 `/tmp/zhishu-review-*.log`。本轮没有提交、推送或发布，原有未跟踪 `out/` 保留。
+
+
+## 平台地址校验放宽（2026-10-31）
+
+范围：`src-tauri/src/zhishu/services/platform_auth.rs` 及其同文件测试、平台登录文档。复用现有登录、会话恢复、HTTP 客户端和 SessionStore；L0 自有模块调整，无新增上游补丁，未修改 IPC 参数、返回类型、数据库或 CLI 配置。
+
+| 检查 | 本次结果 |
+|---|---|
+| `cargo fmt --check --manifest-path src-tauri/Cargo.toml` | 通过 |
+| `CC_SWITCH_TEST_HOME="$(mktemp -d /tmp/zhishu-platform-url-test.XXXXXX)" cargo test --locked --offline --manifest-path src-tauri/Cargo.toml --lib zhishu::services::platform_auth::tests -- --test-threads=1` | 38 项通过；覆盖远程 HTTP、完整地址规范化、实际本机 HTTP 登录请求和会话记录，以及既有 2FA、刷新、恢复与退出回归 |
+| `pnpm test:unit tests/zhishu/lib/platformAuth.test.ts tests/zhishu/components/PlatformLogin.test.tsx` | 2 文件、31 项通过 |
+| `git diff --check` | 通过 |
+
+测试只使用本机模拟平台、临时目录和模拟凭据库。未运行全量测试、Clippy、前端类型检查或构建，也未进行真实平台登录、真实凭据库、Windows/Linux 与安装包验证。HTTP 明文传输及地址附带内容的清除行为见 [平台登录文档](../features/platform-login.md)。
+
+
+## 客户端专用 API 改造（2026-10-31）
+
+范围：按 [客户端专用接口契约](../api/client-api.md) 将平台登录、恢复、账户、基础同步与额度查询统一到 `/api/zhishu/v1/client`，删除自有旧平台调用、Key 查找/创建/替换/撤销与网络模型发现逻辑，不保留旧接口回退。前后端契约、额度与订阅展示、版本 2 私密快照、网关地址适配及相关文档同步更新。
+
+侵入等级为 L0 自有业务、L1 注册/翻译、L2 可选共享 Provider 元数据；复用 ProviderService、应用锁、路径解析、原子配置发布/恢复、keyring 与账户查询隔离。不修改上游 DAO/schema、代理或通用配置引擎。决策、兼容与回退见 [ADR-0004](../adr/ADR-0004-client-api-only.md)，上游薄接入见 [补丁登记](../development/upstream-patches.md) CLIENT-20261031-01～03。
+
+| 检查 | 本次结果 |
+|---|---|
+| `pnpm typecheck` | 通过 |
+| `pnpm format:check` | 通过 |
+| `pnpm test:unit` | 283 文件、3604 项通过 |
+| `pnpm build:renderer` | 最终前端构建通过；保留浏览器数据过旧、duration 类歧义、混合静态/动态导入和大 chunk 的既有警告 |
+| 全量 Rust 库测试：`cargo test --offline --manifest-path src-tauri/Cargo.toml --lib` | 完整复跑 4360 项通过、0 失败、11 项既有忽略项；未排除 OAuth 用例 |
+| 最终自有模块回归：`cargo test --offline --manifest-path src-tauri/Cargo.toml --lib zhishu:: --quiet` | 195 项通过；覆盖全量库测试之后的恒真字段移除、缺凭证警告去重和 Clippy 条件合并 |
+| 最终 `cargo clippy --offline --manifest-path src-tauri/Cargo.toml -- -D warnings` | 通过 |
+| 最终 `cargo fmt --check --manifest-path src-tauri/Cargo.toml` | 通过 |
+| 旧平台路径与 Key 生命周期源码审查 | 扫描 `src/zhishu` 与 `src-tauri/src/zhishu` 的 Rust/TS/TSX：旧 `/api/v1`、账户/分组/订阅/模型发现路径及旧 Key 生命周期函数引用为 0；另有 HTTP 请求方法/路径封闭白名单回归 |
+| 变更文档相对链接核对 | README、补丁表、登录、基础数据、接入契约与 ADR 共 26 条有效，无缺失目标 |
+| `git diff --check` | 通过 |
+
+初轮全量 Rust 库测试为 4358 项通过、2 项失败、11 项忽略：本次缺凭证警告重复导致的断言失败已修复；另一项为未修改的 `proxy::providers::codex_oauth_auth::browser::tests::replacement_closes_the_previous_keep_alive_connection`，错误 `IncompleteMessage`。完整复跑全部通过，但保留该用例的偶发失败记录（历史验证亦有同类记录）。全量库测试完成后仅清理已无意义的目录可用字段/分支；最终 195 项自有模块测试及 Clippy、格式检查覆盖最终代码，不宣称最后清理后再次执行全量库测试。收尾 Clippy 曾指出可合并的嵌套条件，已修复并重新通过。
+
+Rust 每轮使用独立临时目录：
+
+```bash
+CC_SWITCH_TEST_HOME="$(mktemp -d /tmp/zhishu-client-api.XXXXXX)" cargo test --offline --manifest-path src-tauri/Cargo.toml --lib
+CC_SWITCH_TEST_HOME="$(mktemp -d /tmp/zhishu-client-api.XXXXXX)" cargo test --offline --manifest-path src-tauri/Cargo.toml --lib zhishu:: --quiet
+```
+
+网络/存储回归使用本机模拟 HTTP、临时目录、内存数据库和模拟凭据库，不改智能体的 `HOME`/`CODEX_HOME`，未运行真实账户操作或真实 CLI 配置切换。
+
+兼容与未验证项：
+
+- 旧版 `platform-catalog.json` 不迁移、不接管旧 Key；读取返回无目录，升级后需重新同步平台基础数据。新版本 2 快照与原生配置写入保留既有私密权限、原子保存和恢复路径。
+- 真实服务端专用接口、多个客户端共用同一 Key、续订/撤权、请求丢失后的服务端事务幂等尚未联调；模拟测试不能代替服务端验收。
+- 真实系统 keyring、macOS/Windows/Linux 实机矩阵、各 CLI 的模型调用与配置运行未验收。
+- 本次仅执行完整 Rust `--lib`；独立集成测试目标、开发/发布脚本、安装、签名、公证和跨版本升级未执行，未发布或推送。
+- 保留用户原有 README/基础数据文档修改、接入契约文件和未跟踪 `out/`；未创建提交。
+
+
+## 客户端旧逻辑与测试清理（2026-10-31）
+
+用户要求先提交前一轮改造，已在 `ccs-dev` 创建 `6f0c38d2`（`feat(zhishu): migrate platform integration to client-only APIs`），没有推送；随后继续清理二开残留，本节对应后续独立工作区差异。
+
+清理范围：
+
+- 删除无生产入口的 `clear_account_credentials`、`clear_cached_catalog_credentials`、`CatalogStore::clear_credentials`、`SessionStore::identity` 与凭证替换为登录占位符的包装函数，移除对应 `allow(dead_code)`。
+- 删除旧 `credentialsCleared`/`credentials_cleared` 状态、错误码、页面禁用/提示分支及五种语言中的自有旧文案；缺失凭证使用新协议的分组状态表示。正常版本 2 快照继续读取，旧版本仍不迁移；空白凭证或损坏快照拒绝读取并保留原文件。
+- 删除旧模型目录的 `api_format`、`mode`、嵌套 limit 和 camelCase 等元数据回退；模型映射与摘要读取 `/access` 白名单字段。测试使用专用 Key 元数据及当前协议字段，移除一项只验证旧清理流程的 Rust 用例和其他用例中的旧清理断言。
+- 保留退出不改 Provider/原生文件、同账号恢复、跨账号隔离、摘要不泄密、原文件损坏保护、授权撤回及本地配置适配等有效回归。下载页仍在使用的构建网站地址、通用上游 API 和实际生效的配置迁移不属于旧平台 API 清理。
+
+等级为 L0 自有业务、测试及契约清理 + L1 自有翻译键删除；复用现有 ProviderService、配置锁、私密原子存储和会话 keyring，无新增依赖、数据库迁移或上游核心补丁。[ADR-0004](../adr/ADR-0004-client-api-only.md)、[补丁登记](../development/upstream-patches.md)、AGENTS 和基础数据文档已同步。
+
+| 检查 | 本轮结果 |
+|---|---|
+| `pnpm typecheck` | 通过 |
+| `pnpm format:check` | 通过 |
+| `pnpm test:unit tests/zhishu` | 21 文件、228 项通过，其中目录页面 23 项 |
+| `pnpm build:renderer` | 通过；保留浏览器数据过旧、duration 类歧义、混合导入与大 chunk 的既有警告 |
+| `cargo fmt --check --manifest-path src-tauri/Cargo.toml` | 通过 |
+| `CC_SWITCH_TEST_HOME="$(mktemp -d /tmp/zhishu-client-cleanup.XXXXXX)" cargo test --offline --manifest-path src-tauri/Cargo.toml --lib zhishu:: --quiet` | 最终 194 项通过，无失败或忽略；最后模型字段清理后重新执行 |
+| `cargo clippy --offline --manifest-path src-tauri/Cargo.toml -- -D warnings` | 最终通过 |
+| 源码及测试残留扫描 | `src/zhishu`、`src-tauri/src/zhishu`、`tests/zhishu` 内旧平台路径、旧清理函数/状态/占位 Key、旧平台 Key 命名与 dead-code 豁免均无匹配；两个目录映射模块的旧字段回退亦无匹配 |
+| `git diff --check` / 变更文档链接 | 通过 / 相对链接目标均存在 |
+
+本轮没有重复执行全仓前端、全量 Rust 库或独立集成测试，前一轮结果仍按上一节记录；未操作真实账户或 CLI 配置，未进行多设备共享 Key、真实 keyring、跨平台运行、安装升级或发布验收。保留原有未跟踪 `out/`；后续清理未自动提交或推送。
+
+
+## 账号基础数据隔离与清理退出（2026-10-31）
+
+本轮用户授权新增「退出并清除此账号本机数据」，并要求平台基础数据区分账号；多账号同时保持登录明确暂缓。保留上一节尚未提交的自有旧逻辑清理及用户 `out/`，不自动提交或推送。
+
+改动范围：新增自有清理编排、IPC wrapper、确认框和结果展示；目录按平台地址 + 用户 ID 独立私密存储，迁移有效的旧单文件 v2；普通退出仍保留目录/供应商/工具配置。清理按账号复用全应用安全删除，清理快照后退出；保留登录账号记录、服务器地址和已记住密码；逐应用失败及 keyring/服务端退出分别报告。结果只存在 Auth Context 内存，在退出后通过独立可关闭弹窗展示，不占用登录表单；关闭或重新登录成功后清除。前端清理期间阻止新登录/轮询，隔离旧响应，账号变化关闭原详情页。
+
+复用 ProviderService Adapter、操作锁、私密原子写入和既有配置审计/恢复，无新的核心配置写入路径。L0 自有模块 + L1 注册及五种语言入口；[ADR-0005](../adr/ADR-0005-account-local-cleanup.md)、[补丁登记](../development/upstream-patches.md)、基础数据文档及 AGENTS 已同步。
+
+| 检查 | 本轮最终结果 |
+|---|---|
+| `pnpm typecheck` | 通过 |
+| `pnpm format:check` | 通过 |
+| `pnpm test:unit tests/zhishu` | 21 文件、236 项通过；登录/门禁 37 项，目录页 24 项，auth IPC 4 项 |
+| `pnpm build:renderer` | 通过；既有浏览器数据过旧、duration 类歧义、混合导入与大 chunk 警告保留 |
+| `cargo fmt --check --manifest-path src-tauri/Cargo.toml` | 通过 |
+| `CC_SWITCH_TEST_HOME="$(mktemp -d /tmp/zhishu-cleanup-scope.XXXXXX)" cargo test --offline --manifest-path src-tauri/Cargo.toml --lib zhishu:: --quiet` | 204 项通过，无失败或忽略（取消登录历史清理后移除对应旧测试） |
+| `cargo clippy --offline --manifest-path src-tauri/Cargo.toml -- -D warnings` | 通过 |
+| `git diff --check` | 通过 |
+| 旧接口/清理状态扫描 | 自有源码与测试中 `/api/v1`、`/v1/models`、`credentialsCleared`、旧清理函数无匹配；未恢复客户端 Key 创建/撤销 |
+
+新增回归验证：同平台不同账号及同 ID 不同平台分别保存；清理只删目标账号且其他文件字节不变；旧 v2 迁移保持 0600；迁移写入失败保留旧文件并可重试；损坏/归属不明旧文件保留并报告；过时身份不清理不退出；部分删除保留计数；本机凭据与服务端退出同时失败仍丢弃内存会话；登录页保留账号记录、平台地址和记住密码，不调用删除入口；确认取消无副作用；普通退出不调用清理；清理结果跨门禁弹窗展示、可关闭且关闭后不留常驻内容；清理期间迟到目录响应不重建缓存；切换账号关闭旧详情；供应商同步失败/兼容性警告仅浮动提示，目录自身失败仍可见且可重试。
+
+首轮前端新增测试发现两个当前 Vitest 不支持的 matcher 和一个详情按钮名称匹配错误，修正测试后全部通过，无遗留测试失败。测试使用临时配置目录、内存数据库、模拟凭据库及本机 HTTP 模拟响应，没有操作真实平台账号、真实密码或真实 CLI 配置。
+
+本轮未执行全仓前端、全部 Rust 库/独立集成测试、桌面实机视觉验收、真实系统 keyring、Windows/Linux 运行及真实 CLI 调用；未打安装包、发布或推送。安全保留项、自建供应商、配置修改记录和恢复备份可能保留凭据；归属无法确认或系统凭据库清理失败时显示未完成，不宣称安全擦除。重新登录后的既有自动同步可能重新生成目录和托管供应商。
+
+用户反馈修订：清理结果改为可关闭弹窗；保留登录记录、服务器地址与记住密码，后端不调用历史/密码删除函数，移除未发布报告的 loginHistory 字段并同步契约和五语文案。前端回归仍为 236 项，后端为 204 项。本次测试曾因地址标签误写为“服务器地址”失败，按实际“平台后端地址”翻译键修正后全量智枢前端回归通过。既有已删除的登录记录不做推测恢复，需用户重新填写登录。
+
+## 清理弹窗视觉修订（2026-10-31）
+
+用户反馈确认框正文贴边、结果框过长。此次仅调整自有 `PlatformAccountCleanup`、`PlatformProviderDeletionResult`、五语文案及已有用例：统一正文边距与账号卡片，缩短主要说明，保留范围补充说明可展开，结果显示汇总与状态行、逐应用明细默认折叠，正文独立滚动，标题/关闭按钮/底部操作固定。复用上游 Dialog 和主题 token，未改通用 Dialog 或后端清理行为；L0/L1，ADR-0005 与补丁登记已更新。
+
+已执行：`pnpm typecheck`、`pnpm format:check`、`pnpm build:renderer`、`git diff --check` 均通过；`pnpm test:unit tests/zhishu/components/PlatformLogin.test.tsx tests/zhishu/components/PlatformCatalogPage.test.tsx` 共 61 项通过。构建保留既有浏览器数据过旧、duration 类歧义、混合导入和大 chunk 警告。
+
+通过 agent-browser 对实际 React 组件进行模拟数据视觉检查：1200×800 下确认框、成功结果与部分失败结果；亮/暗主题；13 个应用明细展开；640×480 下结果弹窗高度为 432px、关闭按钮处于视口内；360×600 下无横向溢出且关闭可见。模拟数据无真实账号/Key，不访问平台，不执行真实清理；临时预览代码及服务器、专用浏览器已清理。截图保存在本机 `/tmp/zhishu-cleanup-confirm-final.png`、`/tmp/zhishu-cleanup-result-final.png` 等临时路径。
+
+本次未重跑 Rust 或全仓测试，未进行 Tauri 原生 WebView/真实账号清理验收，未提交或发布。前节后端验证记录仍是该功能最近一次执行结果。
+
+## 全应用供应商删除结果弹窗（2026-10-31）
+
+平台基础数据页的一键删除结果/错误由正文常驻展示改为自有 `PlatformProviderDeletionDialog`：显示当前账号、删除/保留计数、失败提示与默认折叠的逐应用明细，固定关闭操作；关闭重置本次 mutation 结果，后续删除可重新显示。该入口关闭重复 toast，应用页菜单沿用原有 toast。复用既有删除 IPC、身份隔离、局部缓存失效和通用 Dialog，L0 自有组件/Hook + L1 五语翻译；补丁登记与基础数据文档已同步，未改后端或上游核心。
+
+已执行：`pnpm test:unit tests/zhishu/components/PlatformCatalogPage.test.tsx tests/zhishu/hooks/usePlatformProviderDeletion.test.tsx` 32 项通过；`pnpm typecheck`、`pnpm format:check`、`pnpm build:renderer`、`git diff --check` 通过，构建既有警告保留。测试覆盖弹窗不属于目录正文、关闭清除结果、错误关闭后重试、部分失败明细、退出/账号切换后的迟到响应隔离，以及应用级通知兼容。初轮测试补齐了新翻译资源、异步 mutation reset 等待和重复状态文本查询，最终无失败。
+
+使用 agent-browser 对实际组件的模拟 13 应用结果检查：桌面视口摘要及默认折叠明细、640×480 展开后的关闭按钮可见、关闭后结果消失。截图 `/tmp/zhishu-provider-deletion-result.png`；临时预览代码/服务器和专用浏览器已清理。没有连接真实平台或执行实际删除，未重跑后端或全仓测试，未进行原生 WebView 验收，未提交或发布。
+
+## 平台详情 UI 与滚轮修复（2026-10-31）
+
+自有 `PlatformCatalogDetails` 调整为固定标题/页签、独立正文滚动的 600px 响应式抽屉；概览分卡展示基本信息、额度周期用量及显式 Key 入口。新增自有 `PlatformCatalogModels`，支持名称/ID 本地筛选、匹配数量、空态及展开参数。保留白名单字段和未知值语义，切换到模型页签卸载 Key 明文状态，不触发同步或 Key 请求。复用 Sheet/Tabs/Collapsible/Input/主题 token，无后端契约或存储变化；L0 自有展示及测试 + L1 五语文案，补丁登记与功能文档已同步。
+
+用户反馈概览鼠标滚轮失效：内部 SheetBody 的 `scroll-stable` 强制 `overflow-y: scroll`，配合 `overscroll-contain` 截断滚动向父级传递。改为普通内容 div，仅外层页签面板负责滚动；未改通用 Sheet 或全局 CSS。
+
+已执行：`pnpm typecheck`、`pnpm format:check`、`pnpm build:renderer` 通过；`pnpm test:unit tests/zhishu/components/PlatformCatalogPage.test.tsx` 25 项通过，覆盖模型名/ID 筛选、大小写和空白、空结果/清空筛选，以及切换页签清除已显示 Key、无额外 Key/同步调用。构建保留既有浏览器数据库过旧、duration 类歧义、混合导入与大 chunk 警告。
+
+浏览器使用本机临时预览加载实际组件和模拟数据，检查亮/暗主题及窄视口。agent-browser 的低层 wheel 命令在本次会话落到了遮罩，因此改用同一专用 Chromium 会话的 CDP `Input.dispatchMouseEvent`，明确指定内容坐标发送真实 wheel 输入。复现旧嵌套样式时正文滚动位置保持 0；修复后 360×640 概览向下至 228px、1280×700 至 168px，API Key 卡片底部可达；模型列表向下至 350px；反向滚轮回到 0，背景保持 0。1280×900 概览全部容纳，无须滚动。截图 `/tmp/zhishu-details-overview-fixed.png`；预览源码、服务器和专用浏览器已清理。
+
+没有操作真实平台、Keyring 或 CLI 配置，未执行原生 Tauri WebView、Windows/Linux 实机验收；本轮未重跑 Rust 或全仓测试。未提交、推送或发布。原有未提交改动和用户 `out/` 保留。
+
+## zws 提交整理与 Harness 接入剔除（2026-10-31）
+
+在独立整理工作树中，从官方 4.0.21 基线重新组织 zws 的二开成果。删除二开新增的 DeepSeek Harness 应用、原生配置适配、平台同步入口、前端表单和相关测试；保留上游 DeepSeek 供应商/模型预设及 WorkBuddy。原发布和同步文档中的 Harness 描述仅保留为历史记录。
+
+已执行：`./node_modules/.bin/tsc --noEmit` 通过；本次修改的现存前端/测试文件 Prettier 检查通过；`cargo fmt --check --manifest-path src-tauri/Cargo.toml` 通过；9 个相关前端测试文件共 202 项通过；`CC_SWITCH_TEST_HOME` 指向独立临时目录的 `cargo test --offline --manifest-path src-tauri/Cargo.toml --lib zhishu:: --quiet` 共 149 项通过。运行时代码与测试中的 Harness/DSH 标识扫描无匹配。另已编译 Rust 测试目标；未执行全仓测试、Clippy、桌面实机或原生 CLI 验收。
+
+本次不迁移或删除用户机器上的旧 Harness 配置及数据库行。新分支不再识别该应用 ID，旧数据需要在原发布版本管理或迁出。提交重组与最终文件树核对见 [整理记录](commit-reorganization.md) 和 [ADR-0006](../adr/ADR-0006-zws-history-without-harness.md)。
+
+## DSH 平台供应商适配（2026-10-31）
+
+用户场景：已登录平台并取得本机基础数据后，可在 DSH 页面同步托管供应商；全应用同步、按账号删除和清理退出也覆盖 DSH。验收范围为兼容模型映射、稳定分组 ID、完整模型目录、重复同步、Key 轮换、原生 profile 写入和账号归属删除。复用上游 4.0.22 的 DSH ProviderService、`dsh_config` 路径/锁/凭据引用及平台两阶段同步；没有新 IPC、schema、凭据存储或上游核心补丁。改动均在智枢模块和自有测试/文档，侵入等级 L0；`UPSTREAM_PATCHES.md` 无新增条目。
+
+后续按用户反馈复核真实本机配置：手动 `shoudongtianjia` 已在 DSH profile，平台托管项的数据库行却标记为未写入原生配置；两者的协议、网关地址及 Key 相同。因此将 DSH 同步改为新建时原子写入原生 profile，已有数据库项在原生节点缺失时补写。隔离回归覆盖与手动项共存、首次可见、移除后再次同步恢复、重复同步不改写、Key 轮换和按账号删除；未改动真实 DSH profile 或凭据。
+
+已执行：`pnpm typecheck` 通过；DSH 入口与白名单前端测试 16 项通过，本次 TS 文件 Prettier 检查通过；隔离 `CC_SWITCH_TEST_HOME` 的 `cargo test --locked --offline --lib zhishu:: -- --test-threads=1` 151 项通过；隔离目录的 `dsh_commands` 集成测试 3 项通过；`cargo fmt --check`、`cargo clippy --locked --offline -- -D warnings`、`git diff --check` 通过。Rust 测试为 DSH 设置临时 `DSH_HOME`，验证 profile 不含明文 Key、凭据引用文件存储 Key、重复同步不改写文件、轮换和删除；不访问真实用户配置。
+
+仓库级 `pnpm format:check` 未通过，仅报告未修改的 `src/App.tsx`；本次改动的 TS 文件单独检查通过。未执行全仓前端/全部 Rust 测试、真实 DSH CLI 调用、真实平台账号、Windows/Linux 运行、安装升级或发布验收。回退可撤销本次智枢适配与白名单，已产生的 DSH 托管项需按账号使用现有删除入口处理；不自动迁移或清理用户配置。
+
+后续现场复核（2026-10-31）：开发数据库中的手动项和平台项均标记已写入原生配置，`web`、`desktop`、`headless` profile 也均含两项；先前“仅数据库保存”的诊断已不能解释当时的不可见。平台项有 177 个模型，其中 6 个曾含 DSH schema 不接受的 `reasoningEfforts.ultra`，手动项只有 5 个模型。已在智枢 DSH 模型适配中限制思考档位，并在重复同步时清理已有托管模型的非法档位；本轮未直接修改真实 `~/.dsh`。期间用户侧配置发生更新，复核时数据库与原生 profile 已无 `ultra`。当前打开的 DSH 模型选择器已实际显示「智枢平台 · 智枢router-ccs-标准」及其 GPT-6-Luna 等模型，手动项同时可见；不能仅凭这次观察断定是谁触发了重同步。
+
+本轮验证：隔离 `CC_SWITCH_TEST_HOME` 与 `DSH_HOME` 的 `cargo test --locked --offline --lib zhishu:: -- --test-threads=1` 共 152 项通过；最终代码的 `cargo test --locked --offline --lib dsh -- --test-threads=1` 共 66 项通过，包含 DSH 原生 YAML 不含 `ultra`、重复同步不改写、已有非法档位清理；`cargo fmt --check`、`cargo clippy --locked --offline -- -D warnings` 和 `git diff --check` 通过。已只读查看本机 DSH 模型选择器，确认平台分组可见；未执行平台模型实际请求、完整仓库测试或发布。REA 对已安装 DSH 应用包的外部分析被自动审批阻止，因此以本机 `dsh 0.2.1-rc.5` 版本、官方同版本 schema、隔离回归和当前界面观察为依据，不宣称安装包内部已核验。
+
+## 文档分类与源码核对（2026-10-31）
+
+范围：`docs/zhishu` 按 development、features、api、releases、history、adr、upstream-sync 分类，根目录只留总索引。合并两份提交整理映射，旧审查报告的有效结论并入本页；发布指南与各版本证据分离。依据当前源码更新 0.0.3 / 上游 4.0.22 / schema 24、真实模块位置和 DSH 平台同步范围。旧分支记录保留原适用范围，不覆盖前面的历史测试结果。
+
+复用当前 ProviderService/Adapter、已有 IPC 和开发/发布脚本的事实说明，不新增业务实现。L0 文档整理，Vite/开发脚本只修正文档提示路径（固定入口按 L1 复核），`AGENTS.md` 和贡献指南同步引用；补丁登记复核 ZS-006、ZS-222。无数据库、凭据、原生配置、平台请求或跨平台行为变更。
+
+| 本次检查 | 结果 |
+| --- | --- |
+| 文档索引可达性 | 27 份文档全部可从总索引访问，无孤立文档 |
+| 本地 Markdown 引用 | 122 处本地链接及其中 6 个章节锚点有效，含相邻网关仓库引用 |
+| 当前文档源码入口 | 59 个完整源码路径存在；历史迁移表和目标示例单独标识 |
+| 版本、schema、白名单与 IPC 静态核对 | 源码版本 0.0.3、schema 24；13 项前后端平台白名单一致，含 DSH；21 个前端 wrapper 命令均已实际注册 |
+| JSON 示例解析 | 12 段均可解析 |
+| `pnpm typecheck` | 通过；初次只读沙箱无法打开 pnpm 存储锁，正常权限重跑成功 |
+| 开发脚本回归 | `node --test scripts/zhishu/macos-dev-sign.test.mjs scripts/zhishu/dev-isolated.test.mjs`：9 项通过，1 项真实钥匙串测试按默认设置跳过 |
+| 修改的工具入口格式与语法 | Vite / macOS 签名模块 Prettier、Node 语法检查及 `sh -n` 均通过 |
+| `git diff --check` | 通过 |
+
+本次未运行全量前端/Rust 测试、构建、真实钥匙串、CLI 请求、安装升级或发布验收；旧记录中的“已执行”不属于本轮结果。保留用户原有 DSH 适配与验证内容、其他源码改动及 `out/`；未创建提交或推送。回退仅恢复本次文档位置/内容与提示引用，不涉及运行时数据。
+
+最终检查期间发现其他任务新增 ADR-0008 及多处前后端未提交修改。上表 27 份文档和 122 处链接包含工作区中的并行 ADR；本次提交仅整理原有 26 份文档，并行 ADR、索引条目及实现说明留在工作区，由对应任务提交。本次类型/脚本测试不作为并行实现的验证证据。
+
+
+## 2026-11-03 与原版 CC Switch 共存隔离（源码 0.0.6）
+
+用户场景：智枢与原版同时安装，共享 Codex 等 CLI 配置时不互相认领派生资源，也不由智枢后台覆盖原版配置。依据 [ADR-0009](../adr/ADR-0009-product-coexistence.md)，实现与升级边界见[共存说明](../development/coexistence.md)。复用现有 ProviderService、配置投影、原子发布/首写备份/pending、原生 Skills 校验和 S3/WebDAV 传输。L0/L1/L2/L3，补丁登记为 COEXIST-20261103-01～06；没有新增依赖、IPC、平台请求或凭据迁移。
+
+独立化模型文件、Codex live 路由、聚合 ID、Desktop profile、DSH 回执和新 MCP 节点、代理占位符与同步协议。后台归属记录保存路径、文件哈希及路由/认证字段的不可逆摘要；普通主题、MCP 等编辑不阻止安全分离，路由交接则撤销后台归属。后台发布拒绝在并发改写上强行重算；故障恢复继续按原 hash/pending 前滚并保留外部内容。旧资源与共享历史不批量迁移或删除。云端上传前验证来源，空目标以智枢标记支持部分上传重试，旧设置缺失 root 也保留旧默认语义并提示改独立目录。
+
+**本次提交审查重做（2026-11-03）**：按用户要求将修复合入原共存提交，保留后续两条提交及原历史备份。只修正三处：Codex profile 指纹仅比较既有路由校验使用的三个覆盖字段，模型/推理档位编辑后允许安全分离和重连；AGY 程序发现同时排除两款产品的包装脚本，清理仍只接受智枢标记；`comp_hash` 恢复原压缩协议分组值。复用原投影、写入/恢复和程序发现路径，L0/L3，更新 ADR-0009 与 COEXIST-20261103-01/02/04；无新增依赖、IPC、凭据迁移或配置格式变更。
+
+新增三项回归，先在未修复实现上确认模型编辑后分离、原版包装脚本排除两项失败；修复后通过，并覆盖每个 profile 路由/认证覆盖字段单独改变时撤销归属。验证在保留后续提交的最终工作树执行；下表是本轮结果，再下一表保留原隔离实施的历史结果。
+
+| 重做已执行检查 | 结果 |
+| --- | --- |
+| 临时 `CC_SWITCH_TEST_HOME` 下完整 `cargo test --offline --manifest-path src-tauri/Cargo.toml -- --test-threads=1` | 4743 项通过、0 失败、11 项既有跳过；其中单元测试 4528 项、金标 44 项通过，不更新快照 |
+| 补强断言后的共存专项 `cargo test --offline --manifest-path src-tauri/Cargo.toml --lib coexistence -- --test-threads=1` | 17 项全部通过，覆盖分离/重连、外部路由字段、两类包装脚本和原版文件保留 |
+| `cargo clippy --offline --manifest-path src-tauri/Cargo.toml -- -D warnings` | 通过 |
+| `cargo fmt --check --manifest-path src-tauri/Cargo.toml` | 通过 |
+| `node node_modules/typescript/bin/tsc --noEmit` | 通过，沿用已安装 TypeScript |
+| `git diff --check`、修改文档本地链接 | 通过 |
+
+本轮没有运行前端测试/构建、真实 CLI/双应用、系统 keyring、Windows/Linux 实机或发布验证。测试仅使用临时配置与本机模拟服务；原版文件保护和发布前并发检查保留，真实配置和凭据未改动。
+
+| 本次已执行检查 | 结果 |
+| --- | --- |
+| `pnpm typecheck` | 通过 |
+| `pnpm test:unit` | 288 个测试文件、3685 项通过 |
+| `pnpm build:renderer` | 通过；保留既有 chunk 大小提示 |
+| `pnpm test:dev-isolation` | 3 项通过 |
+| 修改的前端文件 Prettier | 通过，覆盖 AboutSection、WebdavSyncSection 及其修改的测试 |
+| `pnpm format:check` | 未通过：只提示本次未修改的 `src/App.tsx`；没有混入无关格式化修复 |
+| `cargo fmt --check --manifest-path src-tauri/Cargo.toml` | 通过 |
+| `CC_SWITCH_TEST_HOME=<临时目录> cargo test --manifest-path src-tauri/Cargo.toml` | 4740 项通过、0 失败、11 项按既有设置跳过；其中 Rust 单元测试 4525 项、golden 44 项 |
+| `cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings` | 通过 |
+| 金标 | 通过仓库 `CC_SWITCH_UPDATE_GOLDEN=1` 入口更新并审查 3 份，仅派生目录文件名/排序与导入行路由 ID 变化；MCP 原版 custom 夹具刻意保留 |
+| `git diff --check`、新增文档本地链接 | 通过 |
+
+首轮 Rust 测试受到沙箱禁止回环 bind 的限制，改在相同临时配置下允许本机模拟服务后重跑；最终结果以上表为准。迭代期间修复了旧行为断言、后台与用户主动代理地址修改的边界，以及 OAuth 回调连接复用导致的 `IncompleteMessage`。后续审查补充了同端口 Grok 旧占位符拒绝，以及显式官方历史统一随实际路由迁移/新旧账本限 ID 还原的回归；最终全套无失败。
+
+未执行：真实两款桌面应用同时运行、真实 CLI 请求/旧会话续聊、实际云端上传/旧快照恢复、系统 keyring、Windows/Linux 安装升级与正式打包发布。仅完成源码修复，不替换本机已安装的 0.0.6 客户端，不清理真实 Codex 旧目录文件或云对象。两款应用共同管理同一原生配置时，后续主动切换仍会改变当前供应商；Codex 浏览器 OAuth 的协议端口 1455 保留，被占用时需用户选择设备码或先结束另一处登录。
+
+
+## 2026-11-03 Git 远程命名整理
+
+场景与验收：按二开标准区分智枢协作/发布仓库、官方来源和内网 GitLab；本地名称、URL、发布脚本和当前操作文档一致，保留分支/tag、HEAD 和原跟踪目标。用户明确授权远程整理，执行前工作区干净。使用 Git 原生 `remote rename`，迁移旧 `origin` → `upstream`、旧 `zhishu-git` → `origin`、旧 `zhishu-origin` → `gitlab`；fetch/push URL 不变。改名前已在本机临时目录保存私密配置备份与引用快照。
+
+改动范围为本地 Git 配置/远程跟踪引用、自有发布脚本与既有回归、根 AGENTS 及自有维护文档，L0/L1。复用既有版本校验、固定仓库 URL 白名单和原子发布，不改上游运行时代码或 CI 工作流；补丁登记已追加本轮说明。
+
+| 本次已执行检查 | 结果 |
+| --- | --- |
+| Git 远程与引用核对 | 三个远程名称/地址正确；本地分支/tag、HEAD 不变，其余引用按名称映射保留；并行操作更新了 `origin/ccs-dev`，已单独核对保留 |
+| 分支跟踪 | 改名后初检保留原目标；最终 `main` → `upstream/main`，并行操作已将 `ccs-dev` → `origin/ccs-dev`，未覆盖该变更 |
+| Node 发布回归 | 直接执行 `package.json` 的 `test:release` 所列五份测试，59 项全部通过；包含错误官方地址、多 push URL 拒绝、原子推送和失败重试 |
+| 发布离线预览 | `node scripts/zhishu/tag-release.mjs --dry-run` 通过，仅预览 0.0.6 → 0.0.7，不改版本、分支或 tag |
+| 格式、版本和文档 | 两份修改脚本 Prettier、产品 0.0.6 与上游 4.0.23 祖先核对、当前操作文档本地链接、`git diff --check` 通过 |
+
+初次通过 pnpm 入口运行时，版本管理器需要联网解析 pnpm 10.12.3，因沙箱网络限制未能启动脚本；随后用已安装 Node 直接执行相同测试文件、预览和本地 Prettier，结果如上。不把 pnpm 入口启动失败算作代码测试失败。
+
+最终检查期间，快照比对发现并行操作把 `origin/ccs-dev` 从 `59b437af` 更新到当前 HEAD `c5d3f2c9`，并修改了 `ccs-dev` 的跟踪配置；本任务未执行这些操作，已保留并按实际状态更新文档。本地引用更新不等于本任务已联网核验远端。
+
+本任务未执行 fetch/pull/push、正式发布、服务器权限或默认分支调整、真实 GitHub/GitLab 连通性、全量前端/Rust/跨平台安装升级。`ccs-dev` 与内网旧分支的分歧仍在；其他克隆须核对地址并同步迁移远程名称。本轮脚本/文档未提交。回退按 [基线](../development/baseline.md) 的逆向改名顺序并恢复本轮文件即可，不涉及凭据、CLI 配置、数据库或提交历史迁移。
+
+
+## 2026-11-03 移除开发启动隔离
+
+用户要求“去掉开发隔离相关代码”。依据 [ADR-0010](../adr/ADR-0010-remove-development-isolation.md)，将启动器改为自有 `scripts/zhishu/dev.mjs`，移除目录准备、Codex 凭据模式初始化、子进程目录环境注入和 Rust 开发路径分支；平台文件统一使用 Tauri 本地目录。保留正常目录设置覆盖、Windows 路径兼容、测试专用 `CC_SWITCH_TEST_HOME`、macOS 签名和进程清理。路径分派按 L3 登记，命令/启动接线 L1，自有模块和文档 L0；补丁记录 DEV-20261103-01～04 已更新。
+
+| 本次已执行检查 | 结果 |
+| --- | --- |
+| `node --test scripts/zhishu/dev.test.mjs scripts/zhishu/macos-dev-sign.test.mjs` | 9 项通过，真实钥匙串测试按默认条件跳过 1 项；含跨平台命令选择、配置参数转发、假 CLI 环境继承、无目录初始化、子进程失败退出码 |
+| `node scripts/zhishu/dev.mjs --dry-run` | 通过，仅预览正常 macOS 签名入口，不启动应用 |
+| `node node_modules/typescript/bin/tsc --noEmit` | 通过，直接运行已安装 TypeScript，等价于现有 typecheck 脚本 |
+| `cargo fmt --check --manifest-path src-tauri/Cargo.toml` | 通过 |
+| 临时 `CC_SWITCH_TEST_HOME` 下 `cargo test --offline --manifest-path src-tauri/Cargo.toml --lib config::tests:: -- --test-threads=1` | 351 项通过，1 项既有真实 API Key 测试跳过；过滤包含各配置模块，覆盖默认 Codex 目录、显式设置覆盖、原文件保留和设备路径 |
+| Rust `app_config_load` | 4 项通过 |
+| Rust `provider_commands` | 13 项通过 |
+| Rust `golden` | 最终 44 项全部通过，不更新金标；覆盖格式、未知字段/MCP 保留、文件权限、认证及代理退出 |
+| Rust `zhishu::storage::platform_session::tests::` | 8 项通过，使用内存 vault 与临时文件，不访问真实 keyring |
+| `cargo clippy --offline --manifest-path src-tauri/Cargo.toml -- -D warnings` | 通过 |
+| 修改的 Node 脚本与 `package.json` Prettier、Node / shell 语法、`git diff --check` | 通过 |
+| 运行时代码残留与文档引用 | 源码、脚本和命令入口无专用开发隔离变量/函数；90 处当前维护文档本地链接可达，历史记录保留原事实 |
+
+Rust 共 420 项通过、1 项跳过；Node 共 9 项通过、1 项跳过。金标首轮在沙箱中为 42 通过、2 失败，失败原因均是代理回环监听被拒绝（`Operation not permitted`）；允许本机监听后重跑 44 项全部通过，不将首轮环境限制归为代码失败。
+
+未执行全量前端/Rust 测试、前端构建、正式打包发布、真实 GUI/CLI 请求、系统 keyring 和 Windows/Linux 实机验收。本轮未启动真实开发应用、迁移或删除旧 `~/.zhishu-ccs-dev-home`，未改动真实数据库、CLI 配置或凭据。以后开发启动使用正常数据路径；旧开发登录不会自动迁入。本节记录当时的临时启动器及测试；该包装层随后按用户反馈撤回，当前入口见下节。回退方案见 ADR-0010。
+
+
+## 2026-11-03 开发入口收敛（补充）
+
+用户反馈不应继续堆积开发脚本。删除上一轮新增的 `dev.mjs` 和 `dev.test.mjs`，`package.json` 的 `dev` 直接使用 `tauri dev`，删除 `test:dev`，不再提供自有 dry-run 或 Vite 清理。通用启动、参数和生命周期复用 Tauri CLI；需要 macOS 稳定签名时显式调用既有 `sh scripts/zhishu/dev-macos.sh`。本补充仅为 L0 文档和 L1 命令入口收敛，更新既有 ADR-0010 / DEV-20261103-01，不新增脚本、测试文件或 ADR；上一轮 Rust 路径改动保持不变。
+
+已执行：直接调用本地 Tauri CLI 的 `dev --help` 成功，未启动应用；既有 `macos-dev-sign.test.mjs` 6 项通过、真实 keyring 测试按默认条件跳过 1 项；`package.json` Prettier、签名脚本 shell 语法、62 处本地文档链接及 `git diff --check` 通过。静态断言确认 `dev` 直接调用 Tauri、旧隔离和通用包装脚本均不存在、相应测试命令已移除。更新 AGENTS 和开发/签名文档，使显式签名与普通启动入口一致。
+
+本补充未重跑前端/Rust 全量检查或真实 GUI、keyring 和跨平台启动；前节 420 项 Rust 测试仍仅作为前轮后端改动验证。普通 `pnpm dev` 不再自动使用自定义 macOS 签名 runner；稳定钥匙串授权需使用上述显式签名入口。回退此补充只需恢复上一轮入口与包装层，不涉及数据或凭据。
+
+
+## 2026-11-03 自有脚本去冗余
+
+用户确认处理脚本检查结果。删除 `release-artifacts.mjs` 中六个无生产调用的旧收据/合包及文件遍历函数，文件从 355 行减至 179 行；移除两项只覆盖旧链路的测试，现用测试夹具直接创建签名产物，缺失签名回归改用正式工作流调用的 `collectUpdaterPlatforms`。保留当前版本/平台/哈希/签名校验、`collectReceiptUpdaterPlatforms` 及其 MSI/Linux 历史恢复兼容。
+
+删除独立 `macos-dev-sign-runner.sh`，Cargo runner 改用已有 `dev-macos.sh --run`；普通签名入口不变。在既有签名测试中验证身份与 runner 环境、Tauri 参数和退出码传递，并保留签名失败不启动、应用含空格参数及缺少可执行文件的检查。目录从 20 个文件降为 19 个，无新增脚本、测试文件或依赖。L0 自有脚本/文档清理，补丁台账已补充事件；没有修改上游源码、package 命令、工作流、平台请求或签名策略。
+
+| 本轮已执行检查 | 结果 |
+| --- | --- |
+| 现有 Node 发布五份回归加 macOS 签名回归（`node --test` 直接运行对应六份文件） | 64 项通过、0 失败；真实钥匙串测试默认跳过 1 项 |
+| `python3 -B -m unittest discover -s scripts/zhishu -p 'test_publish_cos.py'` | 21 项通过，2 项 COS SDK 契约测试因未安装 SDK 跳过；使用内存上传模拟 |
+| 修改的三份 Node 文件 Prettier / Node 语法，`dev-macos.sh` shell 语法，`git diff --check` | 通过 |
+| 调用与引用检查 | scripts/工作流没有调用已删除函数或 runner 文件；保留历史 ADR 中当时的路径事实 |
+
+首轮 Node 回归发现测试中仍需使用的 `readFileSync` import 被一并清理，补回后完整重跑通过。没有改变测试断言来掩盖失败。
+
+未执行真实 Apple 签名/keyring、GUI 启动、GitHub Actions 构建、COS 上传或发布验收；前端与 Rust 源码未在本补充中修改，未重跑对应全量检查。测试使用临时文件、假命令和本地 bare Git 仓库，未操作真实发布分支/tag、远程桶或用户凭据。回退只恢复自有脚本和对应测试，无数据迁移。

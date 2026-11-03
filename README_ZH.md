@@ -499,7 +499,7 @@ Codex 还可以在 CC Switch 里用“使用 ChatGPT 登录”登录多个 ChatG
 <details>
 <summary><strong>开始路由后，配置文件里的地址为什么变成了 127.0.0.1？</strong></summary>
 
-路由模式下，工具的请求会先发到 CC Switch 的本地路由（默认 `http://127.0.0.1:15721`），再由 CC Switch 转发给你选中的供应商。所以工具的配置文件里只有本地地址和占位密钥 `PROXY_MANAGED`；Claude Code 的模型名还会写成 `claude-sonnet-5` 之类的固定别名（`/model` 菜单里仍显示真实模型名）。真实的供应商地址、密钥和模型都保存在 CC Switch 里。聚合模式同样如此。
+路由模式下，工具的请求会先发到 CC Switch 的本地路由（默认 `http://127.0.0.1:25721`），再由 CC Switch 转发给你选中的供应商。所以工具的配置文件里只有本地地址和占位密钥 `PROXY_MANAGED`；Claude Code 的模型名还会写成 `claude-sonnet-5` 之类的固定别名（`/model` 菜单里仍显示真实模型名）。真实的供应商地址、密钥和模型都保存在 CC Switch 里。聚合模式同样如此。
 
 在侧栏「用量统计」的请求日志里可以看到每条请求的“请求模型 → 实际模型”。
 

@@ -1,0 +1,36 @@
+# 平台登录与会话
+
+主窗口启动后先显示登录页，登录成功后进入原有应用界面。侧栏显示平台账户并提供退出入口；不再区分新手模式与高级模式。
+
+## 开发运行
+
+1. 启动 zhishu-proxy 后端 `http://127.0.0.1:3000` 与网页前端 `http://127.0.0.1:3081`。
+2. 在 cc switch 中运行 `pnpm install`，再运行 `pnpm dev`。客户端自己的 Vite 服务使用 1420 端口。
+3. 点击「登录智枢」，在系统浏览器完成平台登录及 OAuth2 授权；密码、TOTP 和人机验证均由网页处理。
+
+默认地址已匹配上述开发环境。可复制 `src/.env.example` 为 `src/.env.local` 修改构建配置，正式环境将两个地址都配置为同一 HTTPS 站点，重新构建即可。登录页「高级设置」允许输入后端地址；客户端只保留 OAuth2 登录，不再提供密码、TOTP、记住密码、注册或找回密码表单入口。平台配置缺少 OAuth2 方法、授权地址或客户端 ID 时显示不可用提示，可重试配置或更换服务器，不回退到密码登录。
+
+## 接口与会话
+
+配置与会话请求使用 `/api/zhishu/v1/client` 前缀：`GET /config`、`GET /account`、`POST /auth/refresh`、`POST /auth/logout`；OAuth2 授权码通过 `/api/zhishu/v1/oauth/token` 交换。客户端请求白名单已移除 `/auth/login` 和 `/auth/login/2fa`，对应 IPC、密码读取/遗忘 IPC、登录历史/删除记录 IPC 均已删除。统一请求器按方法和路径白名单拒绝其他路由；Rust 发送 HTTP 并拒绝重定向。HTTP/HTTPS 地址校验仍沿用此前产品决定；登录 URL 中的账号、密码、查询和片段会移除，完整客户端 API 前缀会规范化为平台基址。`/config.api_base_url` 不改变 JWT 的请求目标。缺少 refresh token 的成功登录明确提示不能自动续期，清理上一账号持久化凭证，不复用旧 token。
+
+此前独立改动（2026-10-31）按需求放宽客户端地址校验：这是对二开标准默认 HTTPS 策略的显式调整，HTTP 按明文协议连接；HTTPS 证书校验、重定向限制、平台身份验证与凭据库存储继续沿用既有实现。发行脚本对预置平台地址的检查仍独立执行。该地址校验改动仅修改自有登录模块及测试，L0；本次专用 API 改造的侵入等级和回退边界另见 ADR-0004。
+
+授权码、PKCE verifier 和访问令牌仅在 Rust 中处理；刷新令牌默认保存在系统凭据库的独立 service `com.zhishu.ccswitch.desktop.platform-session`，不发送给前端，不写入 localStorage、数据库、配置导出或同步文件。设备本地 `platform-session.json` 只保存平台地址、用户 ID、凭据条目 ID 和最后使用时间，以原子方式写入，Unix 权限为 0600；它位于 Tauri 应用本地数据目录，凭据条目按存储目录区分。完全退出客户端、重启应用或电脑后，客户端读取刷新令牌并向平台验证，成功后直接进入主界面。连续超过 7 天未使用则清除本机会话并要求重新登录；这是客户端的不活跃期限，不是每隔 7 天强制登录。窗口可见且未最小化时更新最后使用时间，隐藏到托盘、最小化和后台轮询不续期。服务端仍可提前撤销凭据，实际登录恢复以服务端校验为准。客户端不维护历史账号或记住密码，不再包含旧密码存取/清理及登录历史兼容层。登录页只提供 OAuth2 与服务器地址设置；最终账号由浏览器授权和后端账户校验确定。旧版历史文件与密码凭据保留原处，程序不再访问，本次不执行真实数据清理。系统凭据库无法保存刷新令牌时，本次仍可使用并显示提示，但无法跨重启保持登录。
+
+客户端每分钟以及窗口重新可见、网络恢复时查询账户状态。401 时使用刷新令牌轮换后重试；轮换结果在后续请求之前写回系统凭据库，即使随后账户查询失败也保留新凭据，凭据库暂不可用时保留内存中的轮换结果并允许重试保存。凭证失效或账户被禁用时清除本机会话并返回登录页，同时清除前端账户缓存。暂时断网时保留会话并提示错误；启动恢复失败时显示重试页面，不会直接清除凭据或开放未验证的离线入口，也可以主动返回登录页。退出先失效本地会话指针、删除系统凭据库条目，再尝试撤销平台刷新令牌；即使凭据库删除暂时失败，失效指针也阻止下次自动恢复。撤销失败会提示；退出保留平台目录、Provider 和工具配置中的模型 Key，不删除共享 Key。
+
+## 当前范围和限制
+
+- 只支持 OAuth2 浏览器授权。登录、TOTP、验证码、注册及找回密码均在平台网页完成；沿用现有 PKCE、state 和 loopback 校验，详见 [OAuth2 接入说明](../api/oauth-login.md)。
+- 平台基础数据仍只通过 `/access` 获取当前账户授权分组和共享 Key，再从本机快照同步 Provider；不查找、创建或删除 Key。普通摘要不包含 Key；显式查看入口不使用查询缓存。退出登录仅清除会话，保留本机托管配置里的 API Key；需要清理供应商时使用显式删除入口，详见[账号服务供应商同步与分组专用 Key](platform-managed-models.md)。
+- 登录页是主窗口的产品入口，不是本地配置的安全隔离机制。现有托盘与原有本地工具管理逻辑保持原样，平台接口仍必须由后端校验会话权限。后续平台专属操作必须在 Rust 端验证登录状态。
+
+左下角账户区域显示平台美元余额，侧栏收起时仍显示金额。余额每分钟及窗口重新可见时随账户信息刷新，也可点击余额行手动刷新。小于 0.01 美元的非零余额显示六位小数，其余显示两位。
+
+## 实现与回归入口
+
+- 账户态、恢复门禁和登录页：`src/zhishu/auth/PlatformAuthContext.tsx`、`PlatformLogin.tsx`；IPC wrapper：`src/zhishu/api/platformAuth.ts`。
+- HTTP 与认证：`src-tauri/src/zhishu/services/platform_auth.rs`；会话及设备路径：`src-tauri/src/zhishu/storage/platform_session.rs`、`platform_storage.rs`。
+- command 由 `src-tauri/src/zhishu/commands/mod.rs` 导出，在 `src-tauri/src/lib.rs` 注册。接口字段见 [专用 API 契约](../api/client-api.md)，账号清理见 [ADR-0005](../adr/ADR-0005-account-local-cleanup.md)。
+- 前端回归：`tests/zhishu/lib/platformAuth.test.ts`、`tests/zhishu/components/PlatformLogin.test.tsx`；Rust 模拟测试与实现同文件。历史执行结果见 [验证记录](../history/validation.md)。

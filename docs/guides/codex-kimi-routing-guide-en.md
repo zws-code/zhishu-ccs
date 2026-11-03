@@ -24,7 +24,7 @@ CC Switch solves this by making Codex always talk to a local route and continue 
 
 The chain has four main steps:
 
-1. When Codex routing is enabled, the local configuration is written as `http://127.0.0.1:15721/v1`, while `wire_api = "responses"` is kept in place.
+1. When Codex routing is enabled, the local configuration is written as `http://127.0.0.1:25721/v1`, while `wire_api = "responses"` is kept in place.
 2. The provider's `meta.apiFormat = "openai_chat"` tells the route that the real upstream is Chat Completions.
 3. The route rewrites `/responses` or `/v1/responses` to `/chat/completions`, and converts the Responses request body into a Chat request body.
 4. After the upstream responds, the route converts the Chat JSON or SSE stream back into Responses JSON/SSE.
@@ -61,7 +61,7 @@ The preset already includes Kimi's request base URL, default model, model menu, 
 
 Go to the `Routing` page in Settings, expand `Local Routing`, and complete two toggles:
 
-1. Turn on the `Routing Master Switch` to start the local service. The default address is `127.0.0.1:15721`.
+1. Turn on the `Routing Master Switch` to start the local service. The default address is `127.0.0.1:25721`.
 2. Turn on `Codex` under `Routing Enabled`. If you only want Codex to use local routing, you can leave Claude and Gemini off.
 
 ![Enabling Codex routing on the local routing page](../images/codex-kimi-routing/03-local-route-codex-takeover.png)
@@ -89,7 +89,7 @@ If the upstream provider directly supports the OpenAI Responses API, set `Upstre
 
 **Codex reports 404 or cannot find `/responses`**
 
-Usually Codex routing is not enabled, or the Kimi Chat base URL was written directly into Codex manually — the Kimi upstream has no `/responses` endpoint, so that always 404s. Check whether `~/.codex/config.toml` points to `http://127.0.0.1:15721/v1`.
+Usually Codex routing is not enabled, or the Kimi Chat base URL was written directly into Codex manually — the Kimi upstream has no `/responses` endpoint, so that always 404s. Check whether `~/.codex/config.toml` points to `http://127.0.0.1:25721/v1`.
 
 **Kimi upstream reports 401 or 403**
 

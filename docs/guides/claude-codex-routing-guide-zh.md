@@ -15,7 +15,7 @@ CC Switch 的做法是让 Claude Code 始终连本机路由，仍以 Anthropic M
 
 这条链路主要分成四步：
 
-1. 接管 Claude Code 后，`~/.claude/settings.json` 里的 `ANTHROPIC_BASE_URL` 会被写成本机路由地址（默认 `http://127.0.0.1:15721`），认证项只留占位符，真实凭据不进 live 配置。
+1. 接管 Claude Code 后，`~/.claude/settings.json` 里的 `ANTHROPIC_BASE_URL` 会被写成本机路由地址（默认 `http://127.0.0.1:25721`），认证项只留占位符，真实凭据不进 live 配置。
 2. 供应商的 `API 格式` 设为 OpenAI Responses，告诉路由：真实上游说的是 Responses 协议。
 3. 路由把 `/v1/messages` 请求转换成 Responses 请求体发给上游；方式二还会带上 OAuth token 与官方客户端身份访问 ChatGPT 的 Codex 服务。
 4. 上游返回后，路由再把 Responses 的 JSON/SSE 转回 Claude Code 能理解的 Messages 形态。
@@ -68,7 +68,7 @@ CC Switch 的做法是让 Claude Code 始终连本机路由，仍以 Anthropic M
 
 进入设置里的 `路由` 页面，展开 `本地路由`，完成两个开关：
 
-1. 打开 `路由总开关`，启动本地服务（首次开启会弹出说明确认框）。默认地址是 `127.0.0.1:15721`。
+1. 打开 `路由总开关`，启动本地服务（首次开启会弹出说明确认框）。默认地址是 `127.0.0.1:25721`。
 2. 在 `路由启用` 中打开 `Claude Code`。只想让 Claude Code 走路由的话，其余应用保持关闭。
 
 接管后，CC Switch 会把 Claude Code 的 live 配置指向本机路由，认证项只有占位符；方式一的网关 Key 和方式二的 OAuth token 都由本地路由在转发时注入。

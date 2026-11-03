@@ -32,7 +32,7 @@ CC Switch では、Codex が常にローカルルートへ接続し、Responses 
 
 この経路は主に 4 つのステップに分かれます：
 
-1. Codex ルーティングを有効にすると、ローカル設定は `http://127.0.0.1:15721/v1` に書き換えられ、`wire_api = "responses"` は維持されます。
+1. Codex ルーティングを有効にすると、ローカル設定は `http://127.0.0.1:25721/v1` に書き換えられ、`wire_api = "responses"` は維持されます。
 2. Provider の `meta.apiFormat = "openai_chat"` が、実際の上流は Chat Completions だとルートに伝えます。
 3. ルートは `/responses` または `/v1/responses` を `/chat/completions` に書き換え、Responses のリクエストボディを Chat のリクエストボディへ変換します。
 4. 上流から返ってきた後、ルートは Chat の JSON または SSE ストリームを Responses JSON/SSE へ変換して返します。
@@ -73,7 +73,7 @@ CC Switch を開き、上部の `Codex` タブへ切り替え、右上のプラ�
 
 設定の `ルーティング` ページに入り、`ローカルルーティング` を展開して、次の 2 つのスイッチを設定します：
 
-1. `ルーティング総スイッチ` をオンにしてローカルサービスを起動します。デフォルトアドレスは `127.0.0.1:15721` です。
+1. `ルーティング総スイッチ` をオンにしてローカルサービスを起動します。デフォルトアドレスは `127.0.0.1:25721` です。
 2. `ルーティング有効` で `Codex` をオンにします。Codex だけをルーティングしたい場合は、Claude と Gemini はオフのままで構いません。
 
 ![ローカルルーティング画面で Codex ルーティングを有効化](../images/codex-deepseek-routing/03-local-route-codex-takeover.png)
@@ -103,7 +103,7 @@ Codex に入ったら、`/model` で現在のモデルが該当プリセット�
 
 **Codex が 404 を返す、または `/responses` が見つからない**
 
-多くの場合、Codex ルーティングが有効になっていないか、上流 Chat base URL を手動で Codex に直接書いています。`~/.codex/config.toml` が `http://127.0.0.1:15721/v1` を指しているか確認してください。
+多くの場合、Codex ルーティングが有効になっていないか、上流 Chat base URL を手動で Codex に直接書いています。`~/.codex/config.toml` が `http://127.0.0.1:25721/v1` を指しているか確認してください。
 
 **上流が 404 を返す**
 
