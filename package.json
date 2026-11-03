@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "tauri dev",
-    "test:dev-signing": "node --test scripts/zhishu/macos-dev-sign.test.mjs",
     "build": "node scripts/zhishu/build-release.mjs",
     "tauri": "tauri",
     "dev:renderer": "vite",

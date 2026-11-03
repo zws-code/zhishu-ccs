@@ -5326,13 +5326,11 @@
     "oauthHint": "Tarayıcıda Zhishu yetkilendirme sayfası açılır. Onayladığınızda giriş otomatik tamamlanır.",
     "oauthWaiting": "Tarayıcı yetkilendirmesi bekleniyor…",
     "oauthCancel": "Yetkilendirmeyi iptal et",
-    "passwordLogin": "E-posta ve şifreyle giriş yap",
-    "backToOAuth": "Zhishu girişine dön",
-    "sessionHint": "Yeniden başlatmalarda oturum açık kalır. 7 günden uzun süre kullanılmazsa yeniden giriş gerekir. Parolayı hatırla yalnızca bir sonraki girişte parolayı doldurur.",
+    "sessionHint": "Yeniden başlatmalarda oturum açık kalır. 7 günden uzun süre kullanılmazsa yeniden giriş gerekir.",
     "advanced": "Gelişmiş ayarlar",
-    "showPassword": "Parolayı göster",
-    "hidePassword": "Parolayı gizle",
-    "or": "veya"
+    "back": "Girişe dön",
+    "oauthUnavailable": "OAuth2 tarayıcı yetkilendirmesi kullanılamıyor. Sunucu adresini kontrol edin veya yöneticinize başvurun.",
+    "retryConfig": "Giriş ayarlarını yeniden kontrol et"
   },
   "clientQuota": {
     "noLimit": "Dönem sınırı ayarlanmamış",
@@ -5358,7 +5356,7 @@
     "action": "Oturumu kapat ve bu hesabın yerel verilerini temizle",
     "title": "Verileri temizleyip çıkılsın mı?",
     "scope": "Bu hesabın platform kataloğu ve tüm uygulamalardaki yönetilen sağlayıcıları kaldırılır, ardından oturum kapatılır.",
-    "retained": "Kayıtlı hesaplar, sunucu adresleri ve hatırlanan parolalar korunur.",
+    "retained": "Diğer hesaplar, yerel özel sağlayıcılar, Yetkilendirme Merkezi hesapları, yapılandırma geçmişi ve geri yükleme yedekleri korunur.",
     "partialHint": "Güvenle kaldırılamayan sağlayıcılar korunur ve sonuçlarda gösterilir.",
     "confirm": "Temizle ve çık",
     "result": "Hesap temizleme sonuçları",
@@ -5374,7 +5372,7 @@
     "scopeDetails": "Korunan diğer veriler",
     "dismiss": "Pencereyi kapat",
     "providerCounts": "{{removed}} silindi · {{skipped}} korundu",
-    "retainedDetails": "Giriş geçmişi, sunucu adresleri ve kayıtlı parolalar korunur. Diğer hesaplar, özel sağlayıcılar, Yetkilendirme Merkezi hesapları, yapılandırma geçmişi ve kurtarma yedekleri de korunur. Sunucudaki paylaşılan API anahtarları iptal edilmez. Korunan öğeler kimlik bilgileri içerebilir."
+    "retainedDetails": "Sunucu adresleri, diğer hesaplar, özel sağlayıcılar, Yetkilendirme Merkezi hesapları, yapılandırma geçmişi ve kurtarma yedekleri korunur. Sunucudaki paylaşılan API anahtarları iptal edilmez. Korunan öğeler kimlik bilgileri içerebilir."
   },
   "platformDeletion": {
     "result": "Sağlayıcı silme sonuçları",

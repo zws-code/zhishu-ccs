@@ -32,62 +32,25 @@ export interface PlatformClientConfig {
   site_name: string;
   api_base_url: string;
   login_methods: string[];
-  totp_enabled: boolean;
-  registration_enabled: boolean;
-  password_reset_enabled: boolean;
-  register_url: string | null;
-  password_reset_url: string | null;
   subscriptions_url: string | null;
-  turnstile_enabled: boolean;
-  tencent_captcha_enabled: boolean;
-  aliyun_captcha_enabled: boolean;
-  // 旧服务端可能没有浏览器授权字段；缺省时只保留账号密码登录。
+  // 旧服务端缺少授权字段时显示不可用提示，不回退到密码登录。
   oauth_authorize_url?: string | null;
   oauth_client_id?: string;
   oauth_scopes?: string[];
 }
-export interface SavedPlatformLogin {
-  id: string;
-  baseUrl: string;
-  email: string;
-  rememberPassword: boolean;
+export interface PlatformLoginResult {
+  status: "authenticated";
+  account: PlatformAccount;
+  persistenceWarning?: string;
 }
 
-export type PlatformLoginResult =
-  | {
-      status: "authenticated";
-      account: PlatformAccount;
-      persistenceWarning?: string;
-    }
-  | { status: "requires_2fa" };
-
-/** 平台登录 IPC：access/refresh token 留在 Rust；保存密码只在用户选择历史账号时显式读取。 */
+/** OAuth2 登录 IPC：授权码与 access/refresh token 均留在 Rust。 */
 export const platformAuthApi = {
   config: (baseUrl: string) =>
     invoke<PlatformClientConfig>("platform_get_client_config", { baseUrl }),
   account: (active = true) =>
     invoke<PlatformAccount | null>("platform_get_account", { active }),
-  history: () => invoke<SavedPlatformLogin[]>("platform_login_history"),
-  savedPassword: (id: string) =>
-    invoke<string | null>("platform_saved_password", { id }),
-  forgetPassword: (id: string) =>
-    invoke<void>("platform_forget_password", { id }),
-  removeLogin: (id: string) => invoke<void>("platform_remove_login", { id }),
   cancelLogin: () => invoke<void>("platform_cancel_login"),
-  login: (
-    baseUrl: string,
-    email: string,
-    password: string,
-    rememberPassword = false,
-  ) =>
-    invoke<PlatformLoginResult>("platform_login", {
-      baseUrl,
-      email,
-      password,
-      rememberPassword,
-    }),
-  login2fa: (code: string) =>
-    invoke<PlatformLoginResult>("platform_login_2fa", { code }),
   // 打开系统浏览器完成平台授权；回调、令牌交换和持久化都在 Rust 侧完成。
   loginOAuth: (baseUrl: string) =>
     invoke<PlatformLoginResult>("platform_login_oauth", { baseUrl }),

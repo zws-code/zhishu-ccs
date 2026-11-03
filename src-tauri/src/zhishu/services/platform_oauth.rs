@@ -283,18 +283,8 @@ mod tests {
             schema_version: 1,
             site_name: "Test".into(),
             api_base_url: "https://gateway.test".into(),
-            login_methods: vec!["password".into(), "oauth".into()],
-            totp_enabled: false,
-            registration_enabled: false,
-            password_reset_enabled: false,
-            register_url: None,
-            password_reset_url: None,
+            login_methods: vec!["oauth".into()],
             subscriptions_url: None,
-            turnstile_enabled: false,
-            turnstile_site_key: String::new(),
-            tencent_captcha_enabled: false,
-            tencent_captcha_app_id: String::new(),
-            aliyun_captcha_enabled: false,
             oauth_authorize_url: Some(authorize.into()),
             oauth_client_id: "zhishu-ccs".into(),
             oauth_scopes: vec!["client".into()],
@@ -330,7 +320,7 @@ mod tests {
     #[tokio::test]
     async fn prepare_rejects_disabled_oauth() {
         let mut cfg = config("https://portal.test/oauth/authorize");
-        cfg.login_methods = vec!["password".into()];
+        cfg.login_methods.clear();
         assert!(OAuthAttempt::prepare(&cfg).await.is_err());
         cfg.login_methods = vec!["oauth".into()];
         cfg.oauth_authorize_url = None;

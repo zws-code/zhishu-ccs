@@ -1,6 +1,5 @@
-//! 平台登录、二次验证、账户恢复以及带认证的分组与额度请求。
-//! access token 和二次验证临时令牌仅驻内存，refresh token 交给系统凭据库保存；
-//! 「记住密码」由独立的 platform_login_history 管理，不参与会话恢复。
+//! 平台 OAuth2 登录、账户恢复以及带认证的分组与额度请求。
+//! access token 仅驻内存，refresh token 交给系统凭据库保存。
 use super::client_api::{
     self, ClientAccess, ClientAccount, ClientConfig, ClientConnection, ClientUsage, GroupDetails,
     PlatformUsageSummary,
@@ -112,19 +111,12 @@ struct Session {
     last_used_at: i64,
 }
 
-struct PendingLogin {
-    base_url: String,
-    temp_token: String,
-    remembered: Option<(String, bool)>,
-}
-
 #[derive(Default)]
 pub struct PlatformAuthState(Mutex<AuthState>);
 
 #[derive(Default)]
 struct AuthState {
     session: Option<Session>,
-    pending: Option<PendingLogin>,
     store: Option<SessionStore>,
     restoration_checked: bool,
     // 浏览器授权等待期间持有；取消登录或流程结束时清除。
@@ -145,8 +137,6 @@ pub enum LoginResult {
         #[serde(rename = "persistenceWarning", skip_serializing_if = "Option::is_none")]
         persistence_warning: Option<String>,
     },
-    #[serde(rename = "requires_2fa")]
-    Requires2fa,
 }
 
 pub(crate) fn normalize_base_url(input: &str) -> Result<String, PlatformAuthError> {
@@ -192,10 +182,7 @@ async fn request<T: DeserializeOwned>(
     let allowed = matches!(
         (method.as_str(), path),
         ("GET", "/config" | "/account" | "/usage/summary")
-            | (
-                "POST",
-                "/auth/login" | "/auth/login/2fa" | "/auth/refresh" | "/auth/logout" | "/access"
-            )
+            | ("POST", "/auth/refresh" | "/auth/logout" | "/access")
     );
     if !allowed {
         return Err(error("CLIENT_API_ONLY", "仅允许客户端专用接口"));
@@ -304,7 +291,6 @@ async fn finish_login(
     };
     state.session = Some(session);
     state.restoration_checked = true;
-    state.pending = None;
     Ok(LoginResult::Authenticated {
         account,
         persistence_warning,
@@ -323,178 +309,10 @@ async fn initialize_session_store(
 }
 
 #[tauri::command]
-pub async fn platform_login(
-    handle: tauri::AppHandle,
-    state: State<'_, PlatformAuthState>,
-    base_url: String,
-    email: String,
-    password: String,
-    remember_password: Option<bool>,
-) -> Result<LoginResult, PlatformAuthError> {
-    let _operation = crate::zhishu::services::platform_models::APPLY_LOCK
-        .lock()
-        .await;
-    let store_result = initialize_session_store(&state.0, &handle).await;
-    let remember = remember_password.unwrap_or(false);
-    let mut result = login(&state.0, base_url, email, password.clone(), Some(remember)).await?;
-    if let Err(err) = store_result {
-        if let LoginResult::Authenticated {
-            persistence_warning,
-            ..
-        } = &mut result
-        {
-            *persistence_warning = Some(err.message);
-        }
-    }
-    persist_login(handle, &mut result, password, remember).await;
-    Ok(result)
-}
-
-async fn persist_login(
-    handle: tauri::AppHandle,
-    result: &mut LoginResult,
-    password: String,
-    remember: bool,
-) {
-    if let LoginResult::Authenticated {
-        account,
-        persistence_warning,
-    } = result
-    {
-        if let Err(err) = crate::zhishu::storage::platform_login_history::remember_login(
-            handle,
-            account.base_url.clone(),
-            account.user.email.clone(),
-            password,
-            remember,
-        )
-        .await
-        {
-            *persistence_warning = Some(match persistence_warning.take() {
-                Some(previous) => format!("{previous}；{}", err.message),
-                None => err.message,
-            });
-        }
-    }
-}
-
-async fn login(
-    state: &Mutex<AuthState>,
-    base_url: String,
-    email: String,
-    password: String,
-    remember_password: Option<bool>,
-) -> Result<LoginResult, PlatformAuthError> {
-    let base = normalize_base_url(&base_url)?;
-    if email.trim().is_empty() || password.is_empty() {
-        return Err(error("BAD_REQUEST", "请输入邮箱和密码"));
-    }
-    let client = client()?;
-    let mut state = state.lock().await;
-    state.pending = None;
-    let settings = client_config(&client, &base).await?;
-    if !settings
-        .login_methods
-        .iter()
-        .any(|method| method == "password")
-    {
-        return Err(error("LOGIN_UNSUPPORTED", "平台未启用邮箱密码登录"));
-    }
-    if settings.turnstile_enabled
-        || settings.tencent_captcha_enabled
-        || settings.aliyun_captcha_enabled
-    {
-        return Err(error(
-            "CAPTCHA_REQUIRED",
-            "平台已启用人机验证，当前客户端暂不支持此登录方式。",
-        ));
-    }
-    let data: Value = request(
-        &client,
-        &base,
-        Method::POST,
-        "/auth/login",
-        Some(json!({ "email": email.trim(), "password": password })),
-        None,
-    )
-    .await?;
-    if data.get("requires_2fa").and_then(Value::as_bool) == Some(true) {
-        let temp_token = data
-            .get("temp_token")
-            .and_then(Value::as_str)
-            .filter(|token| !token.is_empty())
-            .ok_or_else(|| error("INVALID_RESPONSE", "平台未返回二次验证会话"))?;
-        state.pending = Some(PendingLogin {
-            base_url: base,
-            temp_token: temp_token.into(),
-            remembered: remember_password
-                .map(|remember| (if remember { password } else { String::new() }, remember)),
-        });
-        return Ok(LoginResult::Requires2fa);
-    }
-    finish_login(&mut state, &client, base, data).await
-}
-
-#[tauri::command]
-pub async fn platform_login_2fa(
-    handle: tauri::AppHandle,
-    state: State<'_, PlatformAuthState>,
-    code: String,
-) -> Result<LoginResult, PlatformAuthError> {
-    let _operation = crate::zhishu::services::platform_models::APPLY_LOCK
-        .lock()
-        .await;
-    let (mut result, remembered) = login_2fa_with_preferences(&state.0, code).await?;
-    if let Some((password, remember)) = remembered {
-        persist_login(handle, &mut result, password, remember).await;
-    }
-    Ok(result)
-}
-
-#[cfg(test)]
-async fn login_2fa(
-    state: &Mutex<AuthState>,
-    code: String,
-) -> Result<LoginResult, PlatformAuthError> {
-    login_2fa_with_preferences(state, code)
-        .await
-        .map(|(result, _)| result)
-}
-
-async fn login_2fa_with_preferences(
-    state: &Mutex<AuthState>,
-    code: String,
-) -> Result<(LoginResult, Option<(String, bool)>), PlatformAuthError> {
-    if code.len() != 6 || !code.bytes().all(|c| c.is_ascii_digit()) {
-        return Err(error("BAD_REQUEST", "请输入六位数字验证码"));
-    }
-    let mut state = state.lock().await;
-    let pending = state
-        .pending
-        .as_ref()
-        .ok_or_else(|| error("UNAUTHORIZED", "二次验证会话已失效，请返回重新登录"))?;
-    let base = pending.base_url.clone();
-    let remembered = pending.remembered.clone();
-    let client = client()?;
-    let data = request(
-        &client,
-        &base,
-        Method::POST,
-        "/auth/login/2fa",
-        Some(json!({"temp_token": pending.temp_token, "totp_code": code})),
-        None,
-    )
-    .await?;
-    let result = finish_login(&mut state, &client, base, data).await?;
-    Ok((result, remembered))
-}
-
-#[tauri::command]
 pub async fn platform_cancel_login(
     state: State<'_, PlatformAuthState>,
 ) -> Result<(), PlatformAuthError> {
     let mut auth = state.0.lock().await;
-    auth.pending = None;
     // 浏览器授权等待由独立通道取消；没有进行中的授权时为空操作。
     if let Some(cancel) = auth.oauth_cancel.take() {
         let _ = cancel.send(());
@@ -519,17 +337,14 @@ pub async fn platform_login_oauth(
     let mut auth = state.0.lock().await;
     auth.oauth_cancel = None;
     let (base, tokens) = outcome?;
-    auth.pending = None;
     let client = client()?;
     let mut result = finish_login(&mut auth, &client, base, tokens).await?;
     if let Err(err) = store_result {
-        if let LoginResult::Authenticated {
+        let LoginResult::Authenticated {
             persistence_warning,
             ..
-        } = &mut result
-        {
-            *persistence_warning = Some(err.message);
-        }
+        } = &mut result;
+        *persistence_warning = Some(err.message);
     }
     Ok(result)
 }
@@ -787,7 +602,6 @@ async fn logout_results(
     complete: bool,
 ) -> (Result<(), PlatformAuthError>, Result<(), PlatformAuthError>) {
     let mut state = state.lock().await;
-    state.pending = None;
     state.restoration_checked = true;
     let local = if let Some(store) = &state.store {
         if complete {
@@ -1094,9 +908,7 @@ mod tests {
     fn config_response() -> Value {
         json!({"code":0,"data":{
             "schema_version":1,"site_name":"Test","api_base_url":"https://gateway.test",
-            "login_methods":["password"],"totp_enabled":true,"registration_enabled":true,
-            "password_reset_enabled":true,"register_url":"/register","password_reset_url":"/forgot-password",
-            "subscriptions_url":"/subscriptions","turnstile_enabled":false,"tencent_captcha_enabled":false,"aliyun_captcha_enabled":false
+            "login_methods":["oauth"],"subscriptions_url":"/subscriptions"
         }})
     }
 
@@ -1176,30 +988,17 @@ mod tests {
                     refresh_token: "refresh-secret".into(),
                 },
             }),
-            pending: None,
             ..AuthState::default()
         }))
     }
 
     #[tokio::test]
     async fn login_uses_and_persists_only_the_normalized_platform_base_url() {
-        let (base, server) = mock_server(vec![
-            (
-                "GET /sub/api/zhishu/v1/client/config ",
-                200,
-                config_response(),
-            ),
-            (
-                "POST /sub/api/zhishu/v1/client/auth/login ",
-                200,
-                json!({"code":0,"data":{"access_token":"access-secret","refresh_token":"refresh-secret"}}),
-            ),
-            (
-                "GET /sub/api/zhishu/v1/client/account |access-secret",
-                200,
-                profile(),
-            ),
-        ]);
+        let (base, server) = mock_server(vec![(
+            "GET /sub/api/zhishu/v1/client/account |access-secret",
+            200,
+            profile(),
+        )]);
         let expected_base = format!("{base}/sub");
         let (_dir, store, _vault) =
             crate::zhishu::storage::platform_session::tests::saved_store(&expected_base, now())
@@ -1215,98 +1014,21 @@ mod tests {
         .unwrap();
         input.set_username("url-user").unwrap();
         input.set_password(Some("url-password")).unwrap();
-        let result = login(
-            &state,
-            input.to_string(),
-            "test@example.com".into(),
-            "password".into(),
-            None,
+        let result = finish_login(
+            &mut *state.lock().await,
+            &client().unwrap(),
+            normalize_base_url(input.as_str()).unwrap(),
+            json!({"access_token":"access-secret","refresh_token":"refresh-secret"}),
         )
         .await
         .unwrap();
-        let LoginResult::Authenticated { account, .. } = result else {
-            panic!("expected authenticated login");
-        };
+        let LoginResult::Authenticated { account, .. } = result;
         assert_eq!(account.base_url, expected_base);
         assert_eq!(
             store.load().await.unwrap().unwrap().0.base_url,
             expected_base
         );
         server.join().unwrap();
-    }
-
-    #[tokio::test]
-    async fn login_keeps_pending_2fa_out_of_the_renderer() {
-        let (base, server) = mock_server(vec![
-            ("GET /api/zhishu/v1/client/config ", 200, config_response()),
-            (
-                "POST /api/zhishu/v1/client/auth/login ",
-                200,
-                json!({"code":0,"data":{"requires_2fa":true,"temp_token":"temporary-secret"}}),
-            ),
-            (
-                "POST /api/zhishu/v1/client/auth/login/2fa ",
-                200,
-                json!({"code":0,"data":{"access_token":"access-secret","refresh_token":"refresh-secret"}}),
-            ),
-            ("GET /api/zhishu/v1/client/account ", 200, profile()),
-        ]);
-        let (_dir, store, _vault) =
-            crate::zhishu::storage::platform_session::tests::saved_store(&base, now()).await;
-        store.clear().await.unwrap();
-        let state = Mutex::new(AuthState {
-            store: Some(store.clone()),
-            ..AuthState::default()
-        });
-        let result = login(
-            &state,
-            base,
-            "test@example.com".into(),
-            "password".into(),
-            None,
-        )
-        .await
-        .unwrap();
-        assert_eq!(
-            serde_json::to_value(result).unwrap(),
-            json!({"status":"requires_2fa"})
-        );
-        assert!(state.lock().await.session.is_none());
-        assert!(store.load().await.unwrap().is_none());
-        let result = login_2fa(&state, "123456".into()).await.unwrap();
-        let public = serde_json::to_string(&result).unwrap();
-        assert!(public.contains("test@example.com"));
-        assert!(!public.contains("secret"));
-        assert!(state.lock().await.pending.is_none());
-        assert_eq!(store.load().await.unwrap().unwrap().1, "refresh-secret");
-        server.join().unwrap();
-    }
-
-    #[tokio::test]
-    async fn captcha_blocks_password_submission() {
-        for key in [
-            "turnstile_enabled",
-            "tencent_captcha_enabled",
-            "aliyun_captcha_enabled",
-        ] {
-            let (base, server) = mock_server(vec![("GET /api/zhishu/v1/client/config ", 200, {
-                let mut value = config_response();
-                value["data"][key] = json!(true);
-                value
-            })]);
-            let state = Mutex::new(AuthState::default());
-            let result = login(
-                &state,
-                base,
-                "test@example.com".into(),
-                "password".into(),
-                None,
-            )
-            .await;
-            assert!(matches!(result, Err(err) if err.code == "CAPTCHA_REQUIRED"));
-            assert!(state.lock().await.session.is_none());
-            server.join().unwrap();
-        }
     }
 
     #[tokio::test]
@@ -1338,7 +1060,6 @@ mod tests {
                     refresh_token: "old-refresh".into(),
                 },
             }),
-            pending: None,
             ..AuthState::default()
         });
         assert!(get_account(&state).await.is_err());
@@ -1376,7 +1097,6 @@ mod tests {
                     refresh_token: "expired".into(),
                 },
             }),
-            pending: None,
             ..AuthState::default()
         });
         assert!(get_account(&state).await.unwrap().is_none());
@@ -1430,7 +1150,6 @@ mod tests {
                     refresh_token: "refresh".into(),
                 },
             }),
-            pending: None,
             ..AuthState::default()
         });
         let err = logout(&state).await.unwrap_err();
@@ -1600,13 +1319,7 @@ mod tests {
                 ..AuthState::default()
             }));
             assert!(get_account(&state.0).await.unwrap().is_some());
-            state.0.lock().await.pending = Some(PendingLogin {
-                base_url: base,
-                temp_token: "pending-2fa-token".into(),
-                remembered: None,
-            });
             assert_eq!(state.logout().await.is_ok(), status == 200);
-            assert!(state.0.lock().await.pending.is_none());
             assert!(store.load().await.unwrap().is_none());
             assert!(get_account(&state.0).await.unwrap().is_none());
             let restarted = Mutex::new(AuthState {
@@ -1731,7 +1444,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn successful_new_login_replaces_the_saved_account_without_a_password_preference() {
+    async fn successful_oauth_login_replaces_the_saved_account() {
         let (base, server) = mock_server(vec![(
             "GET /api/zhishu/v1/client/account ",
             200,
@@ -1973,6 +1686,8 @@ mod tests {
     #[tokio::test]
     async fn request_allowlist_rejects_arbitrary_paths_before_network() {
         for (method, path) in [
+            (Method::POST, "/auth/login"),
+            (Method::POST, "/auth/login/2fa"),
             (Method::GET, "/keys"),
             (Method::POST, "/credentials"),
             (Method::DELETE, "/access"),
@@ -1992,21 +1707,15 @@ mod tests {
     }
 
     #[test]
-    fn config_resolves_web_links_from_origin_and_honors_disabled_entries() {
+    fn config_validates_subscription_and_oauth_links() {
         let mut value = config_response()["data"].clone();
-        value["registration_enabled"] = json!(false);
         value["subscriptions_url"] = json!("javascript:alert(1)");
         value["oauth_authorize_url"] = json!("https://portal.test/oauth/authorize");
         value["oauth_client_id"] = json!(" zhishu-ccs ");
         value["oauth_scopes"] = json!([" client ", ""]);
         let config: ClientConfig = serde_json::from_value(value).unwrap();
         let config = config.validate("https://platform.test/sub").unwrap();
-        assert!(config.register_url.is_none());
         assert!(config.subscriptions_url.is_none());
-        assert_eq!(
-            config.password_reset_url.as_deref(),
-            Some("https://platform.test/forgot-password")
-        );
         assert_eq!(
             config.oauth_authorize_url.as_deref(),
             Some("https://portal.test/oauth/authorize")

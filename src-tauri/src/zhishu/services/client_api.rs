@@ -359,20 +359,8 @@ pub struct ClientConfig {
     pub site_name: String,
     pub api_base_url: String,
     pub login_methods: Vec<String>,
-    pub totp_enabled: bool,
-    pub registration_enabled: bool,
-    pub password_reset_enabled: bool,
-    pub register_url: Option<String>,
-    pub password_reset_url: Option<String>,
     pub subscriptions_url: Option<String>,
-    pub turnstile_enabled: bool,
-    #[serde(default)]
-    pub turnstile_site_key: String,
-    pub tencent_captcha_enabled: bool,
-    #[serde(default)]
-    pub tencent_captcha_app_id: String,
-    pub aliyun_captcha_enabled: bool,
-    // 浏览器授权登录由平台下发；旧服务端缺少这些字段时保持密码登录可用。
+    // 旧平台缺少 OAuth2 字段时保持未配置状态，由登录页提示。
     #[serde(default)]
     pub oauth_authorize_url: Option<String>,
     #[serde(default)]
@@ -391,28 +379,17 @@ impl ClientConfig {
             .origin()
             .ascii_serialization();
         let origin = Url::parse(&format!("{origin}/")).map_err(|_| invalid_response())?;
-        for field in [
-            &mut self.register_url,
-            &mut self.password_reset_url,
-            &mut self.subscriptions_url,
-        ] {
-            *field = field
-                .as_deref()
-                .filter(|value| !value.trim().is_empty())
-                .and_then(|value| origin.join(value).ok())
-                .filter(|url| {
-                    matches!(url.scheme(), "http" | "https")
-                        && url.username().is_empty()
-                        && url.password().is_none()
-                })
-                .map(|url| url.to_string());
-        }
-        if !self.registration_enabled {
-            self.register_url = None;
-        }
-        if !self.password_reset_enabled {
-            self.password_reset_url = None;
-        }
+        self.subscriptions_url = self
+            .subscriptions_url
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+            .and_then(|value| origin.join(value).ok())
+            .filter(|url| {
+                matches!(url.scheme(), "http" | "https")
+                    && url.username().is_empty()
+                    && url.password().is_none()
+            })
+            .map(|url| url.to_string());
         self.oauth_authorize_url = self
             .oauth_authorize_url
             .as_deref()

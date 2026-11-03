@@ -5302,13 +5302,11 @@
     "oauthHint": "將在瀏覽器中開啟智樞授權頁面，完成授權後自動返回登入。",
     "oauthWaiting": "等待瀏覽器授權…",
     "oauthCancel": "取消授權",
-    "passwordLogin": "帳號密碼登入",
-    "backToOAuth": "返回智樞登入",
-    "sessionHint": "登入後自動保持登入；連續超過 7 天未使用需要重新登入。「記住密碼」僅用於下次填寫密碼。",
+    "sessionHint": "登入後自動保持登入；連續超過 7 天未使用需要重新登入。",
     "advanced": "進階設定",
-    "showPassword": "顯示密碼",
-    "hidePassword": "隱藏密碼",
-    "or": "或"
+    "back": "返回登入",
+    "oauthUnavailable": "平台未啟用 OAuth2 瀏覽器授權，請檢查伺服器位址或聯絡管理員。",
+    "retryConfig": "重新檢查登入設定"
   },
   "platformUsage": {
     "accountBalance": "帳戶餘額",
@@ -5389,7 +5387,7 @@
     "action": "登出並清除此帳號本機資料",
     "title": "清理資料並登出？",
     "scope": "移除此帳號的平台基礎資料及所有應用程式中的平台供應商，並登出。",
-    "retained": "保留登入帳號記錄、伺服器位址和已記住密碼。",
+    "retained": "其他帳號、本機自建項、授權中心帳號、設定修改記錄和還原備份會保留。",
     "partialHint": "無法安全刪除的供應商會保留，並在結果中說明。",
     "confirm": "清理並登出",
     "result": "帳號清理結果",
@@ -5405,7 +5403,7 @@
     "scopeDetails": "查看清理範圍說明",
     "dismiss": "關閉視窗",
     "providerCounts": "刪除 {{removed}} · 保留 {{skipped}}",
-    "retainedDetails": "保留登入帳號記錄、伺服器位址及已記住密碼；其他帳號、自建供應商、授權中心帳號、設定修改記錄及復原備份也會保留。不刪除伺服器共用 API Key，保留項目仍可能含有憑證。"
+    "retainedDetails": "保留伺服器位址、其他帳號、自建供應商、授權中心帳號、設定修改記錄及復原備份。不刪除伺服器共用 API Key，保留項目仍可能含有憑證。"
   },
   "platformDeletion": {
     "result": "供應商刪除結果",

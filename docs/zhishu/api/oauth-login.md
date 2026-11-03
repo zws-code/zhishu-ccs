@@ -1,6 +1,6 @@
 # 智枢平台 OAuth2 授权登录：接入契约与已知问题
 
-更新：2026-11-02。适用：`zhishu-ccs`（智枢客户端）、`dsh`（DeepSeek Harness 插件）。
+更新：2026-11-03。适用：`zhishu-ccs`（智枢客户端）、`dsh`（DeepSeek Harness 插件）。
 网关侧实现：`zhishu-proxy` 仓库 `backend/internal/zhishu/clientoauth/`、`backend/internal/zhishu/clientapi/handler.go`、`frontend/src/zhishu/views/OAuthAuthorizeView.vue`。
 网关版本：提交 `840c66206`（含 P0 CSP 修复） + 仓库内未提交的 app 深链改动（`app_url`）。
 
@@ -37,7 +37,7 @@
 }
 ```
 
-- 仅当 `login_methods` 包含 `oauth` 且 `oauth_authorize_url` 非空时展示 OAuth 入口。
+- 智枢客户端仅保留 OAuth2。只有 `login_methods` 包含 `oauth`、`oauth_authorize_url` 和 `oauth_client_id` 非空时允许发起授权；缺失字段或配置失败时禁用登录并提示重试/更换服务器，不回退密码登录。
 - `oauth_client_id` 是单客户端时代的旧字段，固定为 `zhishu-ccs`；客户端应使用自己的固定 ID，或从 `oauth_clients` 中按应用 ID 选择。
 - 平台地址仍以配置/用户填写为准；`oauth_authorize_url` 由网关 `FrontendURL` 拼出。
 

@@ -310,7 +310,7 @@ mod tests {
             json!({"query": {}, "body": null})
         );
         let invalid = client
-            .post("https://example.com/api/zhishu/v1/client/auth/login")
+            .post("https://example.com/api/zhishu/v1/oauth/token")
             .body("password=raw-secret")
             .build()
             .unwrap();

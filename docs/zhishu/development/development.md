@@ -7,20 +7,14 @@ pnpm dev          # 启动开发版
 pnpm dev --help   # 查看 Tauri 开发参数，不启动应用
 ```
 
-macOS 需要稳定开发签名以复用钥匙串授权时，显式调用已有脚本：
-
-```sh
-sh scripts/zhishu/dev-macos.sh
-```
-
-证书准备与签名回归见 [macOS 开发签名](macos-dev-signing.md)。普通 `pnpm dev` 不执行这套自定义签名流程。
+各平台开发启动均使用上述 Tauri CLI 入口。2026-11-03 按用户要求移除自有 macOS 开发签名脚本及对应测试命令。OAuth2 refresh token 的保存与恢复由 Rust 会话模块通过系统凭据库完成，不依赖开发签名脚本；macOS 开发版重编译后仍可能出现系统钥匙串授权提示。
 
 ## 数据路径
 
 - 应用数据库默认位于 `~/.zhishu-ccs/cc-switch.db`，仍遵循设置中的目录覆盖。
 - 设备设置、模式状态和首写备份位于 `get_device_data_dir()`，不随数据库目录覆盖。
 - Codex 默认目录仍由 `get_codex_config_dir()` 解析，设置中的目录覆盖优先；其他工具沿用各自路径函数。
-- 平台会话元数据、登录记录与模型目录使用 Tauri `app_local_data_dir()`，凭据继续使用原有系统 keyring。
+- 平台会话元数据与模型目录使用 Tauri `app_local_data_dir()`；OAuth2 refresh token 使用系统 keyring，不保存账号密码或登录历史。
 
 开发版与正式版使用相同应用身份和默认路径。启动前关闭正式版；开发版中的供应商切换、MCP、Skills 等操作会使用当前配置。
 

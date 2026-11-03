@@ -220,7 +220,7 @@ Adapter 的具体调用需由当期上游源码确认。明确区分 TS 前端�
 
 ### 4.2 安全与机密
 
-当前 refresh token 和记住密码使用 keyring；平台分组 Key 与普通 Provider/CLI Key 仍存在明文副本，与本节安全目标有差异。私密权限不等于加密；本次文档整理不执行凭据迁移，后续须经独立 ADR 评审。
+当前 refresh token 使用 keyring；密码登录、旧密码存取/清理和登录历史代码已按用户要求删除，OAuth2 登录只使用独立会话存储；平台分组 Key 与普通 Provider/CLI Key 仍存在明文副本，与本节安全目标有差异。私密权限不等于加密；本次文档整理不执行凭据迁移，后续须经独立 ADR 评审。
 
 - 生产 Token / 用户 API Key 使用经过评审的系统安全凭据存储（例如 OS Keychain/Credential Manager 或经过审计的加密方案）；不要以明文保存在普通 localStorage、SQLite 或日志。
 - 不在前端包/仓库内固定任何平台主 API Key、签名私钥、内部管理接口凭据。

@@ -27,7 +27,6 @@ import {
   type PlatformCleanupReport,
 } from "@/zhishu/api/platformAuth";
 import { toast } from "sonner";
-import { settingsApi } from "@/lib/api/index";
 import zh from "@/i18n/locales/zh.json";
 
 vi.mock("@/zhishu/api/platformAuth", async (original) => ({
@@ -35,14 +34,8 @@ vi.mock("@/zhishu/api/platformAuth", async (original) => ({
   platformAuthApi: {
     config: vi.fn(),
     account: vi.fn(),
-    history: vi.fn(),
-    savedPassword: vi.fn(),
-    forgetPassword: vi.fn(),
-    removeLogin: vi.fn(),
     cancelLogin: vi.fn(),
-    login: vi.fn(),
     loginOAuth: vi.fn(),
-    login2fa: vi.fn(),
     logout: vi.fn(),
     logoutAndClear: vi.fn(),
   },
@@ -104,15 +97,7 @@ function oauthConfig() {
     site_name: "Zhishu",
     api_base_url: account.baseUrl,
     login_methods: ["password", "oauth"],
-    totp_enabled: false,
-    registration_enabled: false,
-    password_reset_enabled: false,
-    register_url: null,
-    password_reset_url: null,
     subscriptions_url: null,
-    turnstile_enabled: false,
-    tencent_captcha_enabled: false,
-    aliyun_captcha_enabled: false,
     oauth_authorize_url: "https://portal.test/oauth/authorize",
     oauth_client_id: "zhishu-ccs",
     oauth_scopes: ["client"],
@@ -148,91 +133,109 @@ function renderGate() {
   );
   return client;
 }
-async function submitCredentials() {
-  await waitFor(() => expect(screen.getByLabelText("邮箱")).toBeEnabled());
-  fireEvent.change(screen.getByLabelText("邮箱"), {
-    target: { value: "user@example.com" },
-  });
-  fireEvent.change(screen.getByLabelText("密码"), {
-    target: { value: "secret-password" },
-  });
+async function submitOAuth() {
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "登录智枢" })).toBeEnabled(),
+  );
   await act(async () => {
-    fireEvent.submit(
-      screen.getByRole("button", { name: "登录" }).closest("form")!,
-    );
+    fireEvent.click(screen.getByRole("button", { name: "登录智枢" }));
   });
 }
 
 beforeEach(() => {
   vi.mocked(platformAuthApi.config)
     .mockReset()
-    .mockResolvedValue({
-      schema_version: 1,
-      site_name: "",
-      api_base_url: "http://127.0.0.1:3000",
-      login_methods: ["password"],
-      totp_enabled: true,
-      registration_enabled: true,
-      password_reset_enabled: true,
-      register_url: "https://portal.test/register",
-      password_reset_url: "https://portal.test/reset",
-      subscriptions_url: null,
-      turnstile_enabled: false,
-      tencent_captcha_enabled: false,
-      aliyun_captcha_enabled: false,
-    });
+    .mockResolvedValue(oauthConfig());
   vi.mocked(platformModelsApi.syncCatalog)
     .mockReset()
     .mockResolvedValue(catalog);
   vi.mocked(platformModelsApi.sync)
     .mockReset()
     .mockResolvedValue({ added: 0, removed: 0, skipped: 0, warnings: [] });
-  vi.mocked(platformAuthApi.history).mockReset().mockResolvedValue([]);
-  vi.mocked(platformAuthApi.savedPassword).mockReset().mockResolvedValue(null);
-  vi.mocked(platformAuthApi.forgetPassword)
-    .mockReset()
-    .mockResolvedValue(undefined);
-  vi.mocked(platformAuthApi.removeLogin)
-    .mockReset()
-    .mockResolvedValue(undefined);
   vi.mocked(platformAuthApi.cancelLogin)
     .mockReset()
     .mockResolvedValue(undefined);
   vi.mocked(platformAuthApi.account).mockReset().mockResolvedValue(null);
-  vi.mocked(platformAuthApi.login).mockReset();
   vi.mocked(platformAuthApi.loginOAuth).mockReset();
-  vi.mocked(platformAuthApi.login2fa).mockReset();
   vi.mocked(platformAuthApi.logout).mockReset().mockResolvedValue(undefined);
   vi.mocked(platformAuthApi.logoutAndClear).mockReset();
 });
 
 describe("platform login", () => {
-  it("defaults to the Zhishu browser login and keeps the password fallback", async () => {
-    vi.mocked(platformAuthApi.config).mockResolvedValue(oauthConfig());
+  it("only offers browser authorization even when password login is advertised", async () => {
     renderGate();
     await screen.findByRole("button", { name: "登录智枢" });
+    expect(screen.queryByLabelText("邮箱")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("密码")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "账号密码登录" }));
-    await screen.findByLabelText("密码");
-    fireEvent.click(screen.getByRole("button", { name: "返回智枢登录" }));
-    await screen.findByRole("button", { name: "登录智枢" });
-    expect(screen.queryByLabelText("密码")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("记住密码")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "账号密码登录" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("忘记密码")).not.toBeInTheDocument();
+  });
+
+  it.each(["methods", "url", "client", "legacy"])(
+    "blocks unsupported OAuth config (%s) without falling back to passwords",
+    async (missing) => {
+      const config = oauthConfig();
+      if (missing === "methods") config.login_methods = ["password"];
+      if (missing === "url") config.oauth_authorize_url = "";
+      if (missing === "client") config.oauth_client_id = "";
+      if (missing === "legacy") {
+        Reflect.deleteProperty(config, "oauth_authorize_url");
+        Reflect.deleteProperty(config, "oauth_client_id");
+      }
+      vi.mocked(platformAuthApi.config).mockResolvedValue(config);
+      renderGate();
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        zh.platformAuth.oauthUnavailable,
+      );
+      expect(screen.getByRole("button", { name: "登录智枢" })).toBeDisabled();
+      expect(screen.queryByLabelText("密码")).not.toBeInTheDocument();
+      expect(platformAuthApi.loginOAuth).not.toHaveBeenCalled();
+    },
+  );
+
+  it("retries config discovery after a temporary failure", async () => {
+    vi.mocked(platformAuthApi.config)
+      .mockRejectedValueOnce({ code: "NETWORK", message: "网络不可用" })
+      .mockResolvedValue(oauthConfig());
+    renderGate();
+    expect(await screen.findByRole("alert")).toHaveTextContent("网络不可用");
+    fireEvent.click(
+      screen.getByRole("button", { name: zh.platformAuth.retryConfig }),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "登录智枢" })).toBeEnabled(),
+    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("completes login through the browser authorization result", async () => {
-    vi.mocked(platformAuthApi.config).mockResolvedValue(oauthConfig());
     vi.mocked(platformAuthApi.loginOAuth).mockResolvedValue({
       status: "authenticated",
       account,
     });
     renderGate();
-    fireEvent.click(await screen.findByRole("button", { name: "登录智枢" }));
+    expect(screen.queryByText("工具主页")).not.toBeInTheDocument();
+    await submitOAuth();
     await screen.findByText("工具主页");
     expect(platformAuthApi.loginOAuth).toHaveBeenCalledWith(account.baseUrl);
   });
 
-  it("cancels an in-flight browser authorization without an error", async () => {
-    vi.mocked(platformAuthApi.config).mockResolvedValue(oauthConfig());
+  it("shows failed authorization without opening the app", async () => {
+    vi.mocked(platformAuthApi.loginOAuth).mockRejectedValue({
+      code: "OAUTH_DENIED",
+      message: "授权被拒绝",
+    });
+    renderGate();
+    await submitOAuth();
+    expect(await screen.findByRole("alert")).toHaveTextContent("授权被拒绝");
+    expect(screen.queryByText("工具主页")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "登录智枢" })).toBeEnabled();
+  });
+
+  it("cancels an in-flight authorization and blocks server edits until it finishes", async () => {
     let rejectLogin!: (reason: unknown) => void;
     vi.mocked(platformAuthApi.loginOAuth).mockImplementation(
       () =>
@@ -244,7 +247,8 @@ describe("platform login", () => {
       rejectLogin({ code: "OAUTH_CANCELLED", message: "已取消授权登录" });
     });
     renderGate();
-    fireEvent.click(await screen.findByRole("button", { name: "登录智枢" }));
+    await submitOAuth();
+    expect(screen.getByLabelText(zh.platformAuth.address)).toBeDisabled();
     fireEvent.click(await screen.findByRole("button", { name: "取消授权" }));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "登录智枢" })).toBeEnabled(),
@@ -252,314 +256,56 @@ describe("platform login", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("uses configured web entries and hides them when disabled", async () => {
-    const config = await platformAuthApi.config(account.baseUrl);
-    vi.mocked(platformAuthApi.config).mockResolvedValue({
-      ...config,
-      registration_enabled: false,
-      site_name: "Client test platform",
+  it("discards a late authorization result after cancellation", async () => {
+    let finish!: (value: {
+      status: "authenticated";
+      account: PlatformAccount;
+    }) => void;
+    vi.mocked(platformAuthApi.loginOAuth).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    renderGate();
+    await submitOAuth();
+    fireEvent.click(await screen.findByRole("button", { name: "取消授权" }));
+    await act(async () => {
+      finish({ status: "authenticated", account });
     });
-    renderGate();
-    await screen.findByText("Client test platform");
-    expect(
-      screen.queryByRole("button", { name: zh.platformAuth.register }),
-    ).not.toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: zh.platformAuth.forgot }),
-    );
-    await waitFor(() =>
-      expect(settingsApi.openExternal).toHaveBeenCalledWith(
-        "https://portal.test/reset",
-      ),
-    );
-  });
-
-  it("does not retain links from a previous platform while config is loading", async () => {
-    renderGate();
-    await screen.findByRole("button", { name: zh.platformAuth.register });
-    vi.mocked(platformAuthApi.config).mockImplementation(
-      () => new Promise(() => {}),
-    );
-    const address = screen.getByDisplayValue("http://127.0.0.1:3000");
-    fireEvent.change(address, { target: { value: "https://another.test" } });
-    expect(
-      screen.queryByRole("button", { name: zh.platformAuth.register }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: zh.platformAuth.forgot }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("gates the app and passes the development backend URL to Rust", async () => {
-    vi.mocked(platformAuthApi.login).mockResolvedValue({
-      status: "authenticated",
-      account,
-    });
-    renderGate();
     expect(screen.queryByText("工具主页")).not.toBeInTheDocument();
-    await submitCredentials();
-    await screen.findByText("工具主页");
-    expect(platformAuthApi.login).toHaveBeenCalledWith(
-      "http://127.0.0.1:3000",
-      "user@example.com",
-      "secret-password",
-      false,
-    );
-    expect(screen.getByText("测试账户")).toBeInTheDocument();
-    expect(Object.values(localStorage)).not.toContain("secret-password");
+    expect(platformModelsApi.syncCatalog).not.toHaveBeenCalled();
   });
 
-  it("requires TOTP completion before mounting the app", async () => {
-    vi.mocked(platformAuthApi.login).mockResolvedValue({
-      status: "requires_2fa",
-    });
-    vi.mocked(platformAuthApi.login2fa).mockResolvedValue({
+  it("disables stale authorization config while a server address changes", async () => {
+    vi.mocked(platformAuthApi.loginOAuth).mockResolvedValue({
       status: "authenticated",
       account,
     });
     renderGate();
-    await submitCredentials();
-    const input = await screen.findByLabelText("二次验证码");
-    expect(screen.queryByText("工具主页")).not.toBeInTheDocument();
-    fireEvent.change(input, { target: { value: "123456" } });
-    fireEvent.submit(
-      screen.getByRole("button", { name: "验证并登录" }).closest("form")!,
-    );
-    await screen.findByText("工具主页");
-    expect(platformAuthApi.login2fa).toHaveBeenCalledWith("123456");
-  });
-
-  it("returns from TOTP to an empty password field", async () => {
-    vi.mocked(platformAuthApi.login).mockResolvedValue({
-      status: "requires_2fa",
-    });
-    renderGate();
-    await submitCredentials();
-    fireEvent.click(
-      await screen.findByRole("button", { name: "返回邮箱登录" }),
-    );
-    await waitFor(() => expect(screen.getByLabelText("密码")).toHaveValue(""));
-    expect(platformAuthApi.cancelLogin).toHaveBeenCalledOnce();
-  });
-
-  it("shows failed login without opening the app", async () => {
-    vi.mocked(platformAuthApi.login).mockRejectedValue({
-      code: "UNAUTHORIZED",
-      message: "邮箱或密码错误",
-    });
-    renderGate();
-    await submitCredentials();
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "邮箱或密码错误",
-    );
-    expect(screen.queryByText("工具主页")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "登录" })).toBeEnabled();
-  });
-
-  it("restores the recent account and its password without logging in automatically", async () => {
-    vi.mocked(platformAuthApi.history).mockResolvedValue([
-      {
-        id: "one",
-        baseUrl: "https://one.example.com",
-        email: "one@example.com",
-        rememberPassword: true,
-      },
-      {
-        id: "two",
-        baseUrl: "https://two.example.com",
-        email: "two@example.com",
-        rememberPassword: false,
-      },
-    ]);
-    vi.mocked(platformAuthApi.savedPassword).mockResolvedValue("saved-secret");
-    renderGate();
+    await screen.findByRole("button", { name: "登录智枢" });
+    const address = screen.getByLabelText(zh.platformAuth.address);
+    fireEvent.change(address, { target: { value: "https://other.test" } });
+    expect(screen.getByRole("button", { name: "登录智枢" })).toBeDisabled();
     await waitFor(() =>
-      expect(screen.getByLabelText("密码")).toHaveValue("saved-secret"),
+      expect(screen.getByRole("button", { name: "登录智枢" })).toBeEnabled(),
     );
-    expect(screen.getByLabelText("邮箱")).toHaveValue("one@example.com");
-    expect(screen.getByLabelText("平台后端地址")).toHaveValue(
-      "https://one.example.com",
+    await submitOAuth();
+    expect(platformAuthApi.loginOAuth).toHaveBeenCalledWith(
+      "https://other.test",
     );
-    expect(screen.getByLabelText("记住密码")).toBeChecked();
-    expect(platformAuthApi.login).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText("登录账号记录"), {
-      target: { value: "two" },
-    });
-    await waitFor(() =>
-      expect(screen.getByLabelText("邮箱")).toHaveValue("two@example.com"),
-    );
-    expect(screen.getByLabelText("平台后端地址")).toHaveValue(
-      "https://two.example.com",
-    );
-    expect(screen.getByLabelText("密码")).toHaveValue("");
-    expect(screen.getByLabelText("记住密码")).not.toBeChecked();
-    expect(platformAuthApi.savedPassword).toHaveBeenCalledOnce();
   });
 
-  it("sends the remember password preference when signing in", async () => {
-    vi.mocked(platformAuthApi.login).mockResolvedValue({
+  it("shows a persistence warning without rejecting a successful login", async () => {
+    vi.mocked(platformAuthApi.loginOAuth).mockResolvedValue({
       status: "authenticated",
       account,
+      persistenceWarning: "无法保存登录会话",
     });
     renderGate();
-    await waitFor(() =>
-      expect(screen.getByLabelText("记住密码")).toBeEnabled(),
-    );
-    fireEvent.click(screen.getByLabelText("记住密码"));
-    fireEvent.change(screen.getByLabelText("邮箱"), {
-      target: { value: "user@example.com" },
-    });
-    fireEvent.change(screen.getByLabelText("密码"), {
-      target: { value: "remember-secret" },
-    });
-    fireEvent.submit(
-      screen.getByRole("button", { name: "登录" }).closest("form")!,
-    );
+    await submitOAuth();
     await screen.findByText("工具主页");
-    expect(platformAuthApi.login).toHaveBeenCalledWith(
-      "http://127.0.0.1:3000",
-      "user@example.com",
-      "remember-secret",
-      true,
-    );
-    expect(JSON.stringify(localStorage)).not.toContain("remember-secret");
-  });
-
-  it("forgets the saved password immediately when unchecked", async () => {
-    vi.mocked(platformAuthApi.history).mockResolvedValue([
-      {
-        id: "one",
-        baseUrl: "https://one.example.com",
-        email: "one@example.com",
-        rememberPassword: true,
-      },
-    ]);
-    vi.mocked(platformAuthApi.savedPassword).mockResolvedValue("saved-secret");
-    renderGate();
-    await waitFor(() =>
-      expect(screen.getByLabelText("密码")).toHaveValue("saved-secret"),
-    );
-    fireEvent.click(screen.getByLabelText("记住密码"));
-    await waitFor(() =>
-      expect(screen.getByLabelText("记住密码")).not.toBeChecked(),
-    );
-    expect(platformAuthApi.forgetPassword).toHaveBeenCalledWith("one");
-    expect(platformAuthApi.login).not.toHaveBeenCalled();
-  });
-
-  it("deletes an account record and clears its filled password", async () => {
-    vi.mocked(platformAuthApi.history).mockResolvedValue([
-      {
-        id: "one",
-        baseUrl: "https://one.example.com",
-        email: "one@example.com",
-        rememberPassword: true,
-      },
-    ]);
-    vi.mocked(platformAuthApi.savedPassword).mockResolvedValue("saved-secret");
-    renderGate();
-    await waitFor(() =>
-      expect(screen.getByLabelText("密码")).toHaveValue("saved-secret"),
-    );
-    fireEvent.click(screen.getByRole("button", { name: "删除记录" }));
-    await waitFor(() =>
-      expect(screen.queryByLabelText("登录账号记录")).not.toBeInTheDocument(),
-    );
-    expect(platformAuthApi.removeLogin).toHaveBeenCalledWith("one");
-    expect(screen.getByLabelText("邮箱")).toHaveValue("");
-    expect(screen.getByLabelText("密码")).toHaveValue("");
-  });
-
-  it("clears a restored password when the platform address is edited", async () => {
-    vi.mocked(platformAuthApi.history).mockResolvedValue([
-      {
-        id: "one",
-        baseUrl: "https://one.example.com",
-        email: "one@example.com",
-        rememberPassword: true,
-      },
-    ]);
-    vi.mocked(platformAuthApi.savedPassword).mockResolvedValue("saved-secret");
-    renderGate();
-    await waitFor(() =>
-      expect(screen.getByLabelText("密码")).toHaveValue("saved-secret"),
-    );
-    fireEvent.change(screen.getByLabelText("平台后端地址"), {
-      target: { value: "https://other.example.com" },
-    });
-    expect(screen.getByLabelText("密码")).toHaveValue("");
-    expect(screen.getByLabelText("记住密码")).not.toBeChecked();
-  });
-
-  it("allows manual login if reading saved accounts fails", async () => {
-    vi.mocked(platformAuthApi.history).mockRejectedValue({
-      code: "LOGIN_HISTORY",
-      message: "无法读取登录记录",
-    });
-    vi.mocked(platformAuthApi.login).mockResolvedValue({
-      status: "authenticated",
-      account,
-    });
-    renderGate();
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "无法读取登录记录",
-    );
-    await submitCredentials();
-    await screen.findByText("工具主页");
-  });
-
-  it("shows every saved server and signs in to an edited server address", async () => {
-    vi.mocked(platformAuthApi.history).mockResolvedValue([
-      {
-        id: "foreign",
-        baseUrl: "https://old.example.com",
-        email: "old@example.com",
-        rememberPassword: false,
-      },
-      {
-        id: "current",
-        baseUrl: "http://127.0.0.1:3000",
-        email: "current@example.com",
-        rememberPassword: false,
-      },
-    ]);
-    vi.mocked(platformAuthApi.login).mockResolvedValue({
-      status: "authenticated",
-      account,
-    });
-    renderGate();
-    await waitFor(() =>
-      expect(screen.getByLabelText("邮箱")).toHaveValue("old@example.com"),
-    );
-    expect(
-      screen.getByRole("option", {
-        name: "old@example.com · https://old.example.com",
-      }),
-    ).toBeInTheDocument();
-    const address = screen.getByLabelText("平台后端地址");
-    expect(address).toHaveValue("https://old.example.com");
-    fireEvent.change(address, {
-      target: { value: "https://edited.example.com" },
-    });
-    await submitCredentials();
-    expect(platformAuthApi.login).toHaveBeenCalledWith(
-      "https://edited.example.com",
-      "user@example.com",
-      "secret-password",
-      false,
-    );
-  });
-
-  it("shows a storage warning without rejecting a successful login", async () => {
-    vi.mocked(platformAuthApi.login).mockResolvedValue({
-      status: "authenticated",
-      account,
-      persistenceWarning: "无法保存密码",
-    });
-    renderGate();
-    await submitCredentials();
-    await screen.findByText("工具主页");
-    expect(toast.warning).toHaveBeenCalledWith("无法保存密码");
+    expect(toast.warning).toHaveBeenCalledWith("无法保存登录会话");
   });
 
   it("clears the UI on logout even when server revocation fails", async () => {
@@ -569,7 +315,7 @@ describe("platform login", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "退出平台登录" }),
     );
-    await screen.findByLabelText("邮箱");
+    await screen.findByRole("button", { name: "登录智枢" });
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "本机已退出登录",
     );
@@ -585,7 +331,7 @@ describe("platform login", () => {
     await act(async () => {
       document.dispatchEvent(new Event("visibilitychange"));
     });
-    await screen.findByLabelText("邮箱");
+    await screen.findByRole("button", { name: "登录智枢" });
     expect(screen.queryByText("工具主页")).not.toBeInTheDocument();
   });
 
@@ -608,9 +354,7 @@ describe("platform login", () => {
     renderGate();
     await screen.findByText("工具主页");
     expect(platformAuthApi.account).toHaveBeenCalledWith(true);
-    expect(platformAuthApi.login).not.toHaveBeenCalled();
-    expect(platformAuthApi.login2fa).not.toHaveBeenCalled();
-    expect(platformAuthApi.savedPassword).not.toHaveBeenCalled();
+    expect(platformAuthApi.loginOAuth).not.toHaveBeenCalled();
     expect(screen.queryByLabelText("密码")).not.toBeInTheDocument();
   });
 
@@ -624,7 +368,7 @@ describe("platform login", () => {
     expect(platformAuthApi.logout).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "重试恢复登录" }));
     await screen.findByText("工具主页");
-    expect(platformAuthApi.login).not.toHaveBeenCalled();
+    expect(platformAuthApi.loginOAuth).not.toHaveBeenCalled();
   });
 
   it("retries restoration when the connection returns", async () => {
@@ -646,10 +390,10 @@ describe("platform login", () => {
     });
     renderGate();
     await screen.findByRole("alert");
-    fireEvent.click(screen.getByRole("button", { name: "返回邮箱登录" }));
-    await screen.findByLabelText("密码");
+    fireEvent.click(screen.getByRole("button", { name: zh.platformAuth.back }));
+    await screen.findByRole("button", { name: "登录智枢" });
     expect(platformAuthApi.logout).toHaveBeenCalledOnce();
-    expect(platformAuthApi.login).not.toHaveBeenCalled();
+    expect(platformAuthApi.loginOAuth).not.toHaveBeenCalled();
   });
 
   it("reports hidden window checks as background activity", async () => {
@@ -677,7 +421,7 @@ describe("platform login", () => {
     await act(async () => {
       document.dispatchEvent(new Event("visibilitychange"));
     });
-    await screen.findByLabelText("密码");
+    await screen.findByRole("button", { name: "登录智枢" });
     expect(client.getQueryData(["providers", "claude"])).toBeUndefined();
   });
 
@@ -699,7 +443,7 @@ describe("platform login", () => {
     await act(async () => {
       finishLogout();
     });
-    await screen.findByLabelText("密码");
+    await screen.findByRole("button", { name: "登录智枢" });
   });
 });
 
@@ -751,23 +495,22 @@ describe("catalog sync after verified login", () => {
     expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce();
     expect(platformModelsApi.sync).not.toHaveBeenCalled();
   });
-  it("does not sync before the second authentication factor completes", async () => {
-    vi.mocked(platformAuthApi.login).mockResolvedValue({
-      status: "requires_2fa",
-    });
-    vi.mocked(platformAuthApi.login2fa).mockResolvedValue({
-      status: "authenticated",
-      account,
-    });
+  it("does not sync before browser authorization completes", async () => {
+    let finish!: (value: {
+      status: "authenticated";
+      account: PlatformAccount;
+    }) => void;
+    vi.mocked(platformAuthApi.loginOAuth).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
     renderGate();
-    await submitCredentials();
-    const input = await screen.findByLabelText("二次验证码");
+    await submitOAuth();
     expect(platformModelsApi.syncCatalog).not.toHaveBeenCalled();
     expect(platformModelsApi.sync).not.toHaveBeenCalled();
-    fireEvent.change(input, { target: { value: "123456" } });
-    fireEvent.submit(
-      screen.getByRole("button", { name: "验证并登录" }).closest("form")!,
-    );
+    await act(async () => finish({ status: "authenticated", account }));
     await waitFor(() =>
       expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce(),
     );
@@ -794,7 +537,7 @@ describe("catalog sync after verified login", () => {
   it("ignores an old sync after logout and a new login to the same account", async () => {
     let finish!: (value: PlatformCatalog) => void;
     vi.mocked(platformAuthApi.account).mockResolvedValue(account);
-    vi.mocked(platformAuthApi.login).mockResolvedValue({
+    vi.mocked(platformAuthApi.loginOAuth).mockResolvedValue({
       status: "authenticated",
       account,
     });
@@ -811,7 +554,7 @@ describe("catalog sync after verified login", () => {
       expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce(),
     );
     fireEvent.click(screen.getByRole("button", { name: "退出平台登录" }));
-    await submitCredentials();
+    await submitOAuth();
     await waitFor(() =>
       expect(platformModelsApi.syncCatalog).toHaveBeenCalledTimes(2),
     );
@@ -887,20 +630,9 @@ describe("account cleanup logout", () => {
     expect(platformAuthApi.logout).not.toHaveBeenCalled();
   });
 
-  it("shows a dismissible result dialog and preserves saved login details", async () => {
+  it("shows a dismissible result dialog and returns to OAuth login", async () => {
     vi.mocked(platformAuthApi.account).mockResolvedValue(account);
     vi.mocked(platformAuthApi.logoutAndClear).mockResolvedValue(cleanupReport);
-    vi.mocked(platformAuthApi.history).mockResolvedValue([
-      {
-        id: "saved-account",
-        baseUrl: "https://saved-platform.test",
-        email: account.user.email,
-        rememberPassword: true,
-      },
-    ]);
-    vi.mocked(platformAuthApi.savedPassword).mockResolvedValue(
-      "remembered-password",
-    );
     const client = renderGate();
     const dialog = await openCleanup();
     client.setQueryData(["providers", "claude"], { private: "old-account" });
@@ -915,7 +647,9 @@ describe("account cleanup logout", () => {
     );
     expect(platformAuthApi.logout).not.toHaveBeenCalled();
     expect(screen.queryByText("工具主页")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("密码")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "登录智枢", hidden: true }),
+    ).toBeInTheDocument();
     expect(client.getQueryData(["providers", "claude"])).toBeUndefined();
     const resultDialog = screen.getByRole("dialog", {
       name: zh.platformCleanup.result,
@@ -923,9 +657,11 @@ describe("account cleanup logout", () => {
     expect(
       within(resultDialog).getByText(zh.platformCleanup.complete),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("密码").closest("main")).not.toContainElement(
-      resultDialog,
-    );
+    expect(
+      screen
+        .getByRole("button", { name: "登录智枢", hidden: true })
+        .closest("main"),
+    ).not.toContainElement(resultDialog);
     const appDetails = within(resultDialog)
       .getByText(zh.platformCatalog.deleteAllResult)
       .closest("details");
@@ -937,15 +673,10 @@ describe("account cleanup logout", () => {
     expect(
       screen.queryByText(zh.platformCleanup.complete),
     ).not.toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.getByLabelText("密码")).toHaveValue("remembered-password"),
-    );
-    expect(screen.getByLabelText("邮箱")).toHaveValue(account.user.email);
+    expect(screen.queryByLabelText("密码")).not.toBeInTheDocument();
     expect(screen.getByLabelText(zh.platformAuth.address)).toHaveValue(
-      "https://saved-platform.test",
+      account.baseUrl,
     );
-    expect(platformAuthApi.removeLogin).not.toHaveBeenCalled();
-    expect(platformAuthApi.forgetPassword).not.toHaveBeenCalled();
   });
 
   it("reports partial failures and retained providers without claiming complete cleanup", async () => {
@@ -1020,7 +751,7 @@ describe("account cleanup logout", () => {
       ),
     ).toBeUndefined();
     await act(async () => finishCleanup(cleanupReport));
-    await screen.findByLabelText("密码");
+    await screen.findByRole("button", { name: "登录智枢", hidden: true });
   });
 
   it("does not claim logout when the cleanup IPC rejects before identity validation", async () => {
@@ -1050,7 +781,7 @@ describe("account cleanup logout", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: zh.platformAuth.logout }),
     );
-    await screen.findByLabelText("密码");
+    await screen.findByRole("button", { name: "登录智枢", hidden: true });
     expect(platformAuthApi.logout).toHaveBeenCalledOnce();
     expect(platformAuthApi.logoutAndClear).not.toHaveBeenCalled();
     expect(

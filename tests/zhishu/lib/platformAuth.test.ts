@@ -37,3 +37,13 @@ it("scopes cleanup logout to the requested platform and user without sending an 
     userId: 7,
   });
 });
+
+it("starts OAuth with only the selected platform address", async () => {
+  await platformAuthApi.loginOAuth("https://platform.test");
+  expect(invoke).toHaveBeenCalledWith("platform_login_oauth", {
+    baseUrl: "https://platform.test",
+  });
+  expect(platformAuthApi).not.toHaveProperty("login");
+  expect(platformAuthApi).not.toHaveProperty("login2fa");
+  expect(platformAuthApi).not.toHaveProperty("savedPassword");
+});

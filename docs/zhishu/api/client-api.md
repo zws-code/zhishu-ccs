@@ -28,9 +28,7 @@
 
 | 方法与路径 | 认证 | 用途 |
 |---|---|---|
-| GET /config | 无 | 平台名称、登录配置、验证码状态和网页入口 |
-| POST /auth/login | 无 | 邮箱密码登录 |
-| POST /auth/login/2fa | TOTP 临时凭证 | 完成二次验证 |
+| GET /config | 无 | 平台名称、OAuth2 配置和订阅网页入口 |
 | POST /auth/refresh | refresh token | 换取并轮换登录令牌 |
 | POST /auth/logout | refresh token | 撤销当前刷新会话 |
 | GET /account | 用户 access token | 账户信息、状态、余额 |
@@ -47,27 +45,14 @@
 
 流程：
 
-1. 读取 config，登录；若要求 TOTP，再完成 /auth/login/2fa。
+1. 桌面客户端读取 config，通过 OAuth2 浏览器授权及 token 交换登录；TOTP 在平台网页完成。
 2. 调用 POST /access，校验当前平台/用户身份，原子保存完整本地快照。
 3. 客户端读取快照，按各工具规则同步 Provider 与配置。
 4. 展示刷新通过 /account 和 /usage/summary 完成；不重复整理 Key 或应用工具配置。
 
 HTTP 契约要求这些接口返回 `Cache-Control: no-store`，实际响应头需在服务端或联调时核验。令牌与 Key 不进入普通前端查询缓存、诊断日志或错误信息。
 
-### 登录与续期示例
-
-```http
-POST /api/zhishu/v1/client/auth/login
-Content-Type: application/json
-
-{"email":"demo@example.invalid","password":"example-password"}
-```
-
-登录复用平台原有认证规则与防滥用限制。正常成功 data 包含 `access_token`、`refresh_token`、`expires_in`（秒）、`token_type` 和 `user`；兼容降级见下文。需要 TOTP 时包含 `requires_2fa: true`、`temp_token` 等原登录响应字段，继续请求：
-
-```json
-{"temp_token":"example-temporary-token","totp_code":"123456"}
-```
+### 会话续期与退出
 
 /auth/refresh 和 /auth/logout 请求体均使用：
 
@@ -79,9 +64,9 @@ Content-Type: application/json
 
 ### 浏览器授权登录（OAuth 2.0，RFC 8252 + RFC 7636）
 
-桌面客户端默认展示「登录智枢」入口，邮箱密码登录保留为回退方式。授权服务器与客户端代码分别位于服务端 `internal/zhishu/clientoauth` 和客户端 `platform_oauth.rs`，网关已于 2026-11-02 实现；完整契约与已知问题见 [oauth-login.md](oauth-login.md)（注意其中默认 CSP 会拦截平台成功页 iframe 回传的 P0）。
+2026-11-03 起桌面客户端只保留「登录智枢」OAuth2 入口，已移除密码登录及客户端 TOTP IPC。密码登录、登录历史、旧密码兼容与管理代码均已删除。授权服务器与客户端代码分别位于服务端 `internal/zhishu/clientoauth` 和客户端 `platform_oauth.rs`，网关已于 2026-11-02 实现；完整契约与已知问题见 [oauth-login.md](oauth-login.md)（包含已修复的 CSP 问题与真实浏览器待验收项）。
 
-/config 额外返回 `oauth_authorize_url`、`oauth_client_id`（旧字段，固定为 `zhishu-ccs`）、`oauth_scopes`（当前为 `client`）和 `oauth_clients`（已注册的公共客户端列表；客户端应使用自己的 ID，不要依赖 `oauth_client_id`）。仅当 `login_methods` 包含 `oauth` 且授权地址非空时，客户端展示浏览器授权入口；旧服务端不返回这些字段时自动回退账号密码登录。
+/config 额外返回 `oauth_authorize_url`、`oauth_client_id`（旧字段，固定为 `zhishu-ccs`）、`oauth_scopes`（当前为 `client`）和 `oauth_clients`（已注册的公共客户端列表；客户端应使用自己的 ID，不要依赖 `oauth_client_id`）。仅当 `login_methods` 包含 `oauth` 且授权地址和 `oauth_client_id` 非空时，客户端允许浏览器授权；旧服务端不返回这些字段时显示不可用提示，不回退账号密码登录。
 
 流程：
 
@@ -90,46 +75,32 @@ Content-Type: application/json
 3. 在系统浏览器打开 `oauth_authorize_url`，附带 `response_type=code`、`client_id`、`redirect_uri`、`code_challenge`、`code_challenge_method=S256`、`state`、`scope`。
 4. 用户在浏览器登录并同意授权；平台回跳回环地址。客户端校验 `state`、最多等待 5 分钟，并支持用户取消。
 5. 客户端调用 `POST /api/zhishu/v1/oauth/token`（JSON）：`grant_type=authorization_code`、`client_id`、`code`、`redirect_uri`、`code_verifier`，成功外壳同其他接口，data 包含 `access_token`、`refresh_token`、`expires_in`、`token_type`、`scope`。
-6. 客户端使用 access token 调 `/account`，按成功登录处理：refresh token 交给系统凭据库，后续恢复与刷新路径和邮箱密码登录一致。
+6. 客户端使用 access token 调 `/account`，按成功登录处理：refresh token 交给系统凭据库，后续恢复与刷新复用既有会话存储。
 
 授权码与 verifier 只驻 Rust 侧，不写入前端、普通日志或持久化文件；token 端点与其他客户端接口一样返回 `Cache-Control: no-store`。浏览器拒绝授权时回跳带 `error=access_denied`，客户端提示重新登录，不把拒绝视为凭证错误。
 
-/config 返回 `schema_version`、`site_name`、`api_base_url`、`login_methods`、`totp_enabled`、注册和找回密码开关与网页入口，以及验证码启用信息。客户端实现邮箱密码、TOTP 与浏览器授权（OAuth 2.0）；平台启用验证码时账号密码入口仍须满足现有登录校验，不能通过客户端接口绕过。浏览器授权页由平台负责登录、验证码和二次验证。
+/config 返回平台配置；客户端 DTO 仅保留 `schema_version`、`site_name`、`api_base_url`、`login_methods`、`subscriptions_url` 与 OAuth2 字段。服务端返回的其他字段由 Serde 忽略，不进入前端。浏览器授权页负责平台登录、验证码和二次验证。
 
+### /config 与会话字段补充
 
-### /config、账户与认证字段补充
-
-/config 成功时的 data 示例：
+/config 的客户端投影示例：
 
 ```json
 {
   "schema_version": 1,
   "site_name": "示例平台",
   "api_base_url": "https://api.example.invalid",
-  "login_methods": ["password"],
-  "totp_enabled": true,
-  "registration_enabled": true,
-  "password_reset_enabled": true,
-  "register_url": "https://www.example.invalid/register",
-  "password_reset_url": "https://www.example.invalid/forgot-password",
+  "login_methods": ["oauth"],
   "subscriptions_url": "https://www.example.invalid/subscriptions",
-  "turnstile_enabled": false,
-  "turnstile_site_key": "",
-  "tencent_captcha_enabled": false,
-  "tencent_captcha_app_id": "",
-  "aliyun_captcha_enabled": false
+  "oauth_authorize_url": "https://www.example.invalid/oauth/authorize",
+  "oauth_client_id": "zhishu-ccs",
+  "oauth_scopes": ["client"]
 }
 ```
 
-网页地址来自平台配置；返回相对路径时，相对于当前登录平台 origin 解析。开关为 false 时不应展示相应入口。服务端契约可接受 `turnstile_token`，或 `tencent_captcha_ticket` 与 `tencent_captcha_randstr` 配对字段；当前 CCS 尚未实现验证码交互，启用这些验证时明确拒绝密码登录，不绕过校验。
+授权与订阅地址来自平台配置；返回相对路径时，相对于当前登录平台 origin 解析。仅接受无 URL 用户凭证的 HTTP/HTTPS 地址。客户端不再声明或解析密码登录、注册、找回密码、TOTP 或验证码组件配置。
 
-TOTP 中间响应的 data 示例：
-
-```json
-{"requires_2fa":true,"temp_token":"example-temporary-token","user_email_masked":"d***@example.invalid"}
-```
-
-登录成功的 `user` 沿用平台现有用户 DTO；账户刷新使用精简的 /account 契约。现有登录实现遇到刷新令牌生成失败时可只返回 `access_token`、`token_type` 和 `user`，因此 `refresh_token`、`expires_in` 是可选字段；缺少刷新令牌时客户端必须标记该会话不能自动续期，不能伪造或复用上一次账号的刷新令牌。
+OAuth2 令牌响应需要包含 `access_token`；缺少刷新令牌时，客户端提示本次会话不能自动续期，并清理上一账号的持久化会话，不伪造或复用旧刷新令牌。
 
 /auth/refresh 成功的 data：
 

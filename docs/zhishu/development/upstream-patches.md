@@ -2,6 +2,42 @@
 
 > 这是按基线/事件累积的补丁台账。222 项清单针对 2026-10-29 的 4.0.21 快照，后续变更按事件追加；旧路径、版本和分支描述仅适用于该段，不是当前 4.0.22 的完整重新统计。当前现状见 [代码基线](baseline.md)。
 
+## 2026-11-03：移除自有 macOS 开发签名辅助
+
+用户明确要求删除三份自有开发签名脚本及测试，同时保留 OAuth2 自动恢复。删除 `scripts/zhishu/dev-macos.sh`、`macos-dev-sign.mjs`、`macos-dev-sign.test.mjs` 和失去入口的开发签名文档；清理命令和当前文档引用，更新既有 ADR-0010。复用上游 Tauri CLI 开发启动与现有 Rust `platform_session` 会话存储，不新增包装或替代脚本。
+
+自有脚本/文档删除 L0；固定 `package.json` 删除 `test:dev-signing` 按 DEV-20261103-01 追加登记（L1，外层 Adapter 无法撤销 package 命令），AGENTS 维护入口 L1 文档。没有更改 Rust、会话 schema、keyring 后端、产品身份或正式发布签名。macOS 开发版重编译后可能重新要求钥匙串授权，属于移除辅助签名的边界；实际检查与未执行项见[验证记录](../history/validation.md)。回退仅恢复本轮文件与命令，无凭据或配置迁移。以下事件保留当时实施事实。
+
+## 2026-11-03：清理本地账号密码脚本
+
+用户要求删除各平台本地账号密码相关脚本与代码，并明确确认保留 OAuth2 自动恢复。删除自有 `scripts/zhishu/fixtures/macos-keychain-probe.c` 及签名测试中的真实钥匙串读写/清理流程和 opt-in 环境变量入口，保留模拟签名回归与代码签名脚本。Windows/Linux 平台密码存储已随前轮历史模块删除，不新增兼容或清理脚本。复用现有 OAuth2 会话与系统 keyring，仅保存 refresh token；不改上游授权中心、CLI 凭据或真实用户数据。
+
+自有脚本/测试/文档 L0；修正五语 `platformCleanup.retainedDetails` 中遗漏的登录历史/记住密码说明，沿用 AUTH-CLEANUP-20261103-02（L1，共享字典入口不能由自有包装替代）；AGENTS 更新沿用 AUTH-CLEANUP-20261103-03（L1 文档）。不涉及核心服务或数据 schema，无需 L3 ADR。回退只恢复本轮自有探针/测试及文案，不迁移凭据。验证与剩余平台验收范围见[验证记录](../history/validation.md)。
+
+## 2026-11-03：彻底删除密码登录遗留代码
+
+用户进一步明确要求删除所有账号/邮箱密码登录相关代码，替代上一轮保留旧密码兼容层的边界。删除自有 `platform_login_history.rs` 及其全部密码存取、遗忘/删除兼容、测试辅助和账号历史；OAuth2 不再更新历史，登录页只保留授权与服务器地址设置。前后端 `/config` DTO 删除密码/注册/找回/TOTP/验证码组件字段，保留 OAuth2 与订阅地址。通用日志脱敏、平台账户邮箱展示及授权中心独立认证继续按各自职责使用。
+
+| ID | 文件 | 改动与不能仅新增/包装的原因 | 等级 | 验证入口 |
+| --- | --- | --- | --- | --- |
+| AUTH-CLEANUP-20261103-01 | `src-tauri/src/lib.rs` | 固定注册表删除 `platform_login_history`、`platform_forget_password`、`platform_remove_login`；外层包装无法撤销 IPC | L1 | Rust 编译与平台回归 |
+| AUTH-CLEANUP-20261103-02 | `src/i18n/locales/{zh,zh-TW,en,ja,tr}.json` | 删除平台命名空间中废弃密码表单/历史文案，更新清理范围说明；共享语言包是运行时固定入口 | L1 | TypeScript、Prettier 与登录/额度组件回归 |
+| AUTH-CLEANUP-20261103-03 | `AGENTS.md` | 按本次明确要求更新固定维护入口的旧凭据与历史边界 | L1 文档 | 实现与引用核对 |
+
+其余为自有业务、测试和文档 L0 清理，不修改上游 Provider、CLI 配置或系统凭据库实现。复用 OAuth2 state/PKCE/回环和现有会话恢复、原子会话元数据写入；不改变会话 schema、keyring service 或登录令牌持久化语义。旧密码 keyring 条目和历史文件保留原处，本程序不再访问，不做自动迁移或真实数据清理；回退需恢复被删模块及其注册/前端调用。验证结果及未验收项见[验证记录](../history/validation.md)。
+
+## 2026-11-03：平台仅保留 OAuth2 登录
+
+依据用户明确要求移除桌面账号密码登录。自有登录 UI/API、Rust 认证服务及历史存储（L0）移除密码提交、客户端 TOTP、密码读取和密码接口白名单；复用现有 OAuth2 PKCE/state/回环授权、账户验证、刷新令牌存储及恢复。OAuth2 成功只更新账号/服务器历史，保留旧密码元数据与凭据，删除记录仍调用既有清理路径；不迁移真实数据，不改平台服务端或授权中心。
+
+| ID | 文件 | 改动与不能仅新增/包装的原因 | 等级 | 验证入口 |
+| --- | --- | --- | --- | --- |
+| AUTH-20261103-01 | `src-tauri/src/lib.rs` | 从固定 handler 表撤销 `platform_login`、`platform_login_2fa`、`platform_saved_password`；包装 UI 不能撤销 IPC 入口 | L1 | Rust 编译、平台认证/会话回归 |
+| AUTH-20261103-02 | `src/i18n/locales/{zh,zh-TW,en,ja,tr}.json` | 固定共享语言包添加 OAuth2 不可用、重试与历史选择说明，更新会话提示和返回登录文案 | L1 | TypeScript、格式和登录组件测试 |
+| AUTH-20261103-03 | `AGENTS.md` | 更新固定维护入口的登录契约与旧密码清理边界，旁路文档无法撤回过期指令 | L1 文档 | 路径与现有实现核对 |
+
+验收：平台缺少 OAuth2 配置或配置失败时阻止登录且不回退，允许重试和修改服务器；覆盖授权成功、失败、取消、迟到结果、历史记录、重启恢复及退出清理。数据 schema、keyring service 和旧历史文件格式不变，可通过恢复本次代码回退；不需要 L3 核心 ADR。实际执行与真实浏览器/跨平台未验收项见[验证记录](../history/validation.md)。
+
 ## 2026-11-03：自有发布与签名脚本去冗余
 
 按用户确认清理 `scripts/zhishu/`：从 `release-artifacts.mjs` 删除没有生产调用的 `configFingerprint`、`walkFiles`、`oneFile`、`saveReceipt`、`validateReceipt`、`assembleRelease` 及无用依赖；删除两项仅验证旧合包/`build.json` 链路的测试，现用夹具不再生成旧收据，缺失签名回归直接调用 `collectUpdaterPlatforms`。当前版本/目标/签名/哈希与历史发布恢复校验继续复用现有实现。

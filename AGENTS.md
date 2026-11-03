@@ -26,7 +26,7 @@
 - `zhishu-ccs` 是 cc-switch 的二开桌面应用，用于管理和切换 Claude Code、Codex、Gemini CLI 等工具的供应商配置。
 - 技术栈：Tauri 2、React 18、TypeScript、Vite 7、Tailwind CSS、TanStack Query 5；后端使用 Rust、Tokio、Serde、SQLite/rusqlite。
 - 上游继承能力包括供应商管理、CLI 配置适配、MCP、Skills、提示词、会话及本地代理；这些主干在本分支也有修改，不能直接用上游文件覆盖。
-- 本项目新增的平台登录、会话恢复、登录历史、平台基础数据、供应商同步和订阅额度，主要位于前后端的 `platform*` 模块；它们与授权中心的 Codex/Copilot/xAI OAuth 是不同链路。
+- 本项目新增的平台 OAuth2 登录、会话恢复、平台基础数据、供应商同步和订阅额度，主要位于前后端的 `platform*` 模块；它们与授权中心的 Codex/Copilot/xAI OAuth 是不同链路。
 - WorkBuddy 已默认显示，已有原生配置适配、平台供应商同步和回归用例。上游 4.0.22 的 DeepSeek Harness 原生适配已接入平台供应商同步；代码支持不等于目标工具的真实运行验收。
 - 登录或会话恢复成功后只自动拉取一次「平台基础数据」快照，不改写供应商列表；接入由用户在「接入到工具」向导中确认：模式应用可选直连、路由或聚合（聚合仅 Claude、Codex、Claude Desktop），累加式应用加入供应商列表。也可在各应用手动同步供应商列表。本地同步不检测外部修改，也不做覆盖确认。
 - 应用可见性、MCP、Skills、增量供应商、路由和 Stack 模式使用不同白名单，见 `src/config/appConfig.tsx` 及后端对应能力判断；不要以出现在应用列表中推断所有功能均支持。
@@ -46,7 +46,7 @@
 - `src-tauri/src/config.rs`、`codex_config.rs`、`gemini_config.rs`：路径解析、格式读写、兼容及原子写入。
 - `src-tauri/src/live/`、`src-tauri/src/mode/`：关键字段投影、文件补丁、写锁、模式状态及崩溃恢复。
 - `src-tauri/src/database/`、`settings.rs`、`app_store.rs`：SQLite、设备设置和应用数据目录覆盖。
-- `src-tauri/src/zhishu/services/platform_auth.rs`：平台认证与刷新；`src-tauri/src/zhishu/storage/` 中的 `platform_session.rs`、`platform_login_history.rs`、`platform_storage.rs` 负责七天闲置、系统凭据库、记住密码和设备路径；`src-tauri/src/zhishu/services/platform_http_log.rs` 负责 HTTP 脱敏诊断。
+- `src-tauri/src/zhishu/services/platform_auth.rs`：平台认证与刷新；`src-tauri/src/zhishu/storage/` 中的 `platform_session.rs`、`platform_storage.rs` 负责七天闲置、系统凭据库和设备路径；`src-tauri/src/zhishu/services/platform_http_log.rs` 负责 HTTP 脱敏诊断。
 - `src-tauri/src/zhishu/services/platform_models/mod.rs`：平台/本地两阶段同步；同目录 `base_data.rs` 存取账号快照，`catalog.rs` 解析模型能力，`connection.rs` 调和模型目录，`sync_report.rs` 生成同步报告。工具格式适配位于 `src-tauri/src/zhishu/integrations/ccswitch/platform_models.rs`；清理退出编排位于 `src-tauri/src/zhishu/services/platform_cleanup.rs`。
 - `src-tauri/src/zhishu/storage/config_history.rs`、`src-tauri/src/zhishu/commands/config_history.rs`：配置修改记录、内部写入指纹、同步操作报告、备份定位及文件还原；前端入口见 `src/zhishu/config-history/ConfigChangeHistoryPanel.tsx`。
 - `src-tauri/src/zhishu/integrations/ccswitch/workbuddy_config.rs`：WorkBuddy 配置适配；业务入口见同目录的 `workbuddy.rs`。
@@ -64,7 +64,6 @@
 | 安装依赖 | `pnpm install --frozen-lockfile` |
 | 桌面开发 | `pnpm dev` |
 | 查看开发启动参数，不启动程序 | `pnpm dev --help` |
-| macOS 开发签名回归 | `pnpm test:dev-signing` |
 | 本机正式构建与打包 | `pnpm build` |
 | 仅构建前端 | `pnpm build:renderer` |
 | 前端类型检查 | `pnpm typecheck` |
@@ -75,7 +74,7 @@
 | Rust 测试，macOS/Linux 隔离示例 | `CC_SWITCH_TEST_HOME="$(mktemp -d)" cargo test --manifest-path src-tauri/Cargo.toml` |
 
 - 前端单元测试使用 `pnpm test:unit`。
-- `pnpm dev` 直接调用 `tauri dev`，沿用正常应用数据和工具配置路径，不使用自有通用启动器。macOS 需要稳定开发签名时运行已有 `sh scripts/zhishu/dev-macos.sh`。详见[开发启动](docs/zhishu/development/development.md)。
+- `pnpm dev` 直接调用 `tauri dev`，沿用正常应用数据和工具配置路径，不使用自有通用启动器或开发签名脚本。详见[开发启动](docs/zhishu/development/development.md)。
 - 工具写入测试需使用各自目录覆盖/夹具；Rust 测试用 `CC_SWITCH_TEST_HOME`，同时检查已有目录覆盖和 `WORKBUDDY_CONFIG_DIR` 等变量，不能修改智能体自身的 `HOME`/`CODEX_HOME` 来隔离。
 - Rust 编译前需存在 `dist/`；打包始终启用更新包签名，需要配置发布私钥，具体配置见[底层打包命令](docs/zhishu/releases/README.md#打包命令)。CI 后端使用 nextest；本地未安装该扩展时使用上表的 `cargo test`，不要把扩展缺失报告成代码失败。
 
@@ -131,24 +130,25 @@
 - 为什么：本项目同时使用内存、系统凭据库和明文配置；混淆它们会造成泄漏、丢失登录或退出后凭据残留。
 - 普通供应商 Key 随 `settings_config` 以 JSON 文本存入 SQLite，默认数据库为 `~/.zhishu-ccs/cc-switch.db`；生效时还可能写入 CLI 配置，不能宣称统一由 keyring 加密。
 - Codex 原生登录需尊重 `cli_auth_credentials_store` 的 `file/keyring/auto/ephemeral` 语义；沿用 `codex_config.rs` 和 `services/provider/codex_direct.rs` 的判断。
-- 平台 access token 和 2FA 临时 token 仅驻 Rust 内存；refresh token 默认持久化到系统 keyring，service 为 `com.zhishu.ccswitch.desktop.platform-session`。它们均不返回前端，不进入 localStorage、SQLite、配置导出或云同步；不要恢复为每次重启都需登录的旧实现。
+- 平台 OAuth2 授权码、PKCE verifier 和 access token 仅在 Rust 中处理；refresh token 默认持久化到系统 keyring，service 为 `com.zhishu.ccswitch.desktop.platform-session`。它们均不返回前端，不进入 localStorage、SQLite、配置导出或云同步；不要恢复为每次重启都需登录的旧实现。
 - `platform-session.json` 只保存平台地址、用户 ID、凭据条目 ID 和最后使用时间；位于 Tauri `app_local_data_dir()`。凭据 ID 按存储目录区分，文件使用私密原子写入。
-- “记住密码”独立使用 keyring service `com.zhishu.ccswitch.desktop.platform-login`；`platform-login-history.json` 与会话元数据遵循相同目录规则，不含密码。保持登录不依赖勾选记住密码，也不使用已保存密码自动登录或跳过 2FA。
+- 按用户要求彻底移除密码登录遗留代码：不再读写或清理旧版密码 keyring service，不再维护登录账号历史。旧版凭据和历史文件保留原处，本次不执行真实数据清理。OAuth2 登录账号由浏览器授权确定，登录页可填写服务器地址，会话仍由独立的 `platform-session` service 恢复。
+- 账号密码持久化脚本、macOS 钥匙串读写探针及自有开发签名脚本已删除；Windows/Linux 同样不保留平台密码存储。用户明确保留 OAuth2 自动恢复，`platform-session` 继续通过跨平台 keyring 保存 refresh token；该会话存储不依赖开发签名脚本。
 - 平台分组模型 Key 则保存在设备本地按平台地址和用户 ID 分隔的 `platform-catalogs/<账号摘要>.json`（旧单文件 v2 可按归属迁移），应用后还可能在供应商 SQLite 行和 CLI 配置中出现；目录文件使用私密原子写入（Unix 0600），不是 keyring 加密存储，不进入数据库导出或云同步。普通目录摘要不含 Key；只有 `platform_get_catalog_key` 显式查看/复制入口返回单个分组 Key，不得放入前端查询缓存。
-- 授权中心另有 `codex_oauth_auth.json`、`copilot_auth.json`、`xai_oauth_auth.json` 文件存储；不要与平台会话或记住密码的存储/清理规则混用。
+- 授权中心另有 `codex_oauth_auth.json`、`copilot_auth.json`、`xai_oauth_auth.json` 文件存储；不要与平台会话的存储/清理规则混用。
 - 要改先做什么：列清读取、落盘、备份、退出和删除路径；保留私密文件权限及日志脱敏，验证 keyring 不可用时不会改用明文密码兜底。
 
 ### 平台登录与会话恢复
 
 - 为什么：登录、会话恢复与账户切换涉及系统凭据库、本机快照和托管配置；误改可能串号、丢失登录或留下退出后可恢复的凭据。
-- 登录 IPC：`platform_login({ baseUrl, email, password, rememberPassword })`、`platform_login_2fa({ code })` 返回 `authenticated` 或 `requires_2fa` 分支；成功可带 `persistenceWarning`。会话持久化失败可保留本次登录并提示，不能用明文 token/密码兜底。
+- 登录 IPC 只保留 `platform_login_oauth({ baseUrl })`，返回 `authenticated`，成功可带 `persistenceWarning`；密码登录、客户端 TOTP 及密码读取 IPC 已移除，取消授权复用 `platform_cancel_login()`。平台未启用 OAuth2 时提示并允许重试配置，不回退密码登录。会话持久化失败可保留本次登录并提示，不能用明文 token/密码兜底。
 - `platform_get_account({ active })` 返回 `{ baseUrl, user: { id, email, username, role, balance } }` 或 `null`；平台错误保持 `{ code, message }`。前端按页面可见性传 `active`，后端还检查主窗口可见且未最小化；后台检查不延长闲置期限。
 - 重启从 keyring 恢复 refresh token，向平台刷新并验证账户；连续超过七天未使用、确认凭据失效或用户身份变化时清除会话。401 按现有路径刷新，轮换结果先保存再继续请求；暂时断网或凭据库故障保留可重试状态。
 - `PlatformAuthContext` 每分钟及窗口重新可见、网络恢复时查询账户。已有账户遇到暂时网络错误仍可使用本地功能；启动恢复失败进入 `recoveryPending` 重试页，可主动退出后重新登录，但没有未验证的离线入口。
-- 认证 HTTP 路径仅使用 `/api/zhishu/v1/client` 前缀：`/config`、`/auth/login`、`/auth/login/2fa`、`/account`、`/auth/refresh`、`/auth/logout`。网页入口来自 config 的地址及开关；缺少 refresh token 时明确提示不能自动续期，不复用旧账号令牌。保留人机验证不支持时明确拒绝的行为，不绕过平台验证。
+- 配置及会话 HTTP 路径使用 `/api/zhishu/v1/client` 前缀：`/config`、`/account`、`/auth/refresh`、`/auth/logout`；OAuth2 授权码交换使用 `/api/zhishu/v1/oauth/token`。客户端白名单不再接受密码登录和 TOTP 路径。OAuth2 授权与订阅网页地址来自 config；缺少 refresh token 时明确提示不能自动续期，不复用旧账号令牌。人机验证、密码及 TOTP 在平台网页完成，不绕过平台验证。
 - 普通主动退出先失效本机会话指针并清理会话 keyring，再尽力撤销服务端 refresh token，同时清理前端查询缓存；保留本机目录、供应商数据库和工具配置中的 API Key，不改写原生配置。退出后平台目录与 Key 查看/同步仍需登录并校验账户归属；同账号重新登录可继续使用本机目录。
-- 显式「退出并清除此账号本机数据」调用 `platform_logout_and_clear_account({ baseUrl, userId })`：操作锁内校验当前身份，复用全应用安全供应商删除，再清理账号目录，最后退出会话。保留登录账号记录、服务器地址及已记住密码，由登录页原有入口单独管理。部分失败仍退出并用可关闭弹窗展示逐项报告；无安全备用项保留。其他账号、自建项、授权中心账号、配置修改记录和恢复备份保留，不撤销共享模型 Key。IPC 验证前失败不宣称已退出。实现与迁移见 ADR-0005；不是多会话登录或安全擦除。
-- 要改先做什么：核对 `platform_auth.rs`、`platform_session.rs`、`platform_login_history.rs`、门禁和 Context；覆盖重启恢复、轮换后断网、凭据库故障、七天边界、2FA、切换账号、主动退出与迟到响应。
+- 显式「退出并清除此账号本机数据」调用 `platform_logout_and_clear_account({ baseUrl, userId })`：操作锁内校验当前身份，复用全应用安全供应商删除，再清理账号目录，最后退出会话。不处理旧版登录历史及密码凭据；相关兼容和管理代码已按用户要求删除。部分失败仍退出并用可关闭弹窗展示逐项报告；无安全备用项保留。其他账号、自建项、授权中心账号、配置修改记录和恢复备份保留，不撤销共享模型 Key。IPC 验证前失败不宣称已退出。实现与迁移见 ADR-0005；不是多会话登录或安全擦除。
+- 要改先做什么：核对 `platform_auth.rs`、`platform_oauth.rs`、`platform_session.rs`、门禁和 Context；覆盖重启恢复、轮换后断网、凭据库故障、七天边界、OAuth2 授权/取消、切换账号、主动退出与迟到响应。
 
 ### 平台基础数据与供应商同步
 

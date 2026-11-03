@@ -2,6 +2,68 @@
 
 > 本页保留各次任务的执行结果和未验证项；测试数量、代码路径、分支状态及临时资料均属于当时快照。本次文档整理没有重跑这些历史测试。当前行为以 [代码基线](../development/baseline.md)、功能说明和源码为准。
 
+## 移除 macOS 开发签名辅助（2026-11-03，后续要求）
+
+用户要求删除自有 macOS 开发签名三件套，同时保留 OAuth2 自动恢复。删除开发启动签名脚本、签名 helper、对应测试与专用操作文档；移除 `package.json` 的 `test:dev-signing`，同步 AGENTS、开发入口、维护索引和 ADR-0010。上游 Tauri CLI 继续管理开发启动；Rust `platform_session` 保持系统 keyring 存储与恢复。自有脚本/文档 L0，固定 package/维护入口 L1，补丁及回退见[登记](../development/upstream-patches.md)。
+
+本轮实际执行：
+
+- `node node_modules/@tauri-apps/cli/tauri.js dev --help`：通过，仅查看帮助，不启动应用。
+- `package.json` Prettier 与 JSON 解析：通过。
+- 静态检查确认 `dev` 仍为 `tauri dev`、旧签名测试命令与四份目标文件均已移除，活跃源码、脚本、CI、package 与 AGENTS 无已删脚本或开发签名变量调用。
+- 修改文档的 63 处本地链接及 `git diff --check`：通过。
+
+未启动真实应用、重编译 macOS 开发版或进行系统钥匙串实测；未运行已删除的签名测试，也未重跑前端/Rust 测试、构建或正式发布。macOS 临时签名产物变化后，首次访问钥匙串可能再次要求系统授权，不能保证每次重编译均免提示；OAuth2 token 存储与会话恢复代码未改动。正式发行签名流程继续沿用发布配置，不依赖本次删除的开发脚本。未访问或修改真实凭据及 CLI 配置。以下记录保留前轮当时结果。
+
+## 本地账号密码脚本清理（2026-11-03，补充）
+
+用户要求删除各平台本地账号密码保存相关脚本与代码，并明确确认保留 OAuth2 自动恢复。删除 macOS 钥匙串 C 探针、签名回归中的真实凭据读写/删除流程、相关 opt-in 入口及未使用 import；保留代码签名与模拟回归。检查确认 Windows/Linux 旧平台密码存储已随前轮历史模块删除，现有平台 keyring 调用只用于 OAuth2 refresh token。修正五语清理说明和当前开发/功能文档中遗漏的历史账号、记住密码描述。自有脚本/文档 L0，共享字典与维护入口 L1；复用既有 OAuth2 会话和签名能力，补丁及回退见[登记](../development/upstream-patches.md)。
+
+本轮实际执行：
+
+- `node --test scripts/zhishu/macos-dev-sign.test.mjs`：7 项通过，0 跳过，全部使用模拟命令，不访问真实钥匙串。
+- `node node_modules/typescript/bin/tsc --noEmit`：通过。
+- 本地 Vitest 执行 `PlatformLogin.test.tsx`、`PlatformUsageFooter.test.tsx`、`platformAuth.test.ts`：60 项通过，覆盖登录、恢复、清理与授权接口。
+- 修改的 Node 测试及五语 JSON Prettier、Node/shell 语法、`git diff --check`：通过。首次格式检查指出删除后的 import/空行需整理，格式化后复查通过。
+- 活跃源码、脚本、测试与 CI 中的旧密码 service/历史模块、密码 IPC、钥匙串探针及入口残留检索：无匹配。
+
+未重跑 Rust 测试、Clippy、renderer 构建或全量测试；本补充未修改 Rust 或前端业务逻辑。未进行真实系统凭据库、真实签名或 macOS/Windows/Linux 桌面端到端验收，不宣称已在各平台运行验证。未修改或删除真实账号凭据、CLI 配置或供应商数据；OAuth2 持久化与恢复保持原有语义。
+
+## 彻底清理密码登录遗留代码（2026-11-03，后续要求）
+
+用户要求将账号/邮箱密码登录相关代码全部删除，替代上一轮保留旧密码兼容层的边界。本轮删除 `platform_login_history.rs`、账号历史选择 UI、密码凭据兼容读写/清理及测试辅助、历史/遗忘/删除记录 IPC、前后端密码/TOTP/验证码配置字段和五种语言中的废弃平台登录文案。OAuth2 保留授权、服务器地址、会话恢复与刷新；通用敏感字段脱敏、账户邮箱展示及授权中心独立认证继续按各自职责使用。
+
+本轮实际执行：
+
+- `node node_modules/typescript/bin/tsc --noEmit` 通过。
+- 本地 Vitest 执行 `PlatformLogin.test.tsx`、`platformAuth.test.ts`、`PlatformUsageFooter.test.tsx`：60 项通过。
+- 修改的前端、翻译与测试文件 Prettier 检查通过；没有重跑完整 `src/` 格式检查，上轮记录的 `App.tsx` 格式问题未在本轮处理。
+- `node node_modules/vite/bin/vite.js build` 通过，仍有大 chunk 提示。
+- `cargo fmt --check --manifest-path src-tauri/Cargo.toml`、`cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings` 通过。
+- 使用临时 `CC_SWITCH_TEST_HOME`，经权限审查允许本机模拟回环端口后执行 `cargo test --manifest-path src-tauri/Cargo.toml --lib platform_ -- --test-threads=1`：146 项通过。数量较上一轮少 4 项，对应已随历史模块删除的旧密码/账号历史测试。
+- 活跃源码、测试与翻译中已无登录历史模块、密码存取/清理 IPC、旧账号历史类型和密码/TOTP/验证码配置字段的实现或引用；保留的旧登录 API 名称仅用于拒绝调用/无旧方法的负向回归。
+- 修改文档相对链接、当前实现路径和 `git diff --check` 通过。
+
+仍未执行真实平台浏览器授权、真实系统凭据库及 macOS/Windows/Linux 桌面端到端验收；未运行全量前端/Rust 测试或正式发布。旧版历史文件和密码 keyring 条目保留原处，本程序不再访问；本次没有迁移或删除真实数据。OAuth2 会话元数据 schema 与 refresh token keyring service 不变。L0 自有模块清理 + L1 注册/文案/维护入口，变更及回退边界见[补丁登记](../development/upstream-patches.md)。
+
+## 平台仅保留 OAuth2 登录（2026-11-03）
+
+范围：删除密码表单、客户端 TOTP、记住密码与回退入口，撤销对应登录/密码读取 IPC 及 HTTP 白名单；只复用既有 OAuth2 PKCE/state/loopback 授权与会话恢复。OAuth2 更新账号/服务器历史，不读写旧密码凭据；删除记录仍清理旧凭据。自有模块 L0，固定 IPC 注册、共享翻译与维护入口 L1，补丁见[登记](../development/upstream-patches.md)。
+
+本轮实际执行：
+
+- `pnpm` 启动尝试无法从 npm registry 解析 `pnpm@10.12.3`（网络/代理沙箱限制），改用已安装依赖的 Node 执行入口，没有安装或变更依赖。
+- `node node_modules/typescript/bin/tsc --noEmit` 通过。
+- `node node_modules/vitest/vitest.mjs run tests/zhishu/components/PlatformLogin.test.tsx tests/zhishu/lib/platformAuth.test.ts`：43 项通过。覆盖 OAuth2 唯一入口、缺字段/旧平台/配置失败、重试、授权成功/失败/取消/迟到结果、服务器编辑、历史清理、会话恢复及平台目录两阶段边界。
+- 修改的前端与测试文件 Prettier 检查通过。完整 `src/` 检查未通过，仅报告本轮未修改的 `src/App.tsx` 格式问题，未顺带格式化。
+- `node node_modules/vite/bin/vite.js build` 通过；仍有大 chunk 提示。
+- `cargo fmt --check --manifest-path src-tauri/Cargo.toml` 与 `cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings` 通过。
+- 隔离 `CC_SWITCH_TEST_HOME` 后执行 `cargo test --manifest-path src-tauri/Cargo.toml --lib platform_ -- --test-threads=1`：150 项通过。因模拟服务器与 OAuth2 回环需要绑定临时本机端口，该次测试经沙箱权限审查后执行；包含授权 state/PKCE/拒绝/令牌交换、刷新轮换、恢复/闲置、凭据库失败、账号清理及旧历史兼容。
+- 较早一次沙箱内 `--lib zhishu::` 广范围尝试为 142 通过、30 失败，包含本机端口绑定被拒及一个上传器身份测试；未把该次计为全量通过。后续 `platform_` 重跑覆盖本次登录改动，未重跑其余非平台范围。
+- `git diff --check` 通过；修改文档相对链接与实现路径已核对。
+
+未执行：真实平台浏览器授权、macOS/Windows/Linux 桌面流程及真实系统凭据库的端到端验收；未运行全量前端/Rust 测试或正式打包发布。未触碰真实账号、密码、供应商/CLI 配置或发布资源。旧平台未提供 OAuth2 时将无法登录，只能重试或更换/升级平台；这是本次明确要求的行为。回退恢复本次代码即可，历史 schema 与 keyring service 保持兼容，不迁移数据。
+
 ## 平台接入向导重做（2026-11-01）
 
 范围：登录/会话恢复后不再自动调用 `platform_sync_providers`，只拉取一次平台目录快照；新增 `src/zhishu/onboarding/PlatformOnboarding.tsx`，在用户确认后对所选可见应用执行本地供应商同步；模式应用可选择分组（默认当前托管分组，否则目录首项），还可逐个选择直连、路由或聚合（聚合仅 Claude、Codex、Claude Desktop，进入聚合并把该应用全部平台供应商加入名单）；累加式应用不选分组，直接加入该应用的全部平台供应商。删除「全部同步平台供应商」入口，`platform_sync_providers` 改为必须指定工具；各应用页的单工具同步保留。新增只读命令 `platform_preview_group_options` 供向导列出模式应用可用分组。侵入等级 L2（新增自有命令与 `lib.rs` 一行注册；语言包新增键），无 schema、凭据或存储变更；实现复用既有 `platform_sync_providers`、`switch_provider`、`set_proxy_takeover_for_app`、`set_proxy_stack_member`、`update_tray_menu`。

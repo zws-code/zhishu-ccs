@@ -1,21 +1,10 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   AlertCircle,
   ChevronDown,
-  Eye,
-  EyeOff,
-  History,
   Loader2,
-  Lock,
   LogOut,
-  Mail,
   RefreshCw,
   Server,
   ShieldCheck,
@@ -23,18 +12,11 @@ import {
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  platformAuthApi,
-  platformAuthError,
-  type SavedPlatformLogin,
-} from "@/zhishu/api/platformAuth";
+import { platformAuthApi, platformAuthError } from "@/zhishu/api/platformAuth";
 import { usePlatformAuth } from "@/zhishu/auth/PlatformAuthContext";
 import { Button } from "@/components/ui/button";
-import { Input, fieldClass } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
-import { settingsApi } from "@/lib/api/index";
 import { DRAG_REGION_ATTR, DRAG_REGION_STYLE, isMac } from "@/lib/platform";
 import { WindowControls } from "@/components/shell/WindowControls";
 import { useClientConfig } from "@/zhishu/auth/useClientConfig";
@@ -47,9 +29,6 @@ import logoMark from "@/zhishu/assets/logo-mark.png";
 // Vite 根目录是 src/，可选的部署环境配置相应放在 src/.env.local。
 const DEFAULT_API =
   import.meta.env.VITE_PLATFORM_API_URL || "http://127.0.0.1:3000";
-
-const fieldShellClass =
-  "pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-3";
 
 /** 登录门禁共用的氛围背景：柔光加淡点阵，避免整屏纯色留白显得空。 */
 function LoginBackdrop() {
@@ -215,190 +194,47 @@ function PlatformSessionRecovery() {
   );
 }
 
-/** 登录表单与二次验证共用入口；账号历史可预填密码，仍需用户提交并完成平台验证。 */
+/** 平台登录仅通过浏览器 OAuth2 授权。 */
 export function PlatformLogin() {
   const auth = usePlatformAuth();
   const { t } = useTranslation();
   const [baseUrl, setBaseUrl] = useState(DEFAULT_API);
   const config = useClientConfig(baseUrl);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
-  const [requires2fa, setRequires2fa] = useState(false);
-  const [history, setHistory] = useState<SavedPlatformLogin[]>([]);
-  const [selectedId, setSelectedId] = useState("");
-  const [rememberPassword, setRememberPassword] = useState(false);
-  const [historyBusy, setHistoryBusy] = useState(true);
-  const historyGeneration = useRef(0);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [oauthBusy, setOauthBusy] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const oauthCancelled = useRef(false);
-  // 默认落地页由平台配置决定：支持浏览器授权时展示「登录智枢」，否则回退到账号密码。
-  const [mode, setMode] = useState<"oauth" | "password" | null>(null);
   const oauthAvailable = Boolean(
     config.data?.login_methods?.includes("oauth") &&
-      config.data?.oauth_authorize_url,
+      config.data?.oauth_authorize_url &&
+      config.data?.oauth_client_id,
   );
-  const oauthPending = mode === null && config.isPending;
-  const pageMode = mode ?? (oauthAvailable ? "oauth" : "password");
-  const showOAuth = pageMode === "oauth" && oauthAvailable && !requires2fa;
-  const disabled = busy || historyBusy;
-  const selectLogin = async (record?: SavedPlatformLogin) => {
-    const generation = ++historyGeneration.current;
-    setSelectedId(record?.id || "");
-    setBaseUrl(record?.baseUrl || DEFAULT_API);
-    setEmail(record?.email || "");
-    setPassword("");
-    setRememberPassword(record?.rememberPassword || false);
-    setError("");
-    setHistoryBusy(true);
-    try {
-      if (record?.rememberPassword) {
-        const saved = await platformAuthApi.savedPassword(record.id);
-        if (generation === historyGeneration.current) {
-          setPassword(saved || "");
-          setRememberPassword(Boolean(saved));
-        }
-      }
-    } catch (cause) {
-      if (generation === historyGeneration.current)
-        setError(platformAuthError(cause));
-    } finally {
-      if (generation === historyGeneration.current) setHistoryBusy(false);
-    }
-  };
-
-  useEffect(() => {
-    let active = true;
-    void platformAuthApi
-      .history()
-      .then(async (records) => {
-        if (!active) return;
-        setHistory(records);
-        await selectLogin(records[0]);
-      })
-      .catch((cause) => {
-        if (active) {
-          setError(platformAuthError(cause));
-          setHistoryBusy(false);
-        }
-      });
-    return () => {
-      active = false;
-      historyGeneration.current += 1;
-    };
-  }, []);
-
-  const editIdentity = () => {
-    if (selectedId) {
-      setSelectedId("");
-      setPassword("");
-      setRememberPassword(false);
-    }
-  };
-
-  const forgetPassword = async (checked: boolean) => {
-    if (checked || !selectedId) {
-      setRememberPassword(checked);
-      return;
-    }
-    setHistoryBusy(true);
-    setError("");
-    try {
-      await platformAuthApi.forgetPassword(selectedId);
-      setRememberPassword(false);
-      setHistory((records) =>
-        records.map((record) =>
-          record.id === selectedId
-            ? { ...record, rememberPassword: false }
-            : record,
-        ),
-      );
-    } catch (cause) {
-      setError(platformAuthError(cause));
-    } finally {
-      setHistoryBusy(false);
-    }
-  };
-
-  const removeLogin = async () => {
-    setHistoryBusy(true);
-    setError("");
-    try {
-      await platformAuthApi.removeLogin(selectedId);
-      setHistory((records) =>
-        records.filter((record) => record.id !== selectedId),
-      );
-      await selectLogin();
-    } catch (cause) {
-      setError(platformAuthError(cause));
-    } finally {
-      setHistoryBusy(false);
-    }
-  };
-
   if (!auth) return null;
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (disabled) return;
-    setBusy(true);
-    setError("");
-    try {
-      const result = requires2fa
-        ? await platformAuthApi.login2fa(code)
-        : await platformAuthApi.login(
-            baseUrl,
-            email,
-            password,
-            rememberPassword,
-          );
-      setPassword("");
-      setCode("");
-      if (result.status === "requires_2fa") setRequires2fa(true);
-      else {
-        if (result.persistenceWarning) toast.warning(result.persistenceWarning);
-        auth.acceptLogin(result);
-      }
-    } catch (cause) {
-      setError(platformAuthError(cause));
-    } finally {
-      setBusy(false);
-    }
-  };
-  const openWebsite = async (url: string) => {
-    try {
-      await settingsApi.openExternal(url);
-    } catch (cause) {
-      setError(platformAuthError(cause));
-    }
-  };
   const startOAuth = async () => {
-    if (oauthBusy || disabled) return;
+    if (oauthBusy || !oauthAvailable || config.isFetching) return;
     oauthCancelled.current = false;
     setOauthBusy(true);
     setError("");
     try {
       const result = await platformAuthApi.loginOAuth(baseUrl);
-      if (result.status === "authenticated") {
-        if (result.persistenceWarning) toast.warning(result.persistenceWarning);
-        auth.acceptLogin(result);
-      } else {
-        setRequires2fa(true);
-      }
+      if (oauthCancelled.current) return;
+      if (result.persistenceWarning) toast.warning(result.persistenceWarning);
+      auth.acceptLogin(result);
     } catch (cause) {
-      // 用户主动取消时后端以 OAUTH_CANCELLED 结束等待，不应展示为错误。
       if (!oauthCancelled.current) setError(platformAuthError(cause));
     } finally {
       setOauthBusy(false);
     }
   };
-  const cancelOAuth = () => {
+  const cancelOAuth = async () => {
     oauthCancelled.current = true;
     setError("");
-    void platformAuthApi.cancelLogin().catch(() => undefined);
+    try {
+      await platformAuthApi.cancelLogin();
+    } catch (cause) {
+      oauthCancelled.current = false;
+      setError(platformAuthError(cause));
+    }
   };
 
   let serverLabel = baseUrl;
@@ -407,12 +243,6 @@ export function PlatformLogin() {
   } catch {
     // 地址输入到一半时保留原始文本，不打断编辑。
   }
-  const registerEnabled = Boolean(
-    config.data?.registration_enabled && config.data.register_url,
-  );
-  const resetEnabled = Boolean(
-    config.data?.password_reset_enabled && config.data.password_reset_url,
-  );
 
   return (
     <div className="relative flex h-screen flex-col overflow-y-auto bg-app text-fg-1">
@@ -451,352 +281,98 @@ export function PlatformLogin() {
                 {t("platformAuth.subtitle")}
               </p>
             </header>
-            {oauthPending ? (
-              <div
-                className="mt-6 flex h-10 items-center justify-center"
-                role="status"
+            <div className="mt-6 space-y-4">
+              <Button
+                type="button"
+                disabled={
+                  oauthBusy ||
+                  config.isPending ||
+                  config.isFetching ||
+                  !oauthAvailable
+                }
+                className="h-9 w-full"
+                onClick={() => void startOAuth()}
               >
-                <Loader2 className="h-4 w-4 animate-spin text-fg-3" />
-              </div>
-            ) : showOAuth ? (
-              <div className="mt-6 space-y-4">
+                {oauthBusy || config.isPending ? (
+                  <Loader2 className="me-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <ShieldCheck className="me-2 h-4 w-4" />
+                )}
+                {t(
+                  oauthBusy
+                    ? "platformAuth.oauthWaiting"
+                    : "platformAuth.oauthLogin",
+                )}
+              </Button>
+              <p className="text-center text-caption text-fg-3">
+                {t("platformAuth.oauthHint")}
+              </p>
+              {oauthBusy && (
                 <Button
                   type="button"
-                  disabled={oauthBusy || disabled}
-                  className="h-9 w-full"
-                  onClick={() => void startOAuth()}
+                  variant="ghost"
+                  size="compact"
+                  className="w-full"
+                  onClick={() => void cancelOAuth()}
                 >
-                  {oauthBusy ? (
-                    <Loader2 className="me-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <ShieldCheck className="me-2 h-4 w-4" />
-                  )}
-                  {t(
-                    oauthBusy
-                      ? "platformAuth.oauthWaiting"
-                      : "platformAuth.oauthLogin",
-                  )}
+                  {t("platformAuth.oauthCancel")}
                 </Button>
-                <p className="text-center text-caption text-fg-3">
-                  {t("platformAuth.oauthHint")}
-                </p>
-                {oauthBusy && (
+              )}
+              {!config.isPending && !config.isFetching && !oauthAvailable && (
+                <>
+                  <LoginError
+                    message={
+                      config.error
+                        ? platformAuthError(config.error)
+                        : t("platformAuth.oauthUnavailable")
+                    }
+                  />
                   <Button
                     type="button"
-                    variant="ghost"
-                    size="compact"
+                    variant="neutral"
                     className="w-full"
-                    onClick={cancelOAuth}
+                    disabled={oauthBusy}
+                    onClick={() => void config.refetch()}
                   >
-                    {t("platformAuth.oauthCancel")}
+                    {t("platformAuth.retryConfig")}
                   </Button>
-                )}
-                <div className="flex items-center gap-3 text-caption text-fg-3">
-                  <span className="h-px flex-1 bg-border" />
-                  {t("platformAuth.or")}
-                  <span className="h-px flex-1 bg-border" />
-                </div>
-                <Button
-                  type="button"
-                  variant="neutral"
-                  className="h-9 w-full"
-                  disabled={oauthBusy}
-                  onClick={() => setMode("password")}
-                >
-                  {t("platformAuth.passwordLogin")}
-                </Button>
-                {(error || auth.error) && (
-                  <LoginError message={error || auth.error} />
-                )}
-              </div>
-            ) : (
-              <>
-                <form
-                  onSubmit={(event) => void submit(event)}
-                  className="mt-6 space-y-3.5"
-                  aria-busy={disabled}
-                >
-                  {requires2fa ? (
-                    <div className="space-y-1.5">
-                      <Label
-                        htmlFor="platform-totp"
-                        className="text-caption text-fg-2"
-                      >
-                        {t("platformAuth.totp")}
-                      </Label>
-                      <div className="relative">
-                        <ShieldCheck className={fieldShellClass} />
-                        <Input
-                          id="platform-totp"
-                          autoFocus
-                          required
-                          inputMode="numeric"
-                          autoComplete="one-time-code"
-                          pattern="[0-9]{6}"
-                          maxLength={6}
-                          value={code}
-                          disabled={disabled}
-                          onChange={(event) => setCode(event.target.value)}
-                          className="h-9 pl-9 font-mono text-[15px] tracking-[0.5em]"
-                        />
-                      </div>
-                      <p className="text-caption text-fg-3">
-                        {t("platformAuth.totpHint")}
-                      </p>
-                    </div>
-                  ) : (
-                    <>
-                      {history.length > 0 && (
-                        <div className="space-y-1.5">
-                          <Label
-                            htmlFor="platform-history"
-                            className="text-caption text-fg-2"
-                          >
-                            {t("platformAuth.loginHistory")}
-                          </Label>
-                          <div className="flex gap-2">
-                            <div className="relative min-w-0 flex-1">
-                              <History className={fieldShellClass} />
-                              <select
-                                id="platform-history"
-                                className={cn(
-                                  fieldClass,
-                                  "h-9 appearance-none pl-9 pr-8",
-                                )}
-                                value={selectedId}
-                                disabled={disabled}
-                                onChange={(event) =>
-                                  void selectLogin(
-                                    history.find(
-                                      (record) =>
-                                        record.id === event.target.value,
-                                    ),
-                                  )
-                                }
-                              >
-                                <option value="">
-                                  {t("platformAuth.otherAccount")}
-                                </option>
-                                {history.map((record) => (
-                                  <option key={record.id} value={record.id}>
-                                    {record.email} · {record.baseUrl}
-                                  </option>
-                                ))}
-                              </select>
-                              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-3" />
-                            </div>
-                            <Button
-                              type="button"
-                              variant="neutral"
-                              size="compact"
-                              className="h-9 shrink-0"
-                              disabled={disabled || !selectedId}
-                              onClick={() => void removeLogin()}
-                            >
-                              {t("platformAuth.removeLogin")}
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                      <div className="space-y-1.5">
-                        <Label
-                          htmlFor="platform-email"
-                          className="text-caption text-fg-2"
-                        >
-                          {t("platformAuth.email")}
-                        </Label>
-                        <div className="relative">
-                          <Mail className={fieldShellClass} />
-                          <Input
-                            id="platform-email"
-                            type="email"
-                            required
-                            autoComplete="username"
-                            value={email}
-                            disabled={disabled}
-                            onChange={(event) => {
-                              editIdentity();
-                              setEmail(event.target.value);
-                            }}
-                            className="h-9 pl-9"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label
-                          htmlFor="platform-password"
-                          className="text-caption text-fg-2"
-                        >
-                          {t("platformAuth.password")}
-                        </Label>
-                        <div className="relative">
-                          <Lock className={fieldShellClass} />
-                          <Input
-                            id="platform-password"
-                            type={showPassword ? "text" : "password"}
-                            required
-                            autoComplete="current-password"
-                            value={password}
-                            disabled={disabled}
-                            onChange={(event) =>
-                              setPassword(event.target.value)
-                            }
-                            className="h-9 pl-9 pr-10"
-                          />
-                          <button
-                            type="button"
-                            aria-label={t(
-                              showPassword
-                                ? "platformAuth.hidePassword"
-                                : "platformAuth.showPassword",
-                            )}
-                            disabled={disabled}
-                            className="absolute right-1 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-control text-fg-3 transition-colors hover:bg-subtle hover:text-fg-1 disabled:opacity-50"
-                            onClick={() => setShowPassword((value) => !value)}
-                          >
-                            {showPassword ? (
-                              <EyeOff className="h-4 w-4" />
-                            ) : (
-                              <Eye className="h-4 w-4" />
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="platform-remember"
-                          checked={rememberPassword}
-                          disabled={disabled}
-                          onCheckedChange={(checked) =>
-                            void forgetPassword(checked)
-                          }
-                        />
-                        <Label
-                          htmlFor="platform-remember"
-                          className="text-caption text-fg-2"
-                        >
-                          {t("platformAuth.rememberPassword")}
-                        </Label>
-                      </div>
-                      <details className="group rounded-control border border-border px-3 py-2">
-                        <summary className="flex cursor-pointer list-none items-center gap-2 text-caption text-fg-2 transition-colors hover:text-fg-1 [&::-webkit-details-marker]:hidden">
-                          <Server className="h-3.5 w-3.5 shrink-0" />
-                          <span className="shrink-0">
-                            {t("platformAuth.advanced")}
-                          </span>
-                          <span className="ms-auto min-w-0 truncate font-mono text-[11px] text-fg-3">
-                            {serverLabel}
-                          </span>
-                          <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform group-open:rotate-180" />
-                        </summary>
-                        <div className="mt-2.5 space-y-1.5">
-                          <Label
-                            htmlFor="platform-url"
-                            className="text-caption text-fg-2"
-                          >
-                            {t("platformAuth.address")}
-                          </Label>
-                          <Input
-                            id="platform-url"
-                            type="url"
-                            required
-                            value={baseUrl}
-                            disabled={disabled}
-                            onChange={(event) => {
-                              editIdentity();
-                              setBaseUrl(event.target.value);
-                            }}
-                            className="h-9 font-mono text-caption"
-                          />
-                        </div>
-                      </details>
-                    </>
-                  )}
-                  {(error || auth.error) && (
-                    <LoginError message={error || auth.error} />
-                  )}
-                  <Button
-                    type="submit"
-                    disabled={disabled}
-                    className="h-9 w-full"
-                  >
-                    {busy && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
-                    {t(
-                      requires2fa
-                        ? "platformAuth.verify"
-                        : "platformAuth.login",
-                    )}
-                  </Button>
-                  {requires2fa && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="compact"
-                      className="w-full"
-                      disabled={disabled}
-                      onClick={() => {
-                        setBusy(true);
-                        void platformAuthApi
-                          .cancelLogin()
-                          .then(() => {
-                            setRequires2fa(false);
-                            setCode("");
-                            setError("");
-                          })
-                          .catch((cause) => setError(platformAuthError(cause)))
-                          .finally(() => setBusy(false));
+                </>
+              )}
+              <details className="group rounded-control border border-border px-3 py-2">
+                <summary className="flex cursor-pointer list-none items-center gap-2 text-caption text-fg-2 transition-colors hover:text-fg-1 [&::-webkit-details-marker]:hidden">
+                  <Server className="h-3.5 w-3.5 shrink-0" />
+                  <span className="shrink-0">{t("platformAuth.advanced")}</span>
+                  <span className="ms-auto min-w-0 truncate font-mono text-[11px] text-fg-3">
+                    {serverLabel}
+                  </span>
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0 transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="mt-2.5 space-y-3">
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="platform-url"
+                      className="text-caption text-fg-2"
+                    >
+                      {t("platformAuth.address")}
+                    </Label>
+                    <Input
+                      id="platform-url"
+                      type="url"
+                      value={baseUrl}
+                      disabled={oauthBusy}
+                      onChange={(event) => {
+                        setBaseUrl(event.target.value);
+                        setError("");
                       }}
-                    >
-                      {t("platformAuth.back")}
-                    </Button>
-                  )}
-                  {oauthAvailable && !requires2fa && (
-                    <Button
-                      type="button"
-                      variant="link"
-                      size="compact"
-                      className="w-full"
-                      disabled={disabled}
-                      onClick={() => setMode("oauth")}
-                    >
-                      {t("platformAuth.backToOAuth")}
-                    </Button>
-                  )}
-                </form>
-                {(registerEnabled || resetEnabled) && (
-                  <div className="mt-4 flex items-center justify-center gap-6">
-                    {registerEnabled && (
-                      <Button
-                        type="button"
-                        variant="link"
-                        size="compact"
-                        className="h-auto px-0 text-caption"
-                        disabled={disabled}
-                        onClick={() =>
-                          void openWebsite(config.data!.register_url!)
-                        }
-                      >
-                        {t("platformAuth.register")}
-                      </Button>
-                    )}
-                    {resetEnabled && (
-                      <Button
-                        type="button"
-                        variant="link"
-                        size="compact"
-                        className="h-auto px-0 text-caption"
-                        disabled={disabled}
-                        onClick={() =>
-                          void openWebsite(config.data!.password_reset_url!)
-                        }
-                      >
-                        {t("platformAuth.forgot")}
-                      </Button>
-                    )}
+                      className="h-9 font-mono text-caption"
+                    />
                   </div>
-                )}
-              </>
-            )}
+                </div>
+              </details>
+              {(error || auth.error) && (
+                <LoginError message={error || auth.error} />
+              )}
+            </div>
           </div>
           <p className="mt-4 flex items-start justify-center gap-1.5 text-center text-caption text-fg-3">
             <ShieldCheck className="mt-[3px] h-3.5 w-3.5 shrink-0" />

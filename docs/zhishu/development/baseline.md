@@ -29,8 +29,8 @@
 | 应用身份 | productName `Zhishu CC Switch`、identifier `com.zhishu.ccswitch.desktop`、binary `zhishu-ccs`、深链 `zhishu-ccswitch` | `src-tauri/tauri.conf.json` |
 | 应用数据库 | 默认 `~/.zhishu-ccs/cc-switch.db`；目录覆盖仍由既有函数解析 | `src-tauri/src/config.rs`、`app_store.rs` |
 | 数据库结构 | schema `24`；保留智枢 v23 缺失 OMP 字段的幂等协调 | `src-tauri/src/database/mod.rs`、`schema.rs` |
-| 登录 access / 2FA token | Rust 内存 | `src-tauri/src/zhishu/services/platform_auth.rs` |
-| refresh token / 记住密码 | 两个独立的系统 keyring service；元数据文件不含 token 或密码 | `src-tauri/src/zhishu/storage/platform_session.rs`、`platform_login_history.rs` |
+| OAuth2 授权码 / PKCE verifier / access token | Rust 内存 | `src-tauri/src/zhishu/services/platform_auth.rs` |
+| refresh token | 独立系统 keyring service；会话元数据不含 token，密码登录及历史存储已删除 | `src-tauri/src/zhishu/storage/platform_session.rs` |
 | 平台目录与模型 Key | 账号独立的 `platform-catalogs/<账号摘要>.json` v2；Unix 0600 私密原子写入，仍为明文 | `src-tauri/src/zhishu/services/platform_models/base_data.rs` |
 | 设备文件位置 | 使用 Tauri `app_local_data_dir()` | `src-tauri/src/zhishu/storage/platform_storage.rs` |
 | 普通供应商 Key | SQLite 的 `settings_config`，生效后可能进入 CLI 原生配置 | 上游 ProviderService、DAO 与配置适配器 |
