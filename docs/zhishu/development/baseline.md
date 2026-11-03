@@ -6,13 +6,15 @@
 
 | 项目 | 当前本地事实 | 依据 |
 | --- | --- | --- |
-| 产品版本 | `0.0.6` | `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json` |
-| 产品分支 / 同步起点 | `ccs-dev` / `1da9fa8bf36400fbcf6043908c1dbdc59a06812b`；在独立 `sync/upstream-4.0.25` 合并后集成，详见同步报告 | `git log`、`git status` |
+| 产品版本 | `0.0.7` | `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json` |
+| 产品分支 / 同步起点 | `ccs-dev`：2026-11-03 线性重建后的 10 条自有功能提交；上游基线 `a3eafa408ae679db2e3401fca767ed2b89d9a2b2`（v4.0.25），重建前 HEAD 为 `a234bc66` | `git log`、[提交整理记录](../history/commit-reorganization.md) |
 | 已合入上游 | `v4.0.25` / `a3eafa408ae679db2e3401fca767ed2b89d9a2b2` | 官方 tag 联网核验；合并保留祖先关系，见 [同步报告](../upstream-sync/2026-11-03.md) |
 | 官方 remote | `upstream` → `git@github.com:farion1231/cc-switch.git` | `git remote -v` |
 | 自有 GitHub | `origin` → `git@github.com:zws-code/zhishu-ccs.git` | 同上；发布 tag 使用此 remote |
 | 自有 GitLab | `gitlab` → `http://172.16.32.4:8929/hunanzs/zhishu-ccs.git` | 同上 |
 | Rust / pnpm | Rust `1.95`；pnpm `10.12.3` | `rust-toolchain.toml`、`package.json` |
+
+2026-11-03 处于开发测试阶段，按用户要求在本地把 `ccs-dev` 自有提交线性重建：以 `a3eafa408ae679db2e3401fca767ed2b89d9a2b2`（v4.0.25）为第一父，28 条自有提交合并为 10 条功能提交，最终树与原 `a234bc66` 完全一致（tree `1b8d2021de963426949d5ed5e17123996ac2f384`）。`v0.0.4`–`v0.0.7` tag 保持原指向、未移动，因此不再位于重建后的 `ccs-dev` 祖先链上；整理前历史保留在 `backup/ccs-dev-before-reorg-20261103`，远程 `origin/ccs-dev` 当时仍为 `c5d3f2c9`，远程同步另按确认执行。详见[提交整理记录](../history/commit-reorganization.md)。
 
 2026-11-03 按用户授权执行 `git remote rename`：旧 `origin` → `upstream`、旧 `zhishu-git` → `origin`、旧 `zhishu-origin` → `gitlab`。fetch/push 地址不变，远程跟踪引用随改名迁移；本地分支、tag 和 HEAD 保持不变。本任务未 fetch、pull、push 或修改服务器配置。
 

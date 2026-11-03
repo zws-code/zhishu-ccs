@@ -2,6 +2,23 @@
 
 > 本页保留各次任务的执行结果和未验证项；测试数量、代码路径、分支状态及临时资料均属于当时快照。本次文档整理没有重跑这些历史测试。当前行为以 [代码基线](../development/baseline.md)、功能说明和源码为准。
 
+## ccs-dev 线性历史重建（2026-11-03）
+
+开发测试阶段按用户要求把 `ccs-dev` 自有提交由 28 条合并为 10 条功能提交：以 `a3eafa40`（v4.0.25）为第一父，整理前 HEAD `a234bc66`。整理后 `531c43b8`（test 提交）的 tree 与整理前及备份分支 `backup/ccs-dev-before-reorg-20261103` 同为 `1b8d2021`，无文件内容差异。本次只重排提交归属、不修改源码；已删除的密码登录/TOTP 与开发隔离启动器等返工不再出现在历史中。详见[提交整理记录](commit-reorganization.md)。
+
+| 本轮已执行检查 | 结果 |
+| --- | --- |
+| `git diff --quiet a234bc66 531c43b8`、两树 `git diff-tree --exit-code` | 无差异（tree `1b8d2021`） |
+| `git rev-list --count a3eafa40..531c43b8` | 10 条自有提交，无 merge 重放 |
+| `pnpm typecheck`、`pnpm format:check` | 通过 |
+| `pnpm test:unit` | 292 文件 / 3742 项通过 |
+| `cargo fmt --check`、`cargo clippy -- -D warnings` | 通过 |
+| `CC_SWITCH_TEST_HOME` 隔离下 `cargo test`（带 `no_proxy=127.0.0.1`） | 4820 通过、0 失败、11 忽略 |
+
+`proxy::error::tests::describe_reqwest_error_keeps_cause_and_drops_url` 在本机系统代理开启时失败：macOS 代理（127.0.0.1:6152）把回环请求代理成 503，不满足“连接被拒绝”的断言；加 `no_proxy` 后通过。整理前后源码相同，故该失败与本轮重排无关。
+
+未逐一构建中间提交，未启动桌面应用、真实 CLI 或真实 keyring；本地整理步骤未 force-push、未移动 tag 或其他分支。
+
 ## 合并上游 v4.0.25（2026-11-03）
 
 从干净产品 HEAD `1da9fa8b` 在独立同步分支合入官方 v4.0.25 / `a3eafa40`；联网获取并核验 tag，保留智枢 0.0.6、OAuth2、平台两阶段同步、WorkBuddy、配置历史及共存隔离。最高 L3，依据 [ADR-0011](../adr/ADR-0011-merge-4.0.25.md)，冲突、依赖和回退详见[同步报告](../upstream-sync/2026-11-03.md)。
