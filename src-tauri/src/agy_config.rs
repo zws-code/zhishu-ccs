@@ -454,8 +454,8 @@ pub(crate) fn remove_legacy_launcher() -> Result<bool, AppError> {
 mod legacy {
     use super::*;
 
-    pub(super) const WRAPPER_MARK: &str = "cc-switch-agy-wrapper";
-    pub(super) const PATH_MARK: &str = "cc-switch agy wrapper";
+    pub(super) const WRAPPER_MARK: &str = "zhishu-ccs-agy-wrapper";
+    pub(super) const PATH_MARK: &str = "zhishu-ccs agy wrapper";
 
     pub(super) fn remove(agy_dir: &Path, home: &Path) -> Result<bool, AppError> {
         let bin_dir = agy_dir.join("bin");
@@ -543,6 +543,25 @@ mod legacy {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn coexistence_keeps_upstream_legacy_launchers_and_shell_entries() {
+        let tmp = tempfile::tempdir().unwrap();
+        let agy = tmp.path().join("agy");
+        let home = tmp.path().join("home");
+        fs::create_dir_all(agy.join("bin")).unwrap();
+        fs::create_dir_all(&home).unwrap();
+        let wrapper = "#!/bin/sh\n# cc-switch-agy-wrapper\nexec agy\n";
+        let env = "# cc-switch agy wrapper\nGEMINI_API_KEY=fixture\n";
+        let profile = "# cc-switch agy wrapper\nexport PATH='/old/bin':\"$PATH\"\n";
+        fs::write(agy.join("bin/agy"), wrapper).unwrap();
+        fs::write(agy.join("env"), env).unwrap();
+        fs::write(home.join(".zshrc"), profile).unwrap();
+        assert!(!legacy::remove(&agy, &home).unwrap());
+        assert_eq!(fs::read_to_string(agy.join("bin/agy")).unwrap(), wrapper);
+        assert_eq!(fs::read_to_string(agy.join("env")).unwrap(), env);
+        assert_eq!(fs::read_to_string(home.join(".zshrc")).unwrap(), profile);
+    }
 
     fn projection(settings: Value) -> AgyProjection {
         AgyProjection::of(&settings)

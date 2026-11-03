@@ -320,3 +320,28 @@ CC_SWITCH_TEST_HOME="$(mktemp -d /tmp/zhishu-client-api.XXXXXX)" cargo test --of
 本次未运行全量前端/Rust 测试、构建、真实钥匙串、CLI 请求、安装升级或发布验收；旧记录中的“已执行”不属于本轮结果。保留用户原有 DSH 适配与验证内容、其他源码改动及 `out/`；未创建提交或推送。回退仅恢复本次文档位置/内容与提示引用，不涉及运行时数据。
 
 最终检查期间发现其他任务新增 ADR-0008 及多处前后端未提交修改。上表 27 份文档和 122 处链接包含工作区中的并行 ADR；本次提交仅整理原有 26 份文档，并行 ADR、索引条目及实现说明留在工作区，由对应任务提交。本次类型/脚本测试不作为并行实现的验证证据。
+
+
+## 2026-11-03 与原版 CC Switch 共存隔离（源码 0.0.6）
+
+用户场景：智枢与原版同时安装，共享 Codex 等 CLI 配置时不互相认领派生资源，也不由智枢后台覆盖原版配置。依据 [ADR-0009](../adr/ADR-0009-product-coexistence.md)，实现与升级边界见[共存说明](../development/coexistence.md)。复用现有 ProviderService、配置投影、原子发布/首写备份/pending、原生 Skills 校验和 S3/WebDAV 传输。L0/L1/L2/L3，补丁登记为 COEXIST-20261103-01～06；没有新增依赖、IPC、平台请求或凭据迁移。
+
+独立化模型文件、Codex live 路由、聚合 ID、Desktop profile、DSH 回执和新 MCP 节点、代理占位符与同步协议。后台归属记录保存路径、文件哈希及路由/认证字段的不可逆摘要；普通主题、MCP 等编辑不阻止安全分离，路由交接则撤销后台归属。后台发布拒绝在并发改写上强行重算；故障恢复继续按原 hash/pending 前滚并保留外部内容。旧资源与共享历史不批量迁移或删除。云端上传前验证来源，空目标以智枢标记支持部分上传重试，旧设置缺失 root 也保留旧默认语义并提示改独立目录。
+
+| 本次已执行检查 | 结果 |
+| --- | --- |
+| `pnpm typecheck` | 通过 |
+| `pnpm test:unit` | 288 个测试文件、3685 项通过 |
+| `pnpm build:renderer` | 通过；保留既有 chunk 大小提示 |
+| `pnpm test:dev-isolation` | 3 项通过 |
+| 修改的前端文件 Prettier | 通过，覆盖 AboutSection、WebdavSyncSection 及其修改的测试 |
+| `pnpm format:check` | 未通过：只提示本次未修改的 `src/App.tsx`；没有混入无关格式化修复 |
+| `cargo fmt --check --manifest-path src-tauri/Cargo.toml` | 通过 |
+| `CC_SWITCH_TEST_HOME=<临时目录> cargo test --manifest-path src-tauri/Cargo.toml` | 4740 项通过、0 失败、11 项按既有设置跳过；其中 Rust 单元测试 4525 项、golden 44 项 |
+| `cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings` | 通过 |
+| 金标 | 通过仓库 `CC_SWITCH_UPDATE_GOLDEN=1` 入口更新并审查 3 份，仅派生目录文件名/排序与导入行路由 ID 变化；MCP 原版 custom 夹具刻意保留 |
+| `git diff --check`、新增文档本地链接 | 通过 |
+
+首轮 Rust 测试受到沙箱禁止回环 bind 的限制，改在相同临时配置下允许本机模拟服务后重跑；最终结果以上表为准。迭代期间修复了旧行为断言、后台与用户主动代理地址修改的边界，以及 OAuth 回调连接复用导致的 `IncompleteMessage`。后续审查补充了同端口 Grok 旧占位符拒绝，以及显式官方历史统一随实际路由迁移/新旧账本限 ID 还原的回归；最终全套无失败。
+
+未执行：真实两款桌面应用同时运行、真实 CLI 请求/旧会话续聊、实际云端上传/旧快照恢复、系统 keyring、Windows/Linux 安装升级与正式打包发布。仅完成源码修复，不替换本机已安装的 0.0.6 客户端，不清理真实 Codex 旧目录文件或云对象。两款应用共同管理同一原生配置时，后续主动切换仍会改变当前供应商；Codex 浏览器 OAuth 的协议端口 1455 保留，被占用时需用户选择设备码或先结束另一处登录。

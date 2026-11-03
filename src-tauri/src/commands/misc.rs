@@ -79,7 +79,7 @@ pub async fn check_for_updates(handle: AppHandle) -> Result<bool, String> {
     handle
         .opener()
         .open_url(
-            "https://github.com/farion1231/cc-switch/releases/latest",
+            "https://github.com/zws-code/zhishu-ccs/releases/latest",
             None::<String>,
         )
         .map_err(|e| format!("打开更新页面失败: {e}"))?;
@@ -87,10 +87,9 @@ pub async fn check_for_updates(handle: AppHandle) -> Result<bool, String> {
     Ok(true)
 }
 
-/// 便携版新版本压缩包的下载地址，命名与 release.yml 的「Prepare Windows Assets」一致：
-/// `CC-Switch-v<版本>-Windows[-arm64]-Portable.zip`。版本号不像版本号时返回 None。
-fn portable_zip_url(version: &str, arm64: bool) -> Option<String> {
-    // TODO(zhishu): Replace upstream portable release URLs with Zhishu-hosted release assets.
+/// 旧便携更新 API 的兼容入口：智枢不发行便携包，转到自有版本安装包页面。
+fn portable_zip_url(version: &str, _arm64: bool) -> Option<String> {
+    // Zhishu distributes installers; retain the old API but open the own release page.
     let version = version.trim().trim_start_matches('v');
     let looks_like_version = version.starts_with(|c: char| c.is_ascii_digit())
         && version
@@ -99,9 +98,8 @@ fn portable_zip_url(version: &str, arm64: bool) -> Option<String> {
     if !looks_like_version {
         return None;
     }
-    let suffix = if arm64 { "-arm64" } else { "" };
     Some(format!(
-        "https://github.com/farion1231/cc-switch/releases/download/v{version}/CC-Switch-v{version}-Windows{suffix}-Portable.zip"
+        "https://github.com/zws-code/zhishu-ccs/releases/tag/v{version}"
     ))
 }
 
@@ -113,7 +111,7 @@ pub async fn open_portable_update_download(
     version: String,
 ) -> Result<bool, String> {
     let url = portable_zip_url(&version, cfg!(target_arch = "aarch64"))
-        .unwrap_or_else(|| "https://github.com/farion1231/cc-switch/releases/latest".to_string());
+        .unwrap_or_else(|| "https://github.com/zws-code/zhishu-ccs/releases/latest".to_string());
     handle
         .opener()
         .open_url(url, None::<String>)
@@ -6895,11 +6893,11 @@ mod tests {
     fn portable_zip_url_matches_release_asset_names() {
         assert_eq!(
             portable_zip_url("4.0.12", false).as_deref(),
-            Some("https://github.com/farion1231/cc-switch/releases/download/v4.0.12/CC-Switch-v4.0.12-Windows-Portable.zip")
+            Some("https://github.com/zws-code/zhishu-ccs/releases/tag/v4.0.12")
         );
         assert_eq!(
             portable_zip_url("v4.1.0-beta.1", true).as_deref(),
-            Some("https://github.com/farion1231/cc-switch/releases/download/v4.1.0-beta.1/CC-Switch-v4.1.0-beta.1-Windows-arm64-Portable.zip")
+            Some("https://github.com/zws-code/zhishu-ccs/releases/tag/v4.1.0-beta.1")
         );
         for bad in ["", "v", "latest", "4.0/../x", "4.0.0?x=1"] {
             assert!(portable_zip_url(bad, false).is_none(), "{bad}");
@@ -7503,7 +7501,7 @@ mod tests {
             "Kimi",
             vec![
                 "model_provider='custom'".to_string(),
-                "model_providers.custom={name='K',base_url='https://k.example/v1?a=1&b=2'}"
+                "model_providers.zhishu={name='K',base_url='https://k.example/v1?a=1&b=2'}"
                     .to_string(),
             ],
             vec![("CC_SWITCH_CODEX_API_KEY", Some("sk-kimi".to_string()))],
@@ -7517,7 +7515,7 @@ mod tests {
                 "-c",
                 "model_provider='custom'",
                 "-c",
-                "model_providers.custom={name='K',base_url='https://k.example/v1?a=1&b=2'}",
+                "model_providers.zhishu={name='K',base_url='https://k.example/v1?a=1&b=2'}",
                 "--dangerously-bypass-approvals-and-sandbox",
             ]
         );

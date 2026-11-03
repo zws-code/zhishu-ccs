@@ -824,8 +824,8 @@ fn import_refuses_live_config_under_proxy_takeover() {
     reset_test_fs();
     ensure_test_home();
 
-    // 接管态 Codex Live：auth 是 PROXY_MANAGED 占位符，不是用户真实配置
-    let auth = json!({"OPENAI_API_KEY": "PROXY_MANAGED"});
+    // 接管态 Codex Live：auth 是 ZHISHU_CCS_PROXY_MANAGED 占位符，不是用户真实配置
+    let auth = json!({"OPENAI_API_KEY": "ZHISHU_CCS_PROXY_MANAGED"});
     let config = r#"model = "gpt-5"
 "#;
     write_codex_live_atomic(&auth, Some(config)).expect("seed taken-over codex live");

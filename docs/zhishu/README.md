@@ -18,6 +18,8 @@
 | 上游同步 | [同步报告](upstream-sync/README.md) | 各次合并来源、冲突、验证与风险 |
 | 历史记录 | [验证记录](history/validation.md)、[提交整理映射](history/commit-reorganization.md) | 当时的测试结果、旧提交映射和恢复依据 |
 
+与原版共存的资源命名、升级、云同步及共享配置边界见[共存说明](development/coexistence.md)和 [ADR-0009](adr/ADR-0009-product-coexistence.md)。
+
 ## 当前代码入口
 
 以下路径均相对仓库根目录；Rust 路径包含完整的 `src-tauri/src/` 前缀。

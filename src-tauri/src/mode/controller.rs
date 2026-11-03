@@ -782,6 +782,15 @@ async fn enter_locked(
     stack_mode: Option<bool>,
     explicit_route: Option<Provider>,
 ) -> Result<(), String> {
+    if op_name == op::ENTER && *app == AppType::ClaudeDesktop {
+        let mut previous = current::mode_state(app);
+        if previous.mode.is_none() {
+            if let Some(card) = claude_desktop_config::legacy_mapping_card(&state.db) {
+                // Only the explicit handoff may adopt the old card's local state.
+                adopt_legacy_desktop_card(state, &mut previous, &card)?;
+            }
+        }
+    }
     if !state.proxy_service.is_running().await {
         state.proxy_service.start().await?;
     }
@@ -905,6 +914,28 @@ fn exit_locked(state: &AppState, app: &AppType, keep_mode: bool) -> Result<(), S
     if !keep_mode && !mode.is_proxy() && !mode.attached {
         log::debug!("[MODE] {} 已经是直连，不用退出", app.as_str());
         return Ok(());
+    }
+    if (mode.attached || mode.is_proxy())
+        && !crate::zhishu::coexistence::unchanged(&DeviceStore::for_device(), app.as_str())
+        && !state.proxy_service.live_is_our_proxy(app)
+    {
+        log::info!(
+            "[MODE] {} 配置已由外部管理，保留原生文件并分离智枢状态",
+            app.as_str()
+        );
+        return commit_state(
+            state,
+            app,
+            &PendingTarget::mode(ModeState {
+                mode: if keep_mode {
+                    mode.mode
+                } else {
+                    Some(Mode::Direct)
+                },
+                attached: false,
+                ..mode
+            }),
+        );
     }
     let op_name = if keep_mode { op::DETACH } else { op::EXIT };
     let was_stack = settled_stack(app).is_ok_and(|stack| stack.enabled);
@@ -1614,6 +1645,11 @@ pub async fn check_codex_official_models(state: &AppState) {
 
 /// 预测登录可能读钥匙串、刷新要跑子进程和联网：整个放到阻塞线程池里。
 async fn refresh_codex_official_models(state: &AppState) {
+    if !crate::zhishu::coexistence::unchanged(&DeviceStore::for_device(), "codex")
+        && !state.proxy_service.live_is_our_proxy(&AppType::Codex)
+    {
+        return;
+    }
     let state = state.clone();
     let _ = codex_direct::off_runtime(move || {
         let login = match codex_official_login_now(&state, &AppType::Codex) {
@@ -1641,7 +1677,25 @@ pub async fn resync_codex_if_behind(state: &AppState) {
     if !codex_official_models::take_client_behind() {
         return;
     }
-    if let Err(error) = resync_route(state, &AppType::Codex).await {
+    if !crate::zhishu::coexistence::unchanged(&DeviceStore::for_device(), "codex")
+        && !state.proxy_service.live_is_our_proxy(&AppType::Codex)
+    {
+        codex_official_models::mark_client_behind();
+        return;
+    }
+    let result = async {
+        let app = AppType::Codex;
+        let _guard = lock_settled(state, &app).await.map_err(err)?;
+        let Some((mode, route)) = attached_route(state, &app)? else {
+            return Ok(());
+        };
+        let live_now = LiveNow::of(state, &app, &mode)?;
+        write_proxy(state, &app, op::ATTACH, &route, &live_now, mode, None)
+            .await
+            .map(|_| ())
+    }
+    .await;
+    if let Err(error) = result {
         codex_official_models::mark_client_behind();
         log::warn!("Codex 官方模型列表更新后重写客户端文件失败，下次检查再试: {error}");
     }
@@ -1759,6 +1813,38 @@ pub async fn startup(state: &AppState) {
 }
 
 async fn startup_app(state: &AppState, app: &AppType) -> Result<(), String> {
+    if !crate::zhishu::coexistence::unchanged(&DeviceStore::for_device(), app.as_str())
+        && !state.proxy_service.live_is_our_proxy(app)
+    {
+        // A stored mode or legacy placeholder cannot claim another manager's files.
+        // Explicit switch/enter operations establish ownership through the writer.
+        log::info!(
+            "[MODE] {} 无可验证的智枢配置归属，启动时保留当前文件",
+            app.as_str()
+        );
+        let mode = current::mode_state(app);
+        if mode.is_proxy() {
+            commit_state(
+                state,
+                app,
+                &PendingTarget::mode(ModeState {
+                    attached: false,
+                    ..mode
+                }),
+            )?;
+            startup_attach_failures().lock().unwrap_or_else(|e| e.into_inner())
+                .push(StartupAttachFailure {
+                    app_type: app.as_str().to_string(),
+                    stack: settled_stack(app).is_ok_and(|s| s.enabled),
+                    error: AppError::localized(
+                        "mode.external_owner",
+                        "当前工具配置可能由其他应用管理，已保留。请主动选择智枢供应商或重新接入路由",
+                        "The current tool configuration may be managed by another application and was preserved. Select a Zhishu provider or reconnect routing explicitly.",
+                    ).to_string(),
+                });
+        }
+        return Ok(());
+    }
     let had_backup = drain_legacy_backup(state, app).await;
     let mut mode = current::mode_state(app);
     // 新版自己接上时写的占位符不算遗留物（比如重启更新时没来得及分离）。
@@ -2713,6 +2799,99 @@ mod mode_tests {
 }
 "#;
 
+    #[tokio::test]
+    #[serial]
+    async fn coexistence_startup_preserves_an_upstream_proxy_without_receipt() {
+        let _home = Home::new();
+        let foreign = r#"{"env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:15721","ANTHROPIC_AUTH_TOKEN":"PROXY_MANAGED"},"hooks":{"Stop":[]}}"#;
+        seed_settings(foreign);
+        let state = state_with(
+            AppType::Claude,
+            &[claude("a", "https://a.example", json!({}))],
+            "a",
+        )
+        .await;
+        state
+            .db
+            .set_proxy_flags_sync("claude", true, false)
+            .unwrap();
+        startup(&state).await;
+        assert_eq!(fs::read_to_string(settings_path()).unwrap(), foreign);
+        assert!(!state.proxy_service.is_running().await);
+        assert!(!mode(&AppType::Claude).attached);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn coexistence_detach_and_startup_preserve_external_handoff() {
+        let _home = Home::new();
+        seed_settings(USER_SETTINGS);
+        let state = state_with(
+            AppType::Claude,
+            &[claude("a", "https://a.example", json!({}))],
+            "a",
+        )
+        .await;
+        enter(&state, &AppType::Claude, false).await.unwrap();
+        let foreign = r#"{"env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:15721","ANTHROPIC_AUTH_TOKEN":"PROXY_MANAGED"},"theme":"user"}"#;
+        seed_settings(foreign);
+        detach_all(&state).await;
+        assert_eq!(fs::read_to_string(settings_path()).unwrap(), foreign);
+        startup(&state).await;
+        assert_eq!(fs::read_to_string(settings_path()).unwrap(), foreign);
+        assert!(!mode(&AppType::Claude).attached);
+        // The user's explicit handoff remains available and restores ownership.
+        enter(&state, &AppType::Claude, false).await.unwrap();
+        assert_eq!(settings()["theme"], "user");
+        detach_all(&state).await;
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn coexistence_unrelated_user_edits_still_allow_safe_detach() {
+        let _home = Home::new();
+        seed_settings(USER_SETTINGS);
+        let state = state_with(
+            AppType::Claude,
+            &[claude("a", "https://a.example", json!({}))],
+            "a",
+        )
+        .await;
+        enter(&state, &AppType::Claude, false).await.unwrap();
+        let mut changed = settings();
+        changed["theme"] = json!("user");
+        changed["mcpServers"] = json!({"user":{"command":"user-server"}});
+        seed_settings(&changed.to_string());
+        detach_all(&state).await;
+        assert!(!mode(&AppType::Claude).attached);
+        assert_ne!(
+            settings()["env"]["ANTHROPIC_AUTH_TOKEN"],
+            PROXY_TOKEN_PLACEHOLDER
+        );
+        assert_eq!(settings()["theme"], "user");
+        assert_eq!(settings()["mcpServers"], changed["mcpServers"]);
+        assert!(!state.proxy_service.is_running().await);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn coexistence_grok_requires_our_token_even_on_the_same_port() {
+        let _home = Home::new();
+        let state = state_with(AppType::GrokBuild, &[grok_row("a", "relay", "")], "a").await;
+        state
+            .db
+            .update_proxy_config(ProxyConfig::default())
+            .await
+            .unwrap();
+        for token in ["PROXY_MANAGED", PROXY_TOKEN_PLACEHOLDER] {
+            seed_grok(&format!("[models]\ndefault = \"relay\"\n[model.relay]\nname = \"Relay\"\nmodel = \"grok-4.5\"\nbase_url = \"http://127.0.0.1:25721/v1\"\napi_key = \"{token}\"\napi_backend = \"responses\"\ncontext_window = 500000\n"));
+            assert_eq!(
+                state.proxy_service.live_is_our_proxy(&AppType::GrokBuild),
+                token == PROXY_TOKEN_PLACEHOLDER
+            );
+        }
+    }
+
     /// 回到直连后：值和用户的原文件相同；非关键字段的顺序不变（关键字段可能挪到末尾）。
     fn assert_back_to_user_settings() {
         let original: Value = serde_json::from_str(USER_SETTINGS).unwrap();
@@ -3216,7 +3395,7 @@ mod mode_tests {
         for enabled in [true, false] {
             let home = Home::new();
             seed_settings(
-                r#"{"env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:15721","ANTHROPIC_AUTH_TOKEN":"PROXY_MANAGED"},"hooks":{}}"#,
+                r#"{"env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:15721","ANTHROPIC_AUTH_TOKEN":"ZHISHU_CCS_PROXY_MANAGED"},"hooks":{}}"#,
             );
             let state = state_with(
                 AppType::Claude,
@@ -3236,6 +3415,13 @@ mod mode_tests {
                 .db
                 .set_proxy_flags_sync("claude", enabled, false)
                 .unwrap();
+            // A generic legacy marker alone is no longer adoption evidence.
+            crate::zhishu::coexistence::record(
+                &DeviceStore::for_device(),
+                "claude",
+                &[settings_path()],
+            )
+            .unwrap();
 
             startup(&state).await;
 
@@ -3296,13 +3482,13 @@ mod mode_tests {
         assert_eq!(
             fs::read_to_string(&env_path).unwrap(),
             format!(
-                "# my notes\nGEMINI_SANDBOX=true\nGEMINI_API_KEY=PROXY_MANAGED\nGOOGLE_GEMINI_BASE_URL={proxy_url}\n"
+                "# my notes\nGEMINI_SANDBOX=true\nGEMINI_API_KEY=ZHISHU_CCS_PROXY_MANAGED\nGOOGLE_GEMINI_BASE_URL={proxy_url}\n"
             )
         );
         exit(&state, &AppType::Gemini).await.expect("exit");
         let text = fs::read_to_string(&env_path).unwrap();
         assert!(text.contains("GEMINI_API_KEY=real-key"), "{text}");
-        assert!(!text.contains("PROXY_MANAGED"), "{text}");
+        assert!(!text.contains("ZHISHU_CCS_PROXY_MANAGED"), "{text}");
     }
 
     /// 代理换了端口：一个应用重写失败（配置文件解析不了），其余接上代理的应用照样按新
@@ -3434,7 +3620,7 @@ mod mode_tests {
             "Relay".to_string(),
             json!({
                 "auth": { "OPENAI_API_KEY": "sk-relay" },
-                "config": "model_provider = \"custom\"\nmodel = \"gpt-5.4\"\n\n[model_providers.custom]\nname = \"custom\"\nbase_url = \"https://relay.example/v1\"\nwire_api = \"responses\"\n"
+                "config": "model_provider = \"zhishu\"\nmodel = \"gpt-5.4\"\n\n[model_providers.zhishu]\nname = \"custom\"\nbase_url = \"https://relay.example/v1\"\nwire_api = \"responses\"\n"
             }),
             None,
         );
@@ -3493,7 +3679,7 @@ mod mode_tests {
             .proxy_service
             .live_has_proxy_placeholder(&AppType::Codex));
         // 第三方路由留下的 custom 表改成休眠形态：指向本地代理、只有占位 Key。
-        let dormant = &doc["model_providers"]["custom"];
+        let dormant = &doc["model_providers"]["zhishu"];
         assert_eq!(
             dormant["experimental_bearer_token"].as_str(),
             Some(PROXY_TOKEN_PLACEHOLDER)
@@ -3559,7 +3745,7 @@ mod mode_tests {
                     .map(str::to_string)
             };
             let bucket = if unified {
-                Some("custom".to_string())
+                Some("zhishu".to_string())
             } else {
                 None
             };
@@ -3571,7 +3757,7 @@ mod mode_tests {
             let doc: toml::Table = toml::from_str(&contract).unwrap();
             if unified {
                 assert!(doc.get("openai_base_url").is_none(), "{contract}");
-                let mirror = &doc["model_providers"]["custom"];
+                let mirror = &doc["model_providers"]["zhishu"];
                 assert_eq!(mirror["name"].as_str(), Some("OpenAI"));
                 assert_eq!(mirror["requires_openai_auth"].as_bool(), Some(true));
                 assert_eq!(mirror["supports_websockets"].as_bool(), Some(false));
@@ -3683,7 +3869,7 @@ mod mode_tests {
     /// live 里 A 的关键字段之外，都是用户和 Codex 自己的东西。
     const CODEX_USER_LIVE: &str = r#"# 用户的注释
 approval_policy = "on-request"
-model_provider = "custom"
+model_provider = "zhishu"
 model = "gpt-a"
 model_context_window = 200000
 
@@ -3694,7 +3880,7 @@ trust_level = "trusted"
 default_subagent_model = "gpt-a-mini"
 max_threads = 4
 
-[model_providers.custom]
+[model_providers.zhishu]
 name = "a"
 base_url = "https://a.example/v1"
 wire_api = "responses"
@@ -3745,9 +3931,9 @@ command = "fs-server"
         ProviderService::switch(&state, AppType::Codex, "b").expect("switch to b");
         let on_b = codex_text();
         let doc = codex_doc();
-        assert_eq!(doc["model_provider"].as_str(), Some("custom"));
+        assert_eq!(doc["model_provider"].as_str(), Some("zhishu"));
         assert_eq!(doc["model"].as_str(), Some("gpt-b"));
-        let route = &doc["model_providers"]["custom"];
+        let route = &doc["model_providers"]["zhishu"];
         assert_eq!(route["base_url"].as_str(), Some("https://b.example/v1"));
         assert_eq!(route["experimental_bearer_token"].as_str(), Some("sk-b"));
         assert!(!on_b.contains("sk-a"), "A's key is gone: {on_b}");
@@ -3868,7 +4054,7 @@ command = "fs-server"
         let text = codex_text();
         let doc = codex_doc();
         assert!(doc.get("model_provider").is_none(), "{text}");
-        let dormant = &doc["model_providers"]["custom"];
+        let dormant = &doc["model_providers"]["zhishu"];
         assert_eq!(
             dormant["base_url"].as_str(),
             Some("http://127.0.0.1:25721/v1"),
@@ -3973,7 +4159,7 @@ base_url = "https://c.example/v1"
 [model_providers.deepseek]
 name = "deepseek"
 base_url = "http://127.0.0.1:15721/v1"
-experimental_bearer_token = "PROXY_MANAGED"
+experimental_bearer_token = "ZHISHU_CCS_PROXY_MANAGED"
 
 [model_providers.ollama_local]
 name = "Ollama"
@@ -3990,7 +4176,10 @@ model_provider = "c"
         ProviderService::switch(&state, AppType::Codex, "b").expect("switch to b");
         let text = codex_text();
         let providers = codex_doc()["model_providers"].as_table().unwrap().clone();
-        assert!(!providers.contains_key("a"), "provably ours: {text}");
+        assert!(
+            providers.contains_key("a"),
+            "unmarked external table is preserved: {text}"
+        );
         assert!(
             !providers.contains_key("deepseek"),
             "placeholder leftover: {text}"
@@ -4004,7 +4193,10 @@ model_provider = "c"
             providers.contains_key("ollama_local"),
             "the user's own table"
         );
-        assert!(!text.contains("sk-a"), "{text}");
+        assert!(
+            text.contains("sk-a"),
+            "the external table remains byte-for-byte owned externally: {text}"
+        );
     }
 
     #[tokio::test]
@@ -4121,7 +4313,7 @@ model_provider = "c"
             "detaching keeps the login"
         );
         assert_eq!(
-            codex_doc()["model_providers"]["custom"]["requires_openai_auth"].as_bool(),
+            codex_doc()["model_providers"]["zhishu"]["requires_openai_auth"].as_bool(),
             Some(true),
             "Codex sees the login it keeps"
         );
@@ -4156,7 +4348,7 @@ model_provider = "c"
         enter(&state, &AppType::Codex, false).await.expect("enter");
         assert_eq!(codex_login_file(), Some(chatgpt_login("acct")));
         assert_eq!(
-            codex_doc()["model_providers"]["custom"]["requires_openai_auth"].as_bool(),
+            codex_doc()["model_providers"]["zhishu"]["requires_openai_auth"].as_bool(),
             Some(true)
         );
 
@@ -4378,7 +4570,7 @@ model_provider = "c"
             ProviderService::switch(&state, AppType::Codex, "b").expect("to b");
             let doc = codex_doc();
             assert_eq!(
-                doc["model_providers"]["custom"]["requires_openai_auth"].as_bool(),
+                doc["model_providers"]["zhishu"]["requires_openai_auth"].as_bool(),
                 Some(preserve),
                 "the login lives in the keyring, auth.json says nothing (preserve={preserve})"
             );
@@ -4666,7 +4858,7 @@ model_provider = "c"
             "model = \"gpt-a\"\nmodel_verbosity = \"high\"\n",
         );
         seed_codex(
-            &format!("profile = \"work\"\n{live}\n[profiles.work]\nmodel_provider = \"custom\"\n"),
+            &format!("profile = \"work\"\n{live}\n[profiles.work]\nmodel_provider = \"zhishu\"\n"),
             None,
         );
         let state = state_with(AppType::Codex, &codex_a_b(), "a").await;
@@ -4701,7 +4893,7 @@ model_provider = "c"
         );
         assert_eq!(
             doc["profiles"]["work"]["model_provider"].as_str(),
-            Some("custom")
+            Some("zhishu")
         );
         let stored = state.db.get_provider_by_id("a", "codex").unwrap().unwrap();
         assert!(!stored.settings_config["config"]
@@ -4825,15 +5017,15 @@ model_provider = "c"
         let view = ProviderService::editor_view(&state, AppType::Codex, &row.settings_config, None)
             .expect("view a");
         let shown = view.settings["config"].as_str().unwrap();
-        assert!(shown.contains("[model_providers.custom]\n"), "{shown}");
+        assert!(shown.contains("[model_providers.zhishu]\n"), "{shown}");
         let mut edited = view.settings.clone();
         edited["config"] = json!(shown
             .replace(
-                "model_provider = \"custom\"",
+                "model_provider = \"zhishu\"",
                 "model_provider = \"deepseek\""
             )
             .replace(
-                "[model_providers.custom]\n",
+                "[model_providers.zhishu]\n",
                 "[model_providers.deepseek]\nexperimental_bearer_token = \"sk-secret\"\n",
             ));
         row.settings_config = edited;
@@ -5063,7 +5255,10 @@ model_provider = "c"
         enter(&state, &AppType::Gemini, false).await.expect("enter");
         let proxy_url = state.proxy_service.build_proxy_urls().await.unwrap().0;
         let env = gemini_env();
-        assert!(env.contains("GEMINI_API_KEY=PROXY_MANAGED"), "{env}");
+        assert!(
+            env.contains("GEMINI_API_KEY=ZHISHU_CCS_PROXY_MANAGED"),
+            "{env}"
+        );
         assert!(
             env.contains(&format!("GOOGLE_GEMINI_BASE_URL={proxy_url}")),
             "{env}"
@@ -5788,7 +5983,7 @@ model_provider = "c"
         assert_eq!(stack_state().members, vec!["a"]);
         assert_eq!(
             picker(),
-            Some(vec!["ccs-claude-a--claude-sonnet-4-6".to_string()])
+            Some(vec!["zccs-claude-a--claude-sonnet-4-6".to_string()])
         );
         let options = &settings()[CLAUDE_MODEL_PICKER]["options"][0];
         assert_eq!(options["label"], "claude-sonnet-4-6（A）");
@@ -5798,7 +5993,7 @@ model_provider = "c"
         for role in ["HAIKU", "SONNET", "OPUS", "FABLE"] {
             assert_eq!(
                 env[format!("ANTHROPIC_DEFAULT_{role}_MODEL")],
-                "ccs-claude-a--claude-sonnet-4-6",
+                "zccs-claude-a--claude-sonnet-4-6",
                 "{role}"
             );
             assert_eq!(
@@ -5810,21 +6005,21 @@ model_provider = "c"
         let views = set_member(&state, "kimi", true).await;
         assert_eq!(views.len(), 2);
         assert!(views[0].route);
-        assert_eq!(views[0].model_ids, vec!["ccs-claude-a--claude-sonnet-4-6"]);
+        assert_eq!(views[0].model_ids, vec!["zccs-claude-a--claude-sonnet-4-6"]);
         assert_eq!(stack_state().key_of("kimi"), Some("kimi"));
-        assert_eq!(views[1].model_ids, vec!["ccs-claude-kimi--kimi-k3"]);
+        assert_eq!(views[1].model_ids, vec!["zccs-claude-kimi--kimi-k3"]);
         assert_eq!(
             picker(),
             Some(vec![
-                "ccs-claude-a--claude-sonnet-4-6".to_string(),
-                "ccs-claude-kimi--kimi-k3".to_string(),
+                "zccs-claude-a--claude-sonnet-4-6".to_string(),
+                "zccs-claude-kimi--kimi-k3".to_string(),
             ])
         );
         let env = settings()["env"].clone();
         assert_eq!(env[CLAUDE_MAX_CONTEXT_ENV], "128000");
         assert_eq!(
             env["ANTHROPIC_DEFAULT_SONNET_MODEL"],
-            "ccs-claude-a--claude-sonnet-4-6"
+            "zccs-claude-a--claude-sonnet-4-6"
         );
         assert_eq!(
             mode(&AppType::Claude).contract.unwrap().exclusive[CLAUDE_MAX_CONTEXT_ENV],
@@ -5838,8 +6033,8 @@ model_provider = "c"
         assert_eq!(
             picker(),
             Some(vec![
-                "ccs-claude-a--claude-sonnet-4-6".to_string(),
-                "ccs-claude-zhipu--glm-5.2[1M]".to_string(),
+                "zccs-claude-a--claude-sonnet-4-6".to_string(),
+                "zccs-claude-zhipu--glm-5.2[1M]".to_string(),
             ])
         );
         let env = settings()["env"].clone();
@@ -5892,7 +6087,7 @@ model_provider = "c"
         enter(&state, &AppType::Claude, true).await.expect("enter");
         assert_eq!(
             picker(),
-            Some(vec!["ccs-claude-a--claude-sonnet-4-6".to_string()])
+            Some(vec!["zccs-claude-a--claude-sonnet-4-6".to_string()])
         );
 
         exit(&state, &AppType::Claude).await.expect("exit");
@@ -5951,7 +6146,7 @@ model_provider = "c"
         assert_eq!(env[CLAUDE_MAX_CONTEXT_ENV], "128000");
         assert_eq!(
             env["ANTHROPIC_DEFAULT_OPUS_MODEL"],
-            "ccs-claude-kimi--kimi-k3"
+            "zccs-claude-kimi--kimi-k3"
         );
         assert_eq!(env["ANTHROPIC_DEFAULT_OPUS_MODEL_NAME"], "kimi-k3");
         let views = stack_views(&state, &AppType::Claude).unwrap().members;
@@ -6112,18 +6307,18 @@ model_provider = "c"
         let env = settings()["env"].clone();
         assert_eq!(
             env["ANTHROPIC_DEFAULT_SONNET_MODEL"],
-            "ccs-claude-zhipu--glm-5.2[1M]"
+            "zccs-claude-zhipu--glm-5.2[1M]"
         );
         assert_eq!(
             env["ANTHROPIC_DEFAULT_HAIKU_MODEL"],
-            "ccs-claude-zhipu--glm-5.2[1M]"
+            "zccs-claude-zhipu--glm-5.2[1M]"
         );
         let with_a = settings();
         set_member(&state, "a", false).await;
         assert_eq!(stack_state().members, vec!["zhipu"]);
         assert_eq!(
             picker(),
-            Some(vec!["ccs-claude-zhipu--glm-5.2[1M]".to_string()])
+            Some(vec!["zccs-claude-zhipu--glm-5.2[1M]".to_string()])
         );
         let env = settings()["env"].clone();
         assert_eq!(env, with_a["env"], "a is not the default any more");
@@ -6477,7 +6672,7 @@ model_provider = "c"
         let stacked = &models[1];
         assert!(stacked["name"]
             .as_str()
-            .is_some_and(|id| id.starts_with("claude-fable-ccs-")));
+            .is_some_and(|id| id.starts_with("claude-fable-zccs-")));
         assert_eq!(stacked["labelOverride"], json!("OTHER / glm-5.2"));
         assert_eq!(profile["modelDiscoveryEnabled"], json!(false));
 
@@ -6537,6 +6732,13 @@ model_provider = "c"
         crate::settings::set_current_provider(&desktop, Some("map")).expect("desktop current");
 
         startup(&state).await;
+        assert!(
+            !current::mode_state(&desktop).attached,
+            "unknown profile must not be adopted at startup"
+        );
+        enter_with_route(&state, &desktop, false, Some("map"))
+            .await
+            .unwrap();
 
         let mode = current::mode_state(&desktop);
         assert!(mode.is_proxy() && mode.attached);
@@ -6894,7 +7096,7 @@ model_provider = "c"
         let env = settings()["env"].clone();
         assert_eq!(
             picker(),
-            Some(vec!["ccs-claude-a--claude-sonnet-4-6".to_string()]),
+            Some(vec!["zccs-claude-a--claude-sonnet-4-6".to_string()]),
             "a still publishes"
         );
         assert!(env.get(CLAUDE_MAX_CONTEXT_ENV).is_none(), "{env}");
@@ -6917,7 +7119,7 @@ model_provider = "c"
         enter(&state, &AppType::Claude, true).await.expect("enter");
         let mapped_contract = mode(&AppType::Claude).contract.unwrap();
         let sonnet = || settings()["env"]["ANTHROPIC_DEFAULT_SONNET_MODEL"].clone();
-        assert_eq!(sonnet(), "ccs-claude-a--claude-sonnet-4-6");
+        assert_eq!(sonnet(), "zccs-claude-a--claude-sonnet-4-6");
 
         // 配了列表：整张照常发布，第一个占四档。
         let mut a = state.db.get_provider_by_id("a", "claude").unwrap().unwrap();
@@ -6930,9 +7132,12 @@ model_provider = "c"
         assert!(views[0].route);
         assert_eq!(
             views[0].model_ids,
-            vec!["ccs-claude-a--a-vision", "ccs-claude-a--claude-sonnet-4-6"]
+            vec![
+                "zccs-claude-a--a-vision",
+                "zccs-claude-a--claude-sonnet-4-6"
+            ]
         );
-        assert_eq!(sonnet(), "ccs-claude-a--a-vision");
+        assert_eq!(sonnet(), "zccs-claude-a--a-vision");
         assert_eq!(
             settings()["env"]["ANTHROPIC_DEFAULT_HAIKU_MODEL_NAME"],
             "A Vision"
@@ -6947,14 +7152,14 @@ model_provider = "c"
             .unwrap()
             .reverse();
         ProviderService::update(&state, AppType::Claude, None, a.clone()).expect("reorder a");
-        assert_eq!(sonnet(), "ccs-claude-a--claude-sonnet-4-6");
+        assert_eq!(sonnet(), "zccs-claude-a--claude-sonnet-4-6");
 
         // 用户清空了列表：什么都不发布，四档回到路由契约的写法。
         a.meta.as_mut().unwrap().stack_models = Some(Vec::new());
         ProviderService::update(&state, AppType::Claude, None, a.clone()).expect("clear a");
         let views = stack_views(&state, &AppType::Claude).unwrap().members;
         assert!(views[0].model_ids.is_empty());
-        assert!(!sonnet().as_str().unwrap().starts_with("ccs-claude-"));
+        assert!(!sonnet().as_str().unwrap().starts_with("zccs-claude-"));
 
         // 没配列表：回到按映射发布，第一个是 `ANTHROPIC_MODEL`。
         a.meta.as_mut().unwrap().stack_models = None;
@@ -7052,11 +7257,11 @@ model_provider = "c"
                 .expect("enter proxy");
             let check = |published_stack: bool| {
                 let doc = codex_doc();
-                assert_eq!(doc["model_provider"].as_str(), Some("custom"));
-                let proxy = &doc["model_providers"]["custom"];
+                assert_eq!(doc["model_provider"].as_str(), Some("zhishu"));
+                let proxy = &doc["model_providers"]["zhishu"];
                 assert_eq!(
                     proxy["name"].as_str(),
-                    Some(if name == "OpenAI" { "OpenAI" } else { "custom" })
+                    Some(if name == "OpenAI" { "OpenAI" } else { "zhishu" })
                 );
                 assert_eq!(
                     proxy
@@ -7132,8 +7337,8 @@ model_provider = "c"
                 .await
                 .unwrap();
             let doc = codex_doc();
-            let proxy = &doc["model_providers"]["custom"];
-            assert_eq!(proxy["name"].as_str(), Some("custom"));
+            let proxy = &doc["model_providers"]["zhishu"];
+            assert_eq!(proxy["name"].as_str(), Some("zhishu"));
             assert!(proxy.get("capabilities").is_none());
             assert!(proxy.get("stream_max_retries").is_none());
             assert!(proxy.get("stream_idle_timeout_ms").is_none());
@@ -7172,7 +7377,7 @@ model_provider = "c"
         // 默认那家（a）在名单最前面，不发布。
         let views = set_codex_member(&state, "deepseek", true).await;
         assert!(views[0].route);
-        assert_eq!(views[1].model_ids, vec!["ccs-deepseek/deepseek-v4-pro"]);
+        assert_eq!(views[1].model_ids, vec!["zccs-deepseek/deepseek-v4-pro"]);
         let doc = codex_doc();
         assert_eq!(
             doc["model"].as_str(),
@@ -7193,17 +7398,17 @@ model_provider = "c"
         let catalog = codex_catalog();
         let models = catalog["models"].as_array().unwrap();
         let slugs: Vec<&str> = models.iter().map(|m| m["slug"].as_str().unwrap()).collect();
-        assert_eq!(slugs, vec!["gpt-a", "ccs-deepseek/deepseek-v4-pro"]);
+        assert_eq!(slugs, vec!["gpt-a", "zccs-deepseek/deepseek-v4-pro"]);
         let (route, stacked) = (&models[0], &models[1]);
         assert_eq!(route["priority"], 1);
         assert_eq!(route["context_window"], 200000);
         assert_eq!(route["auto_compact_token_limit"], 150000);
         // 第三方路由那家的行和 Stack 行同一个值，互相切换不会先用上一家压缩（#8485）。
-        assert_eq!(route["comp_hash"], "cc-switch");
+        assert_eq!(route["comp_hash"], "zhishu-ccs");
         assert_eq!(stacked["priority"], 2);
         assert_eq!(stacked["display_name"], "DeepSeek V4 Pro（DEEPSEEK）");
         // DeepSeek 官方目录的 "3000" 不带过来，窗口按它自己的行算。
-        assert_eq!(stacked["comp_hash"], "cc-switch");
+        assert_eq!(stacked["comp_hash"], "zhishu-ccs");
         let window = stacked["context_window"].as_u64().unwrap();
         assert_eq!(
             stacked["auto_compact_token_limit"].as_u64(),
@@ -7212,7 +7417,7 @@ model_provider = "c"
 
         // 没有配置模型目录的行只发布它的 `model`。
         let views = set_codex_member(&state, "zhipu", true).await;
-        assert_eq!(views[2].model_ids, vec!["ccs-zhipu/gpt-zhipu"]);
+        assert_eq!(views[2].model_ids, vec!["zccs-zhipu/gpt-zhipu"]);
         let slugs: Vec<String> = codex_catalog()["models"]
             .as_array()
             .unwrap()
@@ -7223,8 +7428,8 @@ model_provider = "c"
             slugs,
             vec![
                 "gpt-a",
-                "ccs-deepseek/deepseek-v4-pro",
-                "ccs-zhipu/gpt-zhipu"
+                "zccs-deepseek/deepseek-v4-pro",
+                "zccs-zhipu/gpt-zhipu"
             ]
         );
 
@@ -7276,7 +7481,7 @@ model_provider = "c"
             if stacked {
                 let gemini = models
                     .iter()
-                    .find(|model| model["slug"] == "ccs-gemini/gemini-3.8-flash-high")
+                    .find(|model| model["slug"] == "zccs-gemini/gemini-3.8-flash-high")
                     .unwrap();
                 assert_eq!(gemini["context_window"], 272_000);
                 assert_eq!(gemini["auto_compact_token_limit"], 244_800);
@@ -7381,7 +7586,7 @@ model_provider = "c"
         );
 
         // 还没进 Stack：设置只存着，不碰客户端文件。
-        set_stack_subagent(Some("ccs-deepseek/deepseek-v4-pro"), None);
+        set_stack_subagent(Some("zccs-deepseek/deepseek-v4-pro"), None);
         let before = codex_text();
         resync_codex_stack_catalog(&state).await.expect("no-op");
         assert_eq!(codex_text(), before);
@@ -7401,15 +7606,15 @@ model_provider = "c"
         assert_eq!(
             ids,
             vec![
-                "ccs-a/gpt-a",
-                "ccs-deepseek/deepseek-v4-pro",
-                "ccs-zhipu/gpt-zhipu"
+                "zccs-a/gpt-a",
+                "zccs-deepseek/deepseek-v4-pro",
+                "zccs-zhipu/gpt-zhipu"
             ]
         );
         assert_eq!(all[0].provider_id, "a");
         let choices: Vec<_> = all.into_iter().filter(|c| c.provider_id != "a").collect();
         // 默认那家的 `ccs-*` 不在合并目录里：选了也不写，跟随主模型。
-        set_stack_subagent(Some("ccs-a/gpt-a"), None);
+        set_stack_subagent(Some("zccs-a/gpt-a"), None);
         resync_codex_stack_catalog(&state)
             .await
             .expect("route model");
@@ -7501,7 +7706,7 @@ model_provider = "c"
         let state = state_with(AppType::Codex, &[route, deepseek, zhipu], "a").await;
 
         // 还没进 Stack：设置只存着，不碰客户端文件。
-        set_stack_auto_review(Some("ccs-deepseek/deepseek-v4-pro"));
+        set_stack_auto_review(Some("zccs-deepseek/deepseek-v4-pro"));
         let before = codex_text();
         resync_codex_stack_catalog(&state).await.expect("no-op");
         assert_eq!(codex_text(), before);
@@ -7518,13 +7723,13 @@ model_provider = "c"
         set_codex_member(&state, "deepseek", true).await;
         assert_eq!(catalog_auto_review(), vec![None; 3]);
 
-        let id = "ccs-deepseek/deepseek-v4-pro";
+        let id = "zccs-deepseek/deepseek-v4-pro";
         set_stack_auto_review(Some(id));
         resync_codex_stack_catalog(&state).await.expect("set");
         assert_eq!(catalog_auto_review(), vec![Some(id.to_string()); 3]);
 
         // 默认那家的 `ccs-*` 不在合并目录里：不写。
-        set_stack_auto_review(Some("ccs-a/gpt-a"));
+        set_stack_auto_review(Some("zccs-a/gpt-a"));
         resync_codex_stack_catalog(&state).await.expect("route id");
         assert_eq!(catalog_auto_review(), vec![None; 3]);
 
@@ -7986,7 +8191,7 @@ model_provider = "c"
             .map(|m| m["slug"].as_str().unwrap().to_string())
             .collect();
         assert!(
-            slugs.contains(&"ccs-deepseek/deepseek-v4-pro".to_string()),
+            slugs.contains(&"zccs-deepseek/deepseek-v4-pro".to_string()),
             "{slugs:?}"
         );
         assert_eq!(stack_views(&state, &AppType::Codex).unwrap().notice, None);
@@ -8109,7 +8314,7 @@ model_provider = "c"
             .iter()
             .map(|m| m["slug"].as_str().unwrap().to_string())
             .collect();
-        assert_eq!(slugs, vec!["gpt-a", "ccs-deepseek/deepseek-v5"]);
+        assert_eq!(slugs, vec!["gpt-a", "zccs-deepseek/deepseek-v5"]);
     }
 
     /// 「已添加」列表拖动排序：名单按 sort_index 重排，合并目录跟着重写；顺序没变时不写。
@@ -8126,8 +8331,8 @@ model_provider = "c"
             catalog_slugs(),
             vec![
                 "gpt-a",
-                "ccs-deepseek/deepseek-v4-pro",
-                "ccs-zhipu/gpt-zhipu"
+                "zccs-deepseek/deepseek-v4-pro",
+                "zccs-zhipu/gpt-zhipu"
             ]
         );
 
@@ -8154,8 +8359,8 @@ model_provider = "c"
             catalog_slugs(),
             vec![
                 "gpt-a",
-                "ccs-zhipu/gpt-zhipu",
-                "ccs-deepseek/deepseek-v4-pro"
+                "zccs-zhipu/gpt-zhipu",
+                "zccs-deepseek/deepseek-v4-pro"
             ]
         );
 
@@ -8217,8 +8422,8 @@ model_provider = "c"
             catalog_slugs(),
             vec![
                 "gpt-a",
-                "ccs-zhipu/gpt-zhipu",
-                "ccs-deepseek/deepseek-v4-pro"
+                "zccs-zhipu/gpt-zhipu",
+                "zccs-deepseek/deepseek-v4-pro"
             ]
         );
     }
@@ -8283,8 +8488,8 @@ model_provider = "c"
             catalog_slugs(),
             vec![
                 "gpt-a",
-                "ccs-deepseek/deepseek-v4-pro",
-                "ccs-zhipu/gpt-zhipu"
+                "zccs-deepseek/deepseek-v4-pro",
+                "zccs-zhipu/gpt-zhipu"
             ]
         );
         let mut zhipu = state
@@ -8297,7 +8502,7 @@ model_provider = "c"
         resync_route(&state, &AppType::Codex).await.expect("resync");
         assert_eq!(
             catalog_slugs(),
-            vec!["gpt-a", "ccs-deepseek/deepseek-v4-pro"]
+            vec!["gpt-a", "zccs-deepseek/deepseek-v4-pro"]
         );
         switch_route(&state, &AppType::Codex, "deepseek")
             .await
@@ -8503,7 +8708,7 @@ model_provider = "c"
         set_codex_member(&state, "deepseek", true).await;
         assert_eq!(
             catalog_slugs(),
-            vec!["gpt-6-sol", "gpt-5.5", "ccs-deepseek/deepseek-v4-pro"]
+            vec!["gpt-6-sol", "gpt-5.5", "zccs-deepseek/deepseek-v4-pro"]
         );
         let catalog = codex_catalog();
         let sol = &catalog["models"][0];
@@ -8802,7 +9007,7 @@ model_provider = "c"
     fn codex_keyless_template() -> Value {
         json!({
             "auth": { "OPENAI_API_KEY": "" },
-            "config": "model_provider = \"custom\"\nmodel = \"gpt-5.6-sol\"\n\n[model_providers.custom]\nname = \"custom\"\nwire_api = \"responses\"\nrequires_openai_auth = true\n",
+            "config": "model_provider = \"zhishu\"\nmodel = \"gpt-5.6-sol\"\n\n[model_providers.zhishu]\nname = \"custom\"\nwire_api = \"responses\"\nrequires_openai_auth = true\n",
         })
     }
 
@@ -8827,11 +9032,11 @@ model_provider = "c"
             let doc: toml::Table = toml::from_str(&shown).unwrap();
             assert_eq!(
                 doc["model_provider"].as_str(),
-                Some("custom"),
+                Some("zhishu"),
                 "{label}: {shown}"
             );
             assert!(doc.get("openai_base_url").is_none(), "{label}: {shown}");
-            let route = &doc["model_providers"]["custom"];
+            let route = &doc["model_providers"]["zhishu"];
             assert_eq!(
                 route["requires_openai_auth"].as_bool(),
                 Some(true),
@@ -8902,7 +9107,7 @@ model_provider = "c"
             .expect("view")
             .settings;
         let mut doc: toml_edit::DocumentMut = base["config"].as_str().unwrap().parse().unwrap();
-        doc["model_providers"]["custom"]["requires_openai_auth"] = toml_edit::value(true);
+        doc["model_providers"]["zhishu"]["requires_openai_auth"] = toml_edit::value(true);
         let mut edited = base.clone();
         edited["config"] = json!(doc.to_string());
         edited["auth"]["OPENAI_API_KEY"] = json!("");

@@ -464,3 +464,19 @@ L3 的统一依据见 [ADR-0002](../adr/ADR-0002-structure-and-history.md)，数
 本次为 L0 文档整理，固定工具入口的文档提示路径修正按 L1 复核；复核既有 ZS-006（贡献指南）与 ZS-222（Vite 配置）：只更新指向新文档目录的链接或错误提示字符串。固定入口中的字符串不能由新增文档或 Adapter 自动替换；不改变构建校验、IPC、配置写入或运行行为。macOS 开发脚本中的文档提示属于自有文件，同步修正。
 
 旧审查报告的有效修复与遗留风险已合入历史验证记录，两份提交映射合并保留；版本发布证据与操作指南分离。强制标准按已有 ADR-0004/0005 修正被替代的业务示例，核心红线不变。用户原有 DSH 适配、验证与 AGENTS 修改保留。实际本次检查见历史验证记录的文档整理小节。
+
+
+## 2026-11-03 与原版 CC Switch 共存隔离
+
+用户授权修复共存冲突，依据 [ADR-0009](../adr/ADR-0009-product-coexistence.md)。复用 ProviderService、路径解析、配置投影、原子发布/首写备份/pending、Skills 部署校验与既有 S3/WebDAV 传输；自有常量与归属记录位于 `src-tauri/src/zhishu/{identity,coexistence}.rs`。没有新增依赖或 IPC，也不迁移凭据、不删除上游文件/API。旧资源不自动认领，详见[共存说明](coexistence.md)。
+
+| ID | 上游文件 | 原因与无法仅包装的说明 | 等级 | 关联验证 |
+| --- | --- | --- | --- | --- |
+| COEXIST-20261103-01 | `codex_config.rs`、`live/project/{codex,claude}.rs`、`mode/stack.rs`、`claude_desktop_config.rs`、`deeplink/provider.rs` | 原生派生文件、路由/聚合 ID、占位符及 Desktop profile 的常量在投影内部读取，须在已有边界接入独立身份；保留旧输入解析和原版表/profile | L3 | Codex 投影、Desktop 原版 profile 保留、聚合拒绝外来 ID、金标 |
+| COEXIST-20261103-02 | `mode/{controller,operation}.rs`、`services/proxy.rs`、`lib.rs` | 启停/定时刷新和发布重算在核心内部，外层包装不能阻止误认领或并发重算覆盖；添加自有路径哈希记录，限制共享历史自动迁移，保留所有恢复函数 | L3 | 外来代理启动/退出保留、主动交接、并发 attach/detach、已有 pending/故障回归 |
+| COEXIST-20261103-03 | `settings.rs`、`services/{sync_protocol,s3_sync,webdav_sync}.rs` | 默认根与协议校验由固定序列化/传输入口控制；保留旧设置，拒绝未知/原版目标，上传前验证与部分上传归属标记 | L3 | 缺失 root 保留旧语义、双传输拒绝写入原版目标、同步协议及命令回归 |
+| COEXIST-20261103-04 | `services/skill.rs`、`dsh_config.rs`、`agy_config.rs` | 原生文件直接由现有适配器部署/清理，薄接自有部署证据并复用内容/链接校验，独立 DSH 回执与 MCP ID，清理仅识别智枢旧脚本 | L3 | 外来 Skills 保留、copy 更新/卸载、DSH、旧 agy 脚本保护 |
+| COEXIST-20261103-05 | `proxy/forwarder.rs`、`proxy/providers/codex_oauth_auth/browser.rs`、`codex_history_migration.rs` | 新旧占位符均禁止向上游泄漏；保留旧历史桶的独立含义，显式统一迁移随 live 目标并兼容新旧账本还原；OAuth 保留协议端口，明确占用错误并关闭回调连接 | L3 | 占位符拒绝、历史迁移回归、浏览器监听器替换/取消/端口占用 |
+| COEXIST-20261103-06 | `commands/misc.rs`、`tauri.windows.conf.json`、前端 `settings/{AboutSection,WebdavSyncSection}.tsx` | 固定旧更新入口/链接和表单默认值须直接接线，接口保留，转到智枢安装包页面 | L1/L2 | 全量前端、旧 command URL 回归、renderer 构建 |
+
+其余已有 Rust/集成测试文件中的变更为命名对应断言；三个金标通过 `CC_SWITCH_UPDATE_GOLDEN=1` 生成并审查。部分旧 `custom` MCP/历史夹具刻意保留，验证输入兼容及原版数据不会随名称替换消失。实际验证和未验收项见[验证记录](../history/validation.md)。

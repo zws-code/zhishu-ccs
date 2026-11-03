@@ -100,7 +100,7 @@
 - 为什么：错误的字段、认证形态或整份覆盖会导致 CLI 无法启动，并可能删除用户自己的设置。
 - Claude Code：默认 `~/.claude/settings.json`，兼容已有 `~/.claude/claude.json`；供应商字段主要在 `env`，MCP 默认另存 `~/.claude.json` 的 `mcpServers`。
 - Codex：默认 `~/.codex/config.toml` 和 `auth.json`；供应商行使用 `{ auth, config }`，其中 `config` 是 TOML 字符串。
-- Codex 当前第三方路由通常投影到 `[model_providers.custom]`，Key 写入 `experimental_bearer_token`；不要退回仅向 `auth.json.OPENAI_API_KEY` 写 Key 的旧方案。
+- Codex 当前第三方路由投影到智枢独立的 `[model_providers.zhishu]`，Key 写入 `experimental_bearer_token`；旧 `custom` 输入仍可解析，但原版表不自动清理，历史桶不批量改写。派生目录为 `zhishu-ccs-model-catalog.json`；迁移、后台归属和共存边界见 [ADR-0009](docs/zhishu/adr/ADR-0009-product-coexistence.md) 与[共存说明](docs/zhishu/development/coexistence.md)。不要退回仅向 `auth.json.OPENAI_API_KEY` 写 Key 的旧方案。
 - Gemini：默认 `~/.gemini/.env` 和 `settings.json`；行结构为 `{ env, config }`，关注 `GEMINI_API_KEY`、`GOOGLE_GEMINI_BASE_URL`、`security.auth.selectedType`、`model.name`。
 - WorkBuddy：通过 `get_workbuddy_home()` 解析设置覆盖、`WORKBUDDY_CONFIG_DIR` 和默认 `~/.workbuddy`，写入 `models.json`；兼容模型数组和含 `models` 数组的对象，保留无关字段及 `availableModels` 的既有处理。
 - 所有路径必须调用已有路径函数，保留设置覆盖和隔离环境的优先级；不要把上述默认路径硬编码进新逻辑。

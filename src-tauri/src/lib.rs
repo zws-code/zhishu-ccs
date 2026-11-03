@@ -895,7 +895,7 @@ pub fn run() {
                 Err(e) => log::warn!("✗ Failed to seed official providers: {e}"),
             }
 
-            {
+            if crate::zhishu::coexistence::private_codex_home() {
                 let db_for_codex_history_migration = app_state.db.clone();
                 tauri::async_runtime::spawn_blocking(move || {
                     match crate::codex_history_migration::maybe_migrate_codex_third_party_history_provider_bucket(

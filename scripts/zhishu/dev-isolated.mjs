@@ -117,7 +117,7 @@ export function resolveEnvironment(
     ".codex",
     ".codex/config.toml",
     ".codex/auth.json",
-    ".codex/cc-switch-model-catalog.json",
+    ".codex/zhishu-ccs-model-catalog.json",
   ]) {
     if (!within(home, canonicalPath(path.join(home, name)))) {
       throw new Error(`Dev path points outside the isolated home: ${name}`);
