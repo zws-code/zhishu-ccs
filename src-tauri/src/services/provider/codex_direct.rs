@@ -1343,10 +1343,10 @@ mod tests {
     #[test]
     fn stack_subagent_is_written_only_when_the_catalog_accepts_it() {
         let catalog = json!({ "models": [
-            { "slug": "ccs-ds/v4", "supported_reasoning_levels": [
+            { "slug": "zccs-ds/v4", "supported_reasoning_levels": [
                 { "effort": "low" }, { "effort": "high" }
             ]},
-            { "slug": "ccs-ds/off", "multi_agent_version": "disabled" },
+            { "slug": "zccs-ds/off", "multi_agent_version": "disabled" },
         ]});
         let written = |model: Option<&str>, effort: Option<&str>| -> Vec<(String, String)> {
             stack_subagent_nested(&catalog, model, effort)
@@ -1356,7 +1356,7 @@ mod tests {
         };
         let model = (
             "agents.default_subagent_model".to_string(),
-            "ccs-ds/v4".to_string(),
+            "zccs-ds/v4".to_string(),
         );
         let effort = (
             "agents.default_subagent_reasoning_effort".to_string(),
@@ -1364,16 +1364,16 @@ mod tests {
         );
 
         assert_eq!(
-            written(Some("ccs-ds/v4"), Some("high")),
+            written(Some("zccs-ds/v4"), Some("high")),
             vec![model.clone(), effort]
         );
         assert_eq!(
-            written(Some("ccs-ds/v4"), Some("xhigh")),
+            written(Some("zccs-ds/v4"), Some("xhigh")),
             vec![model.clone()]
         );
-        assert_eq!(written(Some("ccs-ds/v4"), None), vec![model]);
-        assert!(written(Some("ccs-gone/v4"), Some("high")).is_empty());
-        assert!(written(Some("ccs-ds/off"), None).is_empty());
+        assert_eq!(written(Some("zccs-ds/v4"), None), vec![model]);
+        assert!(written(Some("zccs-gone/v4"), Some("high")).is_empty());
+        assert!(written(Some("zccs-ds/off"), None).is_empty());
         assert!(written(None, Some("high")).is_empty());
     }
 

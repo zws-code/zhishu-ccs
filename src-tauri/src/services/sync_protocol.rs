@@ -11,6 +11,7 @@ use std::time::Duration;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tempfile::tempdir;
 
@@ -26,13 +27,16 @@ pub(crate) use super::webdav_sync::archive::{
 
 /// Wire-format identifier stored in remote manifests.
 /// Retains historic "webdav" naming for backward compatibility with existing remotes.
-pub(crate) const PROTOCOL_FORMAT: &str = "cc-switch-webdav-sync";
+pub(crate) const PROTOCOL_FORMAT: &str = crate::zhishu::identity::SYNC_FORMAT;
 pub(crate) const PROTOCOL_VERSION: u32 = 2;
 pub(crate) const DB_COMPAT_VERSION: u32 = 6;
 pub(crate) const LEGACY_DB_COMPAT_VERSION: u32 = 5;
 pub(crate) const REMOTE_DB_SQL: &str = "db.sql";
 pub(crate) const REMOTE_SKILLS_ZIP: &str = "skills.zip";
 pub(crate) const REMOTE_MANIFEST: &str = "manifest.json";
+pub(crate) const REMOTE_OWNER: &str = "zhishu-owner.json";
+pub(crate) const OWNER_BYTES: &[u8] =
+    b"{\"product\":\"com.zhishu.ccswitch.desktop\",\"version\":1}";
 pub(crate) const MAX_DEVICE_NAME_LEN: usize = 64;
 pub(crate) const MAX_MANIFEST_BYTES: usize = 1024 * 1024;
 pub(crate) const MAX_SYNC_ARTIFACT_BYTES: u64 = 512 * 1024 * 1024;
@@ -257,14 +261,7 @@ pub(crate) fn validate_manifest_compat(
     layout: RemoteLayout,
 ) -> Result<(), AppError> {
     if manifest.format != PROTOCOL_FORMAT {
-        return Err(localized(
-            "sync.manifest_format_incompatible",
-            format!("远端 manifest 格式不兼容: {}", manifest.format),
-            format!(
-                "Remote manifest format is incompatible: {}",
-                manifest.format
-            ),
-        ));
+        return Err(unowned_destination_error());
     }
     if manifest.version != PROTOCOL_VERSION {
         return Err(localized(
@@ -312,6 +309,31 @@ pub(crate) fn validate_manifest_compat(
         _ => {}
     }
     Ok(())
+}
+
+pub(crate) fn unowned_destination_error() -> AppError {
+    localized(
+        "sync.foreign_product",
+        "远端快照无法确认属于智枢，已停止读写。请选择独立同步目录；旧快照和本机数据保持不变",
+        "The remote snapshot cannot be identified as Zhishu data. Choose a separate sync directory. The existing snapshot and local data are unchanged.",
+    )
+}
+
+pub(crate) fn validate_upload_destination(bytes: &[u8]) -> Result<(), AppError> {
+    let manifest: SyncManifest =
+        serde_json::from_slice(bytes).map_err(|_| unowned_destination_error())?;
+    validate_manifest_compat(&manifest, RemoteLayout::Current)
+}
+
+pub(crate) fn validate_upload_owner(bytes: &[u8]) -> Result<(), AppError> {
+    let owner: Value = serde_json::from_slice(bytes).map_err(|_| unowned_destination_error())?;
+    if owner.get("product").and_then(Value::as_str) == Some("com.zhishu.ccswitch.desktop")
+        && owner.get("version").and_then(Value::as_u64) == Some(1)
+    {
+        Ok(())
+    } else {
+        Err(unowned_destination_error())
+    }
 }
 
 // ─── Artifact verification ───────────────────────────────────
@@ -627,6 +649,19 @@ mod tests {
     fn validate_manifest_compat_rejects_wrong_format() {
         let manifest = manifest_with("other-format", PROTOCOL_VERSION, Some(DB_COMPAT_VERSION));
         assert!(validate_manifest_compat(&manifest, RemoteLayout::Current).is_err());
+    }
+
+    #[test]
+    fn coexistence_rejects_upstream_and_corrupt_destinations_before_upload() {
+        let upstream = manifest_with(
+            "cc-switch-webdav-sync",
+            PROTOCOL_VERSION,
+            Some(DB_COMPAT_VERSION),
+        );
+        assert!(validate_upload_destination(&serde_json::to_vec(&upstream).unwrap()).is_err());
+        assert!(validate_upload_destination(b"{broken").is_err());
+        let ours = manifest_with(PROTOCOL_FORMAT, PROTOCOL_VERSION, Some(DB_COMPAT_VERSION));
+        assert!(validate_upload_destination(&serde_json::to_vec(&ours).unwrap()).is_ok());
     }
 
     #[test]

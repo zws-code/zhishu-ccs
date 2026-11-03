@@ -374,6 +374,7 @@ impl McpService {
             AppType::Dsh => mcp::dsh::sync(&server.id, Some(&server.server))?,
             AppType::Pi => mcp::pi::sync(&server.id, Some(&server.server))?,
             AppType::Agy => mcp::agy::sync(&server.id, Some(&server.server))?,
+            AppType::WorkBuddy => {}
             AppType::Omp => mcp::sync_single_server_to_omp(&server.id, &server.server)?,
         }
         Ok(())
@@ -432,6 +433,7 @@ impl McpService {
             AppType::Dsh => mcp::dsh::sync(id, None)?,
             AppType::Pi => mcp::pi::sync(id, None)?,
             AppType::Agy => mcp::agy::sync(id, None)?,
+            AppType::WorkBuddy => {}
             AppType::Omp => mcp::remove_server_from_omp(id)?,
         }
         Ok(())
@@ -475,7 +477,12 @@ impl McpService {
     /// 由 CC Switch 管理 MCP 的应用（Claude Desktop、OpenClaw 不支持）
     pub fn live_sync_apps() -> Vec<AppType> {
         AppType::all()
-            .filter(|app| !matches!(app, AppType::OpenClaw | AppType::ClaudeDesktop))
+            .filter(|app| {
+                !matches!(
+                    app,
+                    AppType::OpenClaw | AppType::ClaudeDesktop | AppType::WorkBuddy
+                )
+            })
             .collect()
     }
 
@@ -527,7 +534,10 @@ impl McpService {
         servers: &IndexMap<String, McpServer>,
         app: &AppType,
     ) -> Result<(), AppError> {
-        if matches!(app, AppType::OpenClaw | AppType::ClaudeDesktop) {
+        if matches!(
+            app,
+            AppType::OpenClaw | AppType::ClaudeDesktop | AppType::WorkBuddy
+        ) {
             return Ok(());
         }
 

@@ -894,7 +894,7 @@ fn initialize_profiles_and_commit<T>(
         return commit();
     }
     let profiles = target_paths();
-    let receipt = data_dir().join(".cc-switch-profile-sync.json");
+    let receipt = data_dir().join(".zhishu-ccs-profile-sync.json");
     let parse_receipt = |text: &str| -> Result<Vec<String>, AppError> {
         if text.trim().is_empty() {
             Ok(vec![])
@@ -1451,6 +1451,15 @@ fn mcp_edit(text: &str, id: &str, spec: Option<&Value>) -> Result<String, AppErr
         }
         let location = matches.into_iter().next();
         let existing = location.map(|(_, _, entry)| entry.clone());
+        if existing
+            .as_ref()
+            .and_then(|entry| entry["id"].as_str())
+            .is_some_and(|id| id.starts_with("cc-switch-mcp-"))
+        {
+            return Err(AppError::Config(
+                "此 MCP 节点由原版 CC Switch 管理，已保留。请使用不同的服务器名称接入智枢".into(),
+            ));
+        }
         if existing.is_none() && spec.is_none() {
             return Ok(text.to_owned());
         }
@@ -1458,7 +1467,7 @@ fn mcp_edit(text: &str, id: &str, spec: Option<&Value>) -> Result<String, AppErr
             .as_ref()
             .and_then(|entry| entry["id"].as_str())
             .map(str::to_owned)
-            .unwrap_or_else(|| format!("cc-switch-mcp-{id}"));
+            .unwrap_or_else(|| format!("zhishu-ccs-mcp-{id}"));
         if existing.is_some()
             && existing
                 .as_ref()
@@ -1619,7 +1628,7 @@ mod tests {
         // create a plugin absent from the bundle's existing entry list.
         let plugins = entries[0]["insert"].as_sequence().unwrap();
         assert_eq!(plugins.len(), 1);
-        assert_eq!(plugins[0]["id"], "cc-switch-mcp-test");
+        assert_eq!(plugins[0]["id"], "zhishu-ccs-mcp-test");
         assert_eq!(plugins[0]["name"], "@deepseek-ai/dsh-mcp-client");
         assert_eq!(plugins[0]["config"]["serverName"], "test");
         assert_eq!(plugins[0]["config"]["transport"], "streamable-http");
@@ -1862,7 +1871,7 @@ mod tests {
             assert_eq!(read_text(&path).unwrap(), group);
         }
         // A tagged top-level entry can't be edited, but removing it rewrites nothing else.
-        let own = "- id: cc-switch-mcp-github\n  name: '@deepseek-ai/dsh-mcp-client'\n  config: {serverName: github, transport: stdio, command: node, env: {TOKEN: !!js process.env.TOKEN}}\n";
+        let own = "- id: zhishu-ccs-mcp-github\n  name: '@deepseek-ai/dsh-mcp-client'\n  config: {serverName: github, transport: stdio, command: node, env: {TOKEN: !!js process.env.TOKEN}}\n";
         fs::write(&path, own).unwrap();
         assert!(sync_mcp_file_and_commit(&path, "github", Some(&spec), || Ok(())).is_err());
         assert_eq!(read_text(&path).unwrap(), own);
@@ -1874,7 +1883,7 @@ mod tests {
     fn mcp_rejects_plugin_id_collisions_and_rolls_back_failed_commit() {
         let temp = tempfile::tempdir().unwrap();
         let path = temp.path().join("cordis.patch.yml");
-        let original = "- id: cc-switch-mcp-test\n  name: unrelated-plugin\n";
+        let original = "- id: zhishu-ccs-mcp-test\n  name: unrelated-plugin\n";
         fs::write(&path, original).unwrap();
         assert!(
             sync_mcp_file_and_commit(&path, "test", Some(&json!({"command":"node"})), || Ok(()))
@@ -2252,7 +2261,7 @@ mod tests {
         let _home = DshHome::new();
         let providers = IndexMap::from([("gateway".into(), editor_config())]);
         let servers = IndexMap::from([("fetch".into(), json!({"command":"node"}))]);
-        let receipt = data_dir().join(".cc-switch-profile-sync.json");
+        let receipt = data_dir().join(".zhishu-ccs-profile-sync.json");
         let result = initialize_profiles_and_commit(&providers, &servers, || {
             Err::<(), _>(AppError::Database("injected".into()))
         });
@@ -2291,7 +2300,7 @@ mod tests {
         .unwrap();
         let providers = IndexMap::from([("gateway".into(), editor_config())]);
         initialize_profiles(&providers, &IndexMap::new()).unwrap();
-        assert!(data_dir().join(".cc-switch-profile-sync.json").exists());
+        assert!(data_dir().join(".zhishu-ccs-profile-sync.json").exists());
         for name in ["web", "desktop"] {
             assert!(get_providers_from(&profile_path(name), &credentials_path())
                 .unwrap()

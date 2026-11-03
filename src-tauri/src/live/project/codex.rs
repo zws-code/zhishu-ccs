@@ -1,7 +1,7 @@
 //! Codex 的投影：供应商行 → `config.toml` 的关键字段和独有字段。
 //!
 //! 行的形状是 `{auth, config}`（`config` 是 TOML 文本）。投影只取关键字段，第三方路由
-//! 一律写成 `[model_providers.custom]`：行里用别的 id（`deepseek`）、旧形态的顶层
+//! 一律写成 `[model_providers.zhishu]`：行里用别的 id（`deepseek`）、旧形态的顶层
 //! `openai_base_url` 或顶层 `base_url`、旧版留下的保留 id 表（`[model_providers.openai]`），
 //! 都在这里归一。
 //! 行里其余内容（旧版回填进来的 MCP、projects、插件）不投影，归用户和 Codex。
@@ -20,14 +20,14 @@ use crate::live::patch::toml::{same_value, shape_error, TomlDocPatch};
 use crate::live::patch::LiveWriteError;
 
 /// CC Switch 写入的路由表 id。
-pub const ROUTE_ID: &str = "custom";
+pub const ROUTE_ID: &str = crate::zhishu::identity::CODEX_ROUTE;
 /// 旧版代理官方路由写的表 id。会话按选中的 id 分桶，它让代理下的官方会话自成一桶，
 /// 表一删就 resume 不了，新版不再写；live 里留着的只清理。
-pub const OFFICIAL_PROXY_ROUTE_ID: &str = "cc-switch-official";
+pub const OFFICIAL_PROXY_ROUTE_ID: &str = crate::zhishu::identity::CODEX_OFFICIAL_PROXY;
 /// 把内置 openai 改道到别的地址的顶层键。
 const OPENAI_BASE_URL: &str = "openai_base_url";
 /// CC Switch 生成的模型目录文件名。
-pub const CATALOG_FILENAME: &str = "cc-switch-model-catalog.json";
+pub const CATALOG_FILENAME: &str = crate::zhishu::identity::CODEX_CATALOG;
 pub use super::claude::PROXY_TOKEN_PLACEHOLDER;
 /// `web_search` 的禁用值。
 pub const WEB_SEARCH_DISABLED: &str = "disabled";
@@ -47,7 +47,7 @@ const RESERVED_TABLE_IDS: &[&str] = &["openai", "ollama", "lmstudio"];
 const DEFAULT_PROVIDER_ID: &str = "openai";
 const BEDROCK_IDS: &[&str] = &["amazon-bedrock", "amazon-bedrock-runtime"];
 /// 旧版把顶层 `openai_base_url` 归一成的表 id（`cc-switch`、`cc-switch-2`…）。
-const LEGACY_REROUTE_ID: &str = "cc-switch";
+const LEGACY_REROUTE_ID: &str = "zhishu-ccs";
 
 /// 顶层的关键字段里，直接取行里值的那几个（选路、凭据、模型目录指针另算）。
 pub(crate) const ROW_TOP_FIELDS: &[&str] = &[
@@ -92,7 +92,7 @@ pub fn requires_openai_auth(auth: RouteAuth, login_on_disk: bool) -> bool {
 pub enum Route {
     /// 官方：不写选路，走 Codex 内置的 openai（统一会话历史时另写官方镜像表）。
     Official,
-    /// 第三方：写成 `[model_providers.custom]`。`table` 已带上 Key，`requires_openai_auth`
+    /// 第三方：写成 `[model_providers.zhishu]`。`table` 已带上 Key，`requires_openai_auth`
     /// 在写入时按 [`requires_openai_auth`] 现算。
     Custom { table: Table, auth: RouteAuth },
     /// 选中 Codex 内置的其他 provider（ollama、lmstudio、bedrock），bedrock 可以带覆盖表。
@@ -580,9 +580,11 @@ pub fn foreign_catalog(doc: &DocumentMut) -> Option<&TomlValue> {
     doc.get(MODEL_CATALOG_JSON)
         .and_then(Item::as_value)
         .filter(|value| {
-            value
-                .as_str()
-                .is_some_and(|path| !is_cc_switch_catalog(path))
+            value.as_str().is_some_and(|path| {
+                !is_cc_switch_catalog(path)
+                    && Path::new(path).file_name().and_then(|name| name.to_str())
+                        != Some("cc-switch-model-catalog.json")
+            })
         })
 }
 
@@ -758,7 +760,7 @@ impl CodexConfigPatch {
                     && !referenced.iter().any(|name| name == id)
                     && (*id == OFFICIAL_PROXY_ROUTE_ID
                         || holds_placeholder(item)
-                        || self.is_retired(id, item))
+                        || (id.starts_with("zhishu") && self.is_retired(id, item)))
             })
             .map(|(id, _)| id.to_string())
             .collect();
@@ -957,6 +959,31 @@ fn check_effective_route(doc: &DocumentMut, selector: Option<&str>) -> Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn coexistence_preserves_upstream_route_tables_and_does_not_adopt_their_catalog() {
+        let text = r#"model_provider = "custom"
+model_catalog_json = "cc-switch-model-catalog.json"
+[model_providers.custom]
+name = "upstream"
+base_url = "http://127.0.0.1:15721/v1"
+experimental_bearer_token = "PROXY_MANAGED"
+[model_providers.cc-switch-official]
+name = "upstream-official"
+base_url = "http://127.0.0.1:15721/v1"
+"#;
+        let before = text.parse::<DocumentMut>().unwrap();
+        let doc = apply(official_proxy(true), text);
+        for key in ["custom", "cc-switch-official"] {
+            assert_eq!(
+                doc["model_providers"][key].to_string(),
+                before["model_providers"][key].to_string()
+            );
+        }
+        assert_eq!(doc["model_provider"].as_str(), Some(ROUTE_ID));
+        assert!(!live_catalog_is_ours(text));
+        assert!(foreign_catalog(&before).is_none());
+    }
     use serde_json::json;
 
     fn row(auth: Value, config: &str) -> Value {
@@ -1125,7 +1152,7 @@ mod tests {
     #[test]
     fn the_official_proxy_route_stays_in_the_built_in_openai_bucket() {
         // 旧版写的 cc-switch-official 表删掉；第三方留下的 custom 表改成休眠形态。
-        let live = "model_provider = \"cc-switch-official\"\nopenai_base_url = \"https://stale.example/v1\"\nmodel = \"gpt-5.5\"\n\n[model_providers.cc-switch-official]\nname = \"OpenAI\"\nbase_url = \"http://127.0.0.1:15721/v1\"\nrequires_openai_auth = true\n\n[model_providers.custom]\nname = \"custom\"\nbase_url = \"https://relay.example/v1\"\nexperimental_bearer_token = \"sk-relay\"\n";
+        let live = "model_provider = \"zhishu-ccs-official\"\nopenai_base_url = \"https://stale.example/v1\"\nmodel = \"gpt-5.5\"\n\n[model_providers.zhishu-ccs-official]\nname = \"OpenAI\"\nbase_url = \"http://127.0.0.1:15721/v1\"\nrequires_openai_auth = true\n\n[model_providers.zhishu]\nname = \"custom\"\nbase_url = \"https://relay.example/v1\"\nexperimental_bearer_token = \"sk-relay\"\n";
         let doc = apply(official_proxy(false), live);
         assert!(doc.get("model_provider").is_none(), "{doc}");
         assert_eq!(doc["openai_base_url"].as_str(), Some(PROXY));

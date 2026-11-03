@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+pub const DEFAULT_PROXY_PORT: u16 = 25721;
+
 /// 代理服务器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProxyConfig {
@@ -43,7 +45,7 @@ impl Default for ProxyConfig {
     fn default() -> Self {
         Self {
             listen_address: "127.0.0.1".to_string(),
-            listen_port: 15721, // 使用较少占用的高位端口
+            listen_port: DEFAULT_PROXY_PORT, // avoid upstream CC Switch's 15721
             max_retries: 3,
             request_timeout: 600,
             enable_logging: true,
@@ -521,5 +523,11 @@ mod tests {
         let parsed: LogConfig = serde_json::from_str(&json).unwrap();
         assert!(parsed.enabled);
         assert_eq!(parsed.level, "debug");
+    }
+
+    #[test]
+    fn default_proxy_config_uses_zhishu_port() {
+        assert_eq!(ProxyConfig::default().listen_port, DEFAULT_PROXY_PORT);
+        assert_eq!(DEFAULT_PROXY_PORT, 25721);
     }
 }

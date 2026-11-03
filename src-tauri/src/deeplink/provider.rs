@@ -355,6 +355,11 @@ pub(crate) fn build_provider_from_request(
                 "Add MCode providers from the MCode page".into(),
             ))
         }
+        AppType::WorkBuddy => {
+            return Err(AppError::InvalidInput(
+                "Add WorkBuddy providers from the WorkBuddy page".into(),
+            ))
+        }
         AppType::Agy => {
             let mut settings = build_gemini_settings(request);
             settings["env"]
@@ -714,13 +719,14 @@ fn build_codex_settings(request: &DeepLinkImportRequest) -> Result<serde_json::V
     let endpoint = toml_edit::Value::from(endpoint.as_str()).to_string();
 
     // Build config.toml content
+    let route_id = crate::zhishu::identity::CODEX_ROUTE;
     let config_toml = format!(
-        r#"model_provider = "custom"
+        r#"model_provider = "{route_id}"
 model = {model_name}
 model_reasoning_effort = "high"
 disable_response_storage = true
 
-[model_providers.custom]
+[model_providers.{route_id}]
 name = {provider_display_name}
 base_url = {endpoint}
 wire_api = "responses"
@@ -1531,11 +1537,11 @@ mod tests {
             parsed
                 .get("model_provider")
                 .and_then(|value| value.as_str()),
-            Some("custom")
+            Some("zhishu")
         );
         let custom_provider = parsed
             .get("model_providers")
-            .and_then(|value| value.get("custom"))
+            .and_then(|value| value.get("zhishu"))
             .expect("custom model provider");
         assert_eq!(
             custom_provider.get("name").and_then(|value| value.as_str()),

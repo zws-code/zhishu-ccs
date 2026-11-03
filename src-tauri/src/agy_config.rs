@@ -454,13 +454,13 @@ pub(crate) fn remove_legacy_launcher() -> Result<bool, AppError> {
 mod legacy {
     use super::*;
 
-    pub(super) const WRAPPER_MARK: &str = "cc-switch-agy-wrapper";
-    pub(super) const PATH_MARK: &str = "cc-switch agy wrapper";
+    pub(super) const WRAPPER_MARK: &str = "zhishu-ccs-agy-wrapper";
+    pub(super) const PATH_MARK: &str = "zhishu-ccs agy wrapper";
 
     pub(super) fn remove(agy_dir: &Path, home: &Path) -> Result<bool, AppError> {
         let bin_dir = agy_dir.join("bin");
         let wrapper = bin_dir.join("agy");
-        if wrapper.is_file() && is_wrapper(&wrapper) {
+        if wrapper.is_file() && head_contains(&wrapper, WRAPPER_MARK) {
             fs::remove_file(&wrapper).map_err(|e| AppError::io(&wrapper, e))?;
         }
         // 目录为空才会删除；里面有别的东西时保持原样。
@@ -478,7 +478,9 @@ mod legacy {
     }
 
     pub(super) fn is_wrapper(path: &Path) -> bool {
-        head_contains(path, WRAPPER_MARK)
+        // Both products' wrappers must be excluded from executable discovery;
+        // recognition alone does not authorize cleanup of upstream resources.
+        head_contains(path, WRAPPER_MARK) || head_contains(path, "cc-switch-agy-wrapper")
     }
 
     fn is_marked_env(path: &Path) -> bool {
@@ -543,6 +545,26 @@ mod legacy {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn coexistence_keeps_upstream_legacy_launchers_and_shell_entries() {
+        let tmp = tempfile::tempdir().unwrap();
+        let agy = tmp.path().join("agy");
+        let home = tmp.path().join("home");
+        fs::create_dir_all(agy.join("bin")).unwrap();
+        fs::create_dir_all(&home).unwrap();
+        let wrapper = "#!/bin/sh\n# cc-switch-agy-wrapper\nexec agy\n";
+        let env = "# cc-switch agy wrapper\nGEMINI_API_KEY=fixture\n";
+        let profile = "# cc-switch agy wrapper\nexport PATH='/old/bin':\"$PATH\"\n";
+        fs::write(agy.join("bin/agy"), wrapper).unwrap();
+        fs::write(agy.join("env"), env).unwrap();
+        fs::write(home.join(".zshrc"), profile).unwrap();
+        assert!(legacy::is_wrapper(&agy.join("bin/agy")));
+        assert!(!legacy::remove(&agy, &home).unwrap());
+        assert_eq!(fs::read_to_string(agy.join("bin/agy")).unwrap(), wrapper);
+        assert_eq!(fs::read_to_string(agy.join("env")).unwrap(), env);
+        assert_eq!(fs::read_to_string(home.join(".zshrc")).unwrap(), profile);
+    }
 
     fn projection(settings: Value) -> AgyProjection {
         AgyProjection::of(&settings)
@@ -1028,6 +1050,28 @@ mod integration_tests {
         let real_dir = tmp.path().join("real");
         let real = fake_agy(&real_dir);
         let path = std::env::join_paths([&wrapper_dir, &plain, &real_dir]).unwrap();
+        assert_eq!(resolve_real_agy(&path, &home, &[], false), Some(real));
+    }
+
+    #[test]
+    fn coexistence_resolver_skips_both_products_legacy_wrappers() {
+        let tmp = tempfile::tempdir().unwrap();
+        let home = tmp.path().join("home");
+        let mut wrapper_dirs = Vec::new();
+        for mark in ["cc-switch-agy-wrapper", "zhishu-ccs-agy-wrapper"] {
+            let dir = tmp.path().join(mark);
+            fs::create_dir_all(&dir).unwrap();
+            let wrapper = dir.join("agy");
+            fs::write(&wrapper, format!("#!/bin/sh\n# {mark}\nexec agy \"$@\"\n")).unwrap();
+            fs::set_permissions(wrapper, fs::Permissions::from_mode(0o755)).unwrap();
+            wrapper_dirs.push(dir);
+        }
+        let path = std::env::join_paths(&wrapper_dirs).unwrap();
+        assert_eq!(resolve_real_agy(&path, &home, &[], false), None);
+        let real_dir = tmp.path().join("real");
+        let real = fake_agy(&real_dir);
+        wrapper_dirs.push(real_dir);
+        let path = std::env::join_paths(&wrapper_dirs).unwrap();
         assert_eq!(resolve_real_agy(&path, &home, &[], false), Some(real));
     }
 }

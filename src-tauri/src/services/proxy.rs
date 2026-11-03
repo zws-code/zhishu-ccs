@@ -306,6 +306,50 @@ impl ProxyService {
         }
     }
 
+    /// A product-specific token AND our configured endpoint are needed to adopt
+    /// an unrecorded native proxy. A generic upstream marker is not ownership.
+    pub(crate) fn live_is_our_proxy(&self, app: &AppType) -> bool {
+        let (host, port) = self.db.get_proxy_client_endpoint_sync();
+        if port == 0 {
+            return false;
+        }
+        let origin = proxy_origin(&host, port);
+        let matches = |value: Option<&str>, suffix: &str| {
+            value.is_some_and(|url| url.trim_end_matches('/') == format!("{origin}{suffix}"))
+        };
+        match app {
+            AppType::Claude => self.read_claude_live().is_ok_and(|value| {
+                let token = ["ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"]
+                    .iter()
+                    .any(|key| value["env"][key].as_str() == Some(PROXY_TOKEN_PLACEHOLDER));
+                token && matches(value["env"]["ANTHROPIC_BASE_URL"].as_str(), "")
+            }),
+            AppType::Codex => self.read_codex_live().is_ok_and(|value| {
+                let text = value["config"].as_str().unwrap_or_default();
+                let Ok(doc) = text.parse::<toml_edit::DocumentMut>() else {
+                    return false;
+                };
+                let ours = doc.get("model_provider").and_then(toml_edit::Item::as_str)
+                    == Some(crate::zhishu::identity::CODEX_ROUTE);
+                ours && matches(
+                    crate::codex_config::extract_codex_base_url(text).as_deref(),
+                    "/v1",
+                )
+            }),
+            AppType::Gemini => self.read_gemini_live().is_ok_and(|value| {
+                value["env"]["GEMINI_API_KEY"].as_str() == Some(PROXY_TOKEN_PLACEHOLDER)
+                    && matches(value["env"]["GOOGLE_GEMINI_BASE_URL"].as_str(), "")
+            }),
+            AppType::GrokBuild => self.read_grok_live().is_ok_and(|value| {
+                let text = value["config"].as_str().unwrap_or_default();
+                crate::grok_config::has_proxy_placeholder(text, PROXY_TOKEN_PLACEHOLDER)
+                    && crate::grok_config::extract_base_url(text)
+                        .is_some_and(|url| matches(Some(&url), "/v1"))
+            }),
+            _ => false,
+        }
+    }
+
     /// 一份配置（客户端文件或供应商行）里有没有接管占位符：行里带着它的是旧版接管期间
     /// 被导入的残留，不能照写回 live，否则客户端会一直指着已经不在的本地代理。
     pub(crate) fn config_has_proxy_placeholder(app_type: &AppType, config: &Value) -> bool {
@@ -340,7 +384,11 @@ impl ProxyService {
             "OPENROUTER_API_KEY",
             "OPENAI_API_KEY",
         ] {
-            if env.get(key).and_then(|v| v.as_str()) == Some(PROXY_TOKEN_PLACEHOLDER) {
+            if env
+                .get(key)
+                .and_then(|v| v.as_str())
+                .is_some_and(crate::zhishu::identity::is_proxy_token)
+            {
                 return true;
             }
         }
@@ -354,7 +402,7 @@ impl ProxyService {
             .and_then(|v| v.as_object())
             .and_then(|auth| auth.get("OPENAI_API_KEY"))
             .and_then(|v| v.as_str())
-            == Some(PROXY_TOKEN_PLACEHOLDER)
+            .is_some_and(crate::zhishu::identity::is_proxy_token)
         {
             return true;
         }
@@ -364,7 +412,7 @@ impl ProxyService {
             .and_then(|v| v.as_str())
             .and_then(crate::codex_config::extract_codex_experimental_bearer_token)
             .as_deref()
-            == Some(PROXY_TOKEN_PLACEHOLDER)
+            .is_some_and(crate::zhishu::identity::is_proxy_token)
     }
 
     fn is_codex_live_taken_over(config: &Value) -> bool {
@@ -380,7 +428,9 @@ impl ProxyService {
             Some(env) => env,
             None => return false,
         };
-        env.get("GEMINI_API_KEY").and_then(|v| v.as_str()) == Some(PROXY_TOKEN_PLACEHOLDER)
+        env.get("GEMINI_API_KEY")
+            .and_then(|v| v.as_str())
+            .is_some_and(crate::zhishu::identity::is_proxy_token)
     }
 
     fn is_grok_live_taken_over(config: &Value) -> bool {
@@ -389,6 +439,10 @@ impl ProxyService {
             .and_then(Value::as_str)
             .is_some_and(|config_toml| {
                 crate::grok_config::has_proxy_placeholder(config_toml, PROXY_TOKEN_PLACEHOLDER)
+                    || crate::grok_config::has_proxy_placeholder(
+                        config_toml,
+                        crate::zhishu::identity::LEGACY_PROXY_TOKEN,
+                    )
             })
     }
 

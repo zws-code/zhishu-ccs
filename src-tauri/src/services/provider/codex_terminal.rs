@@ -529,21 +529,21 @@ requires_openai_auth = true
         let live = r#"model = "gpt-6-astra"
 model_reasoning_effort = "xhigh"
 
-[model_providers.custom]
+[model_providers.zhishu]
 name = "Old"
 base_url = "http://127.0.0.1:15721/v1"
 wire_api = "responses"
-experimental_bearer_token = "PROXY_MANAGED"
+experimental_bearer_token = "ZHISHU_CCS_PROXY_MANAGED"
 "#;
         let launch = build(&provider(KIMI, "sk-kimi"), live).unwrap();
         assert_eq!(launch.env, vec![(API_KEY_ENV, Some("sk-kimi".to_string()))]);
         assert!(launch
             .overrides
-            .contains(&"model_provider='custom'".to_string()));
+            .contains(&"model_provider='zhishu'".to_string()));
         let table = launch
             .overrides
             .iter()
-            .find(|o| o.starts_with("model_providers.custom="))
+            .find(|o| o.starts_with("model_providers.zhishu="))
             .expect("route table");
         assert!(table.contains("base_url='https://api.moonshot.cn/v1'"));
         assert!(table.contains(&format!("env_key='{API_KEY_ENV}'")));
@@ -561,9 +561,9 @@ experimental_bearer_token = "PROXY_MANAGED"
 
     #[test]
     fn leftover_headers_in_the_live_table_refuse_to_open() {
-        let live = r#"model_provider = "custom"
+        let live = r#"model_provider = "zhishu"
 
-[model_providers.custom]
+[model_providers.zhishu]
 name = "Other"
 base_url = "https://other.example/v1"
 http_headers = { "X-Api-Key" = "other-secret" }
@@ -571,7 +571,7 @@ http_headers = { "X-Api-Key" = "other-secret" }
         let err = build(&provider(KIMI, "sk-kimi"), live).unwrap_err();
         assert!(err
             .to_string()
-            .contains("model_providers.custom.http_headers"));
+            .contains("model_providers.zhishu.http_headers"));
     }
 
     #[test]
@@ -583,7 +583,7 @@ model_provider = "local"
 name = "Local"
 base_url = "http://localhost:8080/v1"
 "#;
-        let live = r#"[model_providers.custom]
+        let live = r#"[model_providers.zhishu]
 name = "Paid"
 base_url = "https://paid.example/v1"
 experimental_bearer_token = "sk-paid"
@@ -591,7 +591,7 @@ experimental_bearer_token = "sk-paid"
         let err = build(&provider(config, ""), live).unwrap_err();
         assert!(err
             .to_string()
-            .contains("model_providers.custom.experimental_bearer_token"));
+            .contains("model_providers.zhishu.experimental_bearer_token"));
     }
 
     #[test]

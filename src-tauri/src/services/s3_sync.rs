@@ -42,6 +42,35 @@ pub async fn upload(
     settings.validate()?;
     let creds = creds_for(settings);
 
+    // Never overwrite an upstream/unknown snapshot, even with a custom root.
+    let manifest_key = s3_key(settings, REMOTE_MANIFEST);
+    if let Some((bytes, _)) = s3::get_object(&creds, &manifest_key, MAX_MANIFEST_BYTES).await? {
+        super::sync_protocol::validate_upload_destination(&bytes)?;
+    } else if let Some((owner, _)) = s3::get_object(
+        &creds,
+        &s3_key(settings, super::sync_protocol::REMOTE_OWNER),
+        MAX_MANIFEST_BYTES,
+    )
+    .await?
+    {
+        super::sync_protocol::validate_upload_owner(&owner)?;
+    } else {
+        for artifact in [REMOTE_DB_SQL, REMOTE_SKILLS_ZIP] {
+            if s3::get_object(&creds, &s3_key(settings, artifact), 1)
+                .await?
+                .is_some()
+            {
+                return Err(super::sync_protocol::unowned_destination_error());
+            }
+        }
+        s3::put_object(
+            &creds,
+            &s3_key(settings, super::sync_protocol::REMOTE_OWNER),
+            super::sync_protocol::OWNER_BYTES.to_vec(),
+            "application/json",
+        )
+        .await?;
+    }
     let snapshot = build_local_snapshot(db)?;
 
     // Upload order: artifacts first, manifest last (best-effort consistency)
@@ -208,7 +237,7 @@ async fn download_and_verify(
 /// Build the S3 object key for a given artifact.
 ///
 /// Format: `{remote_root}/v{PROTOCOL_VERSION}/db-v{DB_COMPAT_VERSION}/{profile}/{artifact}`
-/// Example: `cc-switch-sync/v2/db-v6/default/manifest.json`
+/// Example: `zhishu-ccs-sync/v2/db-v6/default/manifest.json`
 fn s3_key(settings: &S3SyncSettings, artifact: &str) -> String {
     format!(
         "{}/v{}/db-v{}/{}/{}",
@@ -241,7 +270,7 @@ mod tests {
 
     fn test_settings() -> S3SyncSettings {
         S3SyncSettings {
-            remote_root: "cc-switch-sync".to_string(),
+            remote_root: "zhishu-ccs-sync".to_string(),
             profile: "default".to_string(),
             ..S3SyncSettings::default()
         }
@@ -251,7 +280,7 @@ mod tests {
     fn s3_key_uses_v2_and_correct_format() {
         let settings = test_settings();
         let key = s3_key(&settings, "manifest.json");
-        assert_eq!(key, "cc-switch-sync/v2/db-v6/default/manifest.json");
+        assert_eq!(key, "zhishu-ccs-sync/v2/db-v6/default/manifest.json");
     }
 
     #[test]
@@ -271,7 +300,7 @@ mod tests {
         // Should follow {remote_root}/v{version}/db-v{db}/{profile}/{artifact}
         let parts: Vec<&str> = key.splitn(5, '/').collect();
         assert_eq!(parts.len(), 5);
-        assert_eq!(parts[0], "cc-switch-sync");
+        assert_eq!(parts[0], "zhishu-ccs-sync");
         assert_eq!(parts[1], "v2");
         assert_eq!(parts[2], "db-v6");
         assert_eq!(parts[3], "default");

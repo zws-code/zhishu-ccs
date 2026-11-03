@@ -18,8 +18,8 @@ use crate::mode::stack::DesktopStackModel;
 use crate::mode::state::{self, PendingTarget};
 use crate::provider::{ClaudeDesktopMode, Provider};
 
-pub const PROFILE_ID: &str = "00000000-0000-4000-8000-000000157210";
-pub const PROFILE_NAME: &str = "CC Switch";
+pub const PROFILE_ID: &str = "00000000-0000-4000-8000-000000257210";
+pub const PROFILE_NAME: &str = "Zhishu CC Switch";
 
 #[cfg(any(target_os = "macos", windows, target_os = "linux", test))]
 const CONFIG_FILE: &str = "claude_desktop_config.json";
@@ -304,6 +304,16 @@ pub fn get_status(db: &Database, proxy_running: bool) -> Result<ClaudeDesktopSta
 
 pub fn get_config_library_path() -> Result<PathBuf, AppError> {
     Ok(current_platform_paths()?.config_library_path)
+}
+
+pub(crate) fn live_file_paths() -> Result<Vec<PathBuf>, AppError> {
+    let paths = current_platform_paths()?;
+    Ok(vec![
+        paths.normal_config_path,
+        paths.threep_config_path,
+        paths.profile_path,
+        paths.meta_path,
+    ])
 }
 
 pub fn default_proxy_routes() -> Vec<ClaudeDesktopDefaultRoute> {
@@ -1713,7 +1723,7 @@ mod tests {
                 .join("Application Support")
                 .join("Claude-3p"),
         );
-        paths.device = DeviceStore::at(home.join(".cc-switch"));
+        paths.device = DeviceStore::at(home.join(".zhishu-ccs"));
         paths
     }
 
@@ -2135,12 +2145,12 @@ mod tests {
             }
             let before = serde_json::to_value(&provider).expect("provider snapshot");
             let db = test_db();
-            let profile = route_profile(&db, &provider, "http://127.0.0.1:15721", &[])
+            let profile = route_profile(&db, &provider, "http://127.0.0.1:25721", &[])
                 .expect("native provider should not need a pre-existing mapping");
 
             assert_eq!(
                 profile["inferenceGatewayBaseUrl"],
-                json!("http://127.0.0.1:15721/claude-desktop")
+                json!("http://127.0.0.1:25721/claude-desktop")
             );
             assert_eq!(
                 profile["inferenceModels"],
@@ -2223,7 +2233,7 @@ mod tests {
 
         let error = validate_proxy_provider(&provider).expect_err("mapping is required");
         assert!(error.to_string().contains("至少需要一个模型路由映射"));
-        route_profile(&test_db(), &provider, "http://127.0.0.1:15721", &[])
+        route_profile(&test_db(), &provider, "http://127.0.0.1:25721", &[])
             .expect_err("an empty mapping must not silently become native defaults");
     }
 
@@ -2250,7 +2260,7 @@ mod tests {
         let profile: Value = read_json_file(&paths.profile_path).expect("read profile");
         assert_eq!(
             profile["inferenceGatewayBaseUrl"],
-            json!("http://127.0.0.1:15721/claude-desktop")
+            json!("http://127.0.0.1:25721/claude-desktop")
         );
         assert_eq!(profile["inferenceGatewayAuthScheme"], json!("bearer"));
         assert_eq!(profile["coworkEgressAllowedHosts"], json!(["*"]));
@@ -2284,7 +2294,7 @@ mod tests {
             let profile: Value = read_json_file(&paths.profile_path).expect("read profile");
             assert_eq!(
                 profile["inferenceGatewayBaseUrl"],
-                json!("http://127.0.0.1:15721/claude-desktop")
+                json!("http://127.0.0.1:25721/claude-desktop")
             );
             assert_eq!(
                 profile["inferenceModels"],
@@ -3095,6 +3105,34 @@ mod tests {
             json!([{"id": "other-1", "name": "Mine"}, {"id": "other-2", "name": "Also mine"}])
         );
         assert_eq!(meta["appliedId"], json!("other-1"));
+    }
+
+    #[test]
+    fn coexistence_preserves_the_original_cc_switch_desktop_profile() {
+        let tmp = TempDir::new().unwrap();
+        let paths = test_paths(tmp.path());
+        fs::create_dir_all(&paths.config_library_path).unwrap();
+        let original_id = "00000000-0000-4000-8000-000000157210";
+        let original = paths
+            .config_library_path
+            .join(format!("{original_id}.json"));
+        let original_bytes = br#"{"name":"CC Switch","inferenceGatewayApiKey":"fixture"}"#;
+        fs::write(&original, original_bytes).unwrap();
+        crate::config::write_json_file(
+            &paths.meta_path,
+            &json!({
+                "entries":[{"id":original_id,"name":"CC Switch"}], "appliedId":original_id
+            }),
+        )
+        .unwrap();
+        apply_provider_to_paths(&test_db(), &direct_provider("a"), &paths).unwrap();
+        assert_eq!(fs::read(&original).unwrap(), original_bytes);
+        let meta: Value = read_json_file(&paths.meta_path).unwrap();
+        assert_eq!(meta["entries"][0]["id"], original_id);
+        restore_official(&paths).unwrap();
+        assert_eq!(fs::read(&original).unwrap(), original_bytes);
+        let meta: Value = read_json_file(&paths.meta_path).unwrap();
+        assert_eq!(meta["appliedId"], original_id);
     }
 
     #[cfg(unix)]

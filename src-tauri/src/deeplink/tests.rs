@@ -1,7 +1,7 @@
 //! Deep link module tests
 
 use super::mcp::parse_mcp_apps;
-use super::parser::parse_deeplink_url;
+use super::parser::{is_oauth_wakeup, parse_deeplink_url};
 use super::prompt::import_prompt_from_deeplink;
 use super::provider::parse_and_merge_config;
 use super::utils::{infer_homepage_from_endpoint, validate_url};
@@ -174,6 +174,47 @@ fn test_parse_grokbuild_provider() {
     assert_eq!(model["api_key"].as_str(), Some("secret"));
     assert_eq!(model["api_backend"].as_str(), Some("responses"));
     assert_eq!(model["context_window"].as_integer(), Some(500_000));
+}
+
+#[test]
+fn test_parse_zhishu_and_legacy_schemes_equivalently() {
+    for payload in [
+        "provider&app=claude&name=Test&endpoint=https%3A%2F%2Fapi.example.com&apiKey=sk-test",
+        "mcp&apps=claude&config=eyJtY3BTZXJ2ZXJzIjp7ImRlbW8iOnsiY29tbWFuZCI6Im5weCJ9fX0%3D",
+        "prompt&app=codex&name=Test&content=IyBUZXN0",
+        "skill&repo=example/skills&directory=skills&branch=main",
+    ] {
+        let suffix = format!("v1/import?resource={payload}");
+        let zhishu = parse_deeplink_url(&format!("zhishu-ccswitch://{suffix}")).unwrap();
+        let legacy = parse_deeplink_url(&format!("ccswitch://{suffix}")).unwrap();
+        assert_eq!(
+            serde_json::to_value(zhishu).unwrap(),
+            serde_json::to_value(legacy).unwrap()
+        );
+    }
+}
+
+#[test]
+fn test_oauth_wakeup_link_is_recognized() {
+    for url in [
+        "zhishu-ccswitch://v1/oauth",
+        "zhishu-ccswitch://v1/oauth/",
+        "ccswitch://v1/oauth",
+        "zhishu-ccswitch://v1/oauth?state=abc",
+    ] {
+        assert!(is_oauth_wakeup(url), "{url} should be an OAuth wake-up");
+    }
+    for url in [
+        "zhishu-ccswitch://v1/import?resource=provider&app=claude&name=Test",
+        "zhishu-ccswitch://v2/oauth",
+        "https://example.com/v1/oauth",
+        "zhishu-ccswitch://v1/oauth/extra",
+    ] {
+        assert!(
+            !is_oauth_wakeup(url),
+            "{url} should not be an OAuth wake-up"
+        );
+    }
 }
 
 #[test]
@@ -1263,10 +1304,10 @@ fn test_codex_link_config_keeps_provider_auth_fields_through_to_live() {
     let config = serde_json::json!({
         "auth": { "OPENAI_API_KEY": "sk-link" },
         "config": concat!(
-            "model_provider = \"custom\"\n",
+            "model_provider = \"zhishu\"\n",
             "model = \"gpt-5.5\"\n",
             "model_reasoning_effort = \"medium\"\n\n",
-            "[model_providers.custom]\n",
+            "[model_providers.zhishu]\n",
             "name = \"Relay Auth\"\n",
             "base_url = \"https://api.relay.example/v1\"\n",
             "wire_api = \"responses\"\n",
@@ -1283,7 +1324,7 @@ fn test_codex_link_config_keeps_provider_auth_fields_through_to_live() {
     let doc = row_config(&settings);
     assert_eq!(doc["model"].as_str(), Some("gpt-5.5"));
     assert_eq!(doc["model_reasoning_effort"].as_str(), Some("medium"));
-    let table = &doc["model_providers"]["custom"];
+    let table = &doc["model_providers"]["zhishu"];
     assert_eq!(table["name"].as_str(), Some("Relay Auth"));
     assert_eq!(table["requires_openai_auth"].as_bool(), Some(false));
     assert_eq!(table["supports_websockets"].as_bool(), Some(true));
@@ -1324,9 +1365,9 @@ fn test_codex_link_url_params_override_the_config_and_refresh_the_bearer_token()
     let doc = row_config(&settings);
 
     // 选路一律写成 custom，链接自己的 id 不带进来
-    assert_eq!(doc["model_provider"].as_str(), Some("custom"));
+    assert_eq!(doc["model_provider"].as_str(), Some("zhishu"));
     assert!(doc["model_providers"].get("relay").is_none());
-    let table = &doc["model_providers"]["custom"];
+    let table = &doc["model_providers"]["zhishu"];
     assert_eq!(
         table["base_url"].as_str(),
         Some("https://api.relay.example/v1")
@@ -1343,7 +1384,7 @@ fn test_codex_link_config_keeps_same_origin_model_catalog_url() {
     // #7942
     let config = serde_json::json!({
         "config": concat!(
-            "[model_providers.custom]\n",
+            "[model_providers.zhishu]\n",
             "base_url = \"https://api.relay.example/v1\"\n",
             "model_catalog_url = \"https://api.relay.example/v1/models?format=codex\"\n",
         )
@@ -1351,7 +1392,7 @@ fn test_codex_link_config_keeps_same_origin_model_catalog_url() {
 
     let settings = import_codex_with_config(config, None, Some("custom-model")).unwrap();
     assert_eq!(
-        row_config(&settings)["model_providers"]["custom"]["model_catalog_url"].as_str(),
+        row_config(&settings)["model_providers"]["zhishu"]["model_catalog_url"].as_str(),
         Some("https://api.relay.example/v1/models?format=codex")
     );
     assert_eq!(
@@ -1365,7 +1406,7 @@ fn test_codex_link_config_rejects_a_model_catalog_url_on_another_origin() {
     // Codex 取目录时带着这个供应商的鉴权：别的源会把 Key 发到确认框里没显示的地方
     let config = serde_json::json!({
         "config": concat!(
-            "[model_providers.custom]\n",
+            "[model_providers.zhishu]\n",
             "base_url = \"https://api.relay.example/v1\"\n",
             "model_catalog_url = \"https://collector.example/models\"\n",
         )
@@ -1390,7 +1431,7 @@ fn test_codex_link_config_keeps_provider_settings_and_drops_global_ones() {
             "[features]\nstandalone_web_search = true\n\n",
             "[tools.web_search]\ncontext_size = \"high\"\n\n",
             "[mcp_servers.evil]\ncommand = \"sh\"\n\n",
-            "[model_providers.custom]\n",
+            "[model_providers.zhishu]\n",
             "base_url = \"https://api.relay.example/v1\"\n",
             "supports_standalone_web_search = true\n",
             "unknown_future_field = \"x\"\n",
@@ -1407,7 +1448,7 @@ fn test_codex_link_config_keeps_provider_settings_and_drops_global_ones() {
         Some("gpt-5.5-mini")
     );
     assert_eq!(
-        doc["model_providers"]["custom"]["supports_standalone_web_search"].as_bool(),
+        doc["model_providers"]["zhishu"]["supports_standalone_web_search"].as_bool(),
         Some(true)
     );
     for dropped in [
@@ -1423,7 +1464,7 @@ fn test_codex_link_config_keeps_provider_settings_and_drops_global_ones() {
             "'{dropped}' must not be imported"
         );
     }
-    assert!(doc["model_providers"]["custom"]
+    assert!(doc["model_providers"]["zhishu"]
         .get("unknown_future_field")
         .is_none());
 }
@@ -1431,19 +1472,19 @@ fn test_codex_link_config_keeps_provider_settings_and_drops_global_ones() {
 #[test]
 fn test_codex_link_config_rejects_command_and_local_credential_sources() {
     for (key, snippet) in [
-        ("auth", "[model_providers.custom.auth]\ncommand = \"sh\"\n"),
+        ("auth", "[model_providers.zhishu.auth]\ncommand = \"sh\"\n"),
         (
             "aws",
-            "[model_providers.custom.aws]\nprofile = \"default\"\n",
+            "[model_providers.zhishu.aws]\nprofile = \"default\"\n",
         ),
         (
             "env_http_headers",
-            "[model_providers.custom.env_http_headers]\nx-key = \"HOME\"\n",
+            "[model_providers.zhishu.env_http_headers]\nx-key = \"HOME\"\n",
         ),
     ] {
         let config = serde_json::json!({
             "config": format!(
-                "[model_providers.custom]\nbase_url = \"https://api.relay.example/v1\"\n\n{snippet}"
+                "[model_providers.zhishu]\nbase_url = \"https://api.relay.example/v1\"\n\n{snippet}"
             )
         });
         let err = import_codex_with_config(config, None, None).unwrap_err();
@@ -1455,7 +1496,7 @@ fn test_codex_link_config_rejects_command_and_local_credential_sources() {
 fn test_codex_link_config_drops_env_key_when_the_link_has_a_key() {
     let config = serde_json::json!({
         "config": concat!(
-            "[model_providers.custom]\n",
+            "[model_providers.zhishu]\n",
             "base_url = \"https://api.relay.example/v1\"\n",
             "env_key = \"RELAY_API_KEY\"\n",
         )
@@ -1463,7 +1504,7 @@ fn test_codex_link_config_drops_env_key_when_the_link_has_a_key() {
 
     let settings = import_codex_with_config(config, None, None).unwrap();
     let doc = row_config(&settings);
-    assert!(doc["model_providers"]["custom"].get("env_key").is_none());
+    assert!(doc["model_providers"]["zhishu"].get("env_key").is_none());
     // 没有 env_key，切换时 Key 走 bearer token
     assert_eq!(
         projected_route_table(&settings)["experimental_bearer_token"].as_str(),
@@ -1480,7 +1521,7 @@ fn test_codex_link_with_only_env_key_is_rejected_by_name() {
         name: Some("Relay".to_string()),
         config: Some(BASE64_STANDARD.encode(
             serde_json::json!({
-                "config": "[model_providers.custom]\nbase_url = \"https://api.relay.example/v1\"\nenv_key = \"RELAY_API_KEY\"\n"
+                "config": "[model_providers.zhishu]\nbase_url = \"https://api.relay.example/v1\"\nenv_key = \"RELAY_API_KEY\"\n"
             })
             .to_string(),
         )),
@@ -1498,8 +1539,8 @@ fn test_codex_link_accepts_a_whole_config_toml() {
 
     // configFormat=toml：整份就是 config.toml
     let toml_text = concat!(
-        "model_provider = \"custom\"\nmodel = \"gpt-5.5\"\n\n",
-        "[model_providers.custom]\nname = \"Toml Relay\"\n",
+        "model_provider = \"zhishu\"\nmodel = \"gpt-5.5\"\n\n",
+        "[model_providers.zhishu]\nname = \"Toml Relay\"\n",
         "base_url = \"https://api.relay.example/v1\"\n",
         "wire_api = \"responses\"\nsupports_websockets = true\n",
         "experimental_bearer_token = \"sk-from-toml\"\n",
@@ -1527,11 +1568,11 @@ fn test_codex_link_accepts_a_whole_config_toml() {
         .settings_config;
     let doc = row_config(&settings);
     assert_eq!(
-        doc["model_providers"]["custom"]["supports_websockets"].as_bool(),
+        doc["model_providers"]["zhishu"]["supports_websockets"].as_bool(),
         Some(true)
     );
     assert_eq!(
-        doc["model_providers"]["custom"]["name"].as_str(),
+        doc["model_providers"]["zhishu"]["name"].as_str(),
         Some("Toml Relay")
     );
 }

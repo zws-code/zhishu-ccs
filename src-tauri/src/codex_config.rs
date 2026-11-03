@@ -21,8 +21,9 @@ pub const CC_SWITCH_CODEX_MODEL_PROVIDER_ID: &str = "custom";
 /// provider is routed through CC Switch.  A dedicated id is an ownership
 /// marker: unlike a generic localhost `base_url`, it can be detected and
 /// cleaned up without mistaking a user's own local provider for takeover.
-pub const CC_SWITCH_CODEX_OFFICIAL_PROXY_PROVIDER_ID: &str = "cc-switch-official";
-pub const CC_SWITCH_CODEX_MODEL_CATALOG_FILENAME: &str = "cc-switch-model-catalog.json";
+pub const CC_SWITCH_CODEX_OFFICIAL_PROXY_PROVIDER_ID: &str =
+    crate::zhishu::identity::CODEX_OFFICIAL_PROXY;
+pub const CC_SWITCH_CODEX_MODEL_CATALOG_FILENAME: &str = crate::zhishu::identity::CODEX_CATALOG;
 
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
@@ -311,9 +312,12 @@ fn extract_codex_managed_oauth_account_id(auth: &Value) -> Option<String> {
         return None;
     }
 
-    let api_key_is_clearable = auth
-        .get("OPENAI_API_KEY")
-        .is_none_or(|value| value.is_null() || value.as_str() == Some("PROXY_MANAGED"));
+    let api_key_is_clearable = auth.get("OPENAI_API_KEY").is_none_or(|value| {
+        value.is_null()
+            || value
+                .as_str()
+                .is_some_and(crate::zhishu::identity::is_proxy_token)
+    });
     if !api_key_is_clearable {
         return None;
     }
@@ -2553,6 +2557,7 @@ pub(crate) enum CodexStackRoute<'a> {
 /// 上一家（#8485）。代价是加进第一家、移除最后一家时，路由上原本带值的会话会用路由那家
 /// 自己的模型压缩一次。官方路由的原生行不改：失败时 Codex 会改用当前模型重试，官方的
 /// 压缩语义也要保留。
+// This is a persisted protocol grouping key, not a product ownership marker.
 const CODEX_STACK_COMP_HASH: &str = "cc-switch";
 
 /// 让一行加入合并目录里共用历史的那组：`comp_hash` 按工具协议分组，同协议的行共用一个值。
@@ -2748,7 +2753,7 @@ fn sink_row_windows(entry: &mut Value, windows: &RowWindows, third_party: bool) 
 ///
 /// We only reverse-parse catalogs whose `model_catalog_json` path is the
 /// cc-switch–generated file (identified by filename
-/// `cc-switch-model-catalog.json`). A user-managed external catalog file is
+/// `zhishu-ccs-model-catalog.json`). A user-managed external catalog file is
 /// left alone — surfacing its richer structure as the simplified table would
 /// be a downgrade we can't safely round-trip.
 ///
@@ -2858,7 +2863,7 @@ pub(crate) fn resolve_cc_switch_catalog_path(
     }
 
     // 词法包含不等于运行时包含：配置目录内的符号链接（如 ~/.codex/link ->
-    // /etc）能让 `link/cc-switch-model-catalog.json` 通过上面的检查，读取却
+    // /etc）能让 `link/zhishu-ccs-model-catalog.json` 通过上面的检查，读取却
     // 落到目录外。文件存在时把真实路径 canonicalize 出来再校验一次，并把
     // canonical 路径返回给调用方——后续读取不再经过 symlink 组件。
     if resolved.exists() {
@@ -3119,18 +3124,22 @@ pub fn codex_config_routes_official_to_proxy(
     };
     match doc.get("model_provider").and_then(|item| item.as_str()) {
         None | Some("openai") => same_url(doc.get("openai_base_url")),
-        Some(CC_SWITCH_CODEX_MODEL_PROVIDER_ID) => doc
-            .get("model_providers")
-            .and_then(|item| item.as_table_like())
-            .and_then(|providers| providers.get(CC_SWITCH_CODEX_MODEL_PROVIDER_ID))
-            .and_then(|item| item.as_table_like())
-            .is_some_and(|table| {
-                table
-                    .get("requires_openai_auth")
-                    .and_then(|item| item.as_bool())
-                    == Some(true)
-                    && same_url(table.get("base_url"))
-            }),
+        Some(id)
+            if id == crate::zhishu::identity::CODEX_ROUTE
+                || id == CC_SWITCH_CODEX_MODEL_PROVIDER_ID =>
+        {
+            doc.get("model_providers")
+                .and_then(|item| item.as_table_like())
+                .and_then(|providers| providers.get(id))
+                .and_then(|item| item.as_table_like())
+                .is_some_and(|table| {
+                    table
+                        .get("requires_openai_auth")
+                        .and_then(|item| item.as_bool())
+                        == Some(true)
+                        && same_url(table.get("base_url"))
+                })
+        }
         Some(_) => false,
     }
 }
@@ -3161,15 +3170,20 @@ pub fn strip_codex_unified_session_bucket(config_text: &str) -> Result<String, A
         .parse::<DocumentMut>()
         .map_err(|e| AppError::Message(format!("Invalid Codex config.toml: {e}")))?;
 
-    if doc.get("model_provider").and_then(|item| item.as_str())
-        != Some(CC_SWITCH_CODEX_MODEL_PROVIDER_ID)
-    {
+    let Some(route_id) = doc
+        .get("model_provider")
+        .and_then(|item| item.as_str())
+        .filter(|id| {
+            *id == CC_SWITCH_CODEX_MODEL_PROVIDER_ID || *id == crate::zhishu::identity::CODEX_ROUTE
+        })
+        .map(str::to_string)
+    else {
         return Ok(config_text.to_string());
-    }
+    };
     let matches_injected = doc
         .get("model_providers")
         .and_then(|item| item.as_table())
-        .and_then(|providers| providers.get(CC_SWITCH_CODEX_MODEL_PROVIDER_ID))
+        .and_then(|providers| providers.get(&route_id))
         .and_then(|item| item.as_table())
         .is_some_and(table_matches_codex_unified_official_provider);
     if !matches_injected {
@@ -3180,7 +3194,7 @@ pub fn strip_codex_unified_session_bucket(config_text: &str) -> Result<String, A
     let providers_empty = doc["model_providers"]
         .as_table_mut()
         .map(|providers| {
-            providers.remove(CC_SWITCH_CODEX_MODEL_PROVIDER_ID);
+            providers.remove(&route_id);
             providers.is_empty()
         })
         .unwrap_or(false);
@@ -3224,13 +3238,13 @@ mod tests {
         for (config, expected) in [
             ("openai_base_url = \"http://127.0.0.1:15721/v1/\"\n", true),
             ("model_provider = \"openai\"\nopenai_base_url = \"http://127.0.0.1:15721/v1\"\n", true),
-            ("model_provider = \"custom\"\n[model_providers.custom]\nname = \"OpenAI\"\nbase_url = \"http://127.0.0.1:15721/v1\"\nrequires_openai_auth = true\n", true),
+            ("model_provider = \"zhishu\"\n[model_providers.zhishu]\nname = \"OpenAI\"\nbase_url = \"http://127.0.0.1:15721/v1\"\nrequires_openai_auth = true\n", true),
             // 别的地址（比如其他工具改道到自己的本地服务）不算。
             ("openai_base_url = \"http://127.0.0.1:10531/v1\"\n", false),
             // 选了别的 provider，改道不生效。
             ("model_provider = \"relay\"\nopenai_base_url = \"http://127.0.0.1:15721/v1\"\n", false),
             // 官方直连的统一会话镜像表没有地址。
-            ("model_provider = \"custom\"\n[model_providers.custom]\nname = \"OpenAI\"\nrequires_openai_auth = true\n", false),
+            ("model_provider = \"zhishu\"\n[model_providers.zhishu]\nname = \"OpenAI\"\nrequires_openai_auth = true\n", false),
             ("model = \"gpt-5.5\"\n", false),
         ] {
             assert_eq!(
@@ -3350,7 +3364,7 @@ mod tests {
         crate::config::write_json_file(&get_codex_auth_path(), &auth).expect("seed live auth R1");
         crate::config::write_text_file(
             &get_codex_config_path(),
-            "# cas-guard-sentinel\nmodel = \"gpt-5.5\"\nmodel_catalog_json = \"cc-switch-model-catalog.json\"\n",
+            "# cas-guard-sentinel\nmodel = \"gpt-5.5\"\nmodel_catalog_json = \"zhishu-ccs-model-catalog.json\"\n",
         )
         .expect("seed live config");
         crate::config::write_json_file(
@@ -3413,9 +3427,9 @@ mod tests {
     fn unified_session_bucket_strip_keeps_third_party_custom_entry() {
         // 第三方模板同样用 custom 路由，但条目带 base_url 等差异字段，
         // 形态不等于注入产物，必须原样保留。
-        let third_party = r#"model_provider = "custom"
+        let third_party = r#"model_provider = "zhishu"
 
-[model_providers.custom]
+[model_providers.zhishu]
 name = "Relay"
 base_url = "https://relay.example/v1"
 wire_api = "responses"
@@ -3458,7 +3472,7 @@ base_url = "https://other.example.com/v1"
     fn extract_base_url_ignores_non_active_provider_sections() {
         let mismatched = r#"model_provider = "openai"
 
-[model_providers.custom]
+[model_providers.zhishu]
 base_url = "https://leftover.example.com/v1"
 "#;
         assert_eq!(extract_codex_base_url(mismatched), None);
@@ -4535,9 +4549,9 @@ experimental_bearer_token = "stale-table-key"
     }
 
     const DEEPSEEK_NATIVE_CONFIG: &str = r#"model = "deepseek-v4-flash"
-model_provider = "custom"
+model_provider = "zhishu"
 
-[model_providers.custom]
+[model_providers.zhishu]
 name = "deepseek"
 base_url = "https://api.deepseek.com"
 wire_api = "responses"
@@ -4752,9 +4766,9 @@ wire_api = "responses"
         }
 
         let minimax_config = r#"model = "MiniMax-M3"
-model_provider = "custom"
+model_provider = "zhishu"
 
-[model_providers.custom]
+[model_providers.zhishu]
 name = "minimax"
 base_url = "https://api.minimaxi.com/v1"
 wire_api = "responses"
@@ -4872,7 +4886,7 @@ wire_api = "responses"
     fn web_search_blacklist_disables_only_known_reject_gateways() {
         let cfg = |model: &str, base_url: &str| {
             format!(
-                "model_provider = \"custom\"\nmodel = \"{model}\"\n\n[model_providers.custom]\nname = \"x\"\nbase_url = \"{base_url}\"\nwire_api = \"responses\"\n"
+                "model_provider = \"zhishu\"\nmodel = \"{model}\"\n\n[model_providers.zhishu]\nname = \"x\"\nbase_url = \"{base_url}\"\nwire_api = \"responses\"\n"
             )
         };
 
@@ -4998,7 +5012,7 @@ wire_api = "responses"
     #[test]
     fn resolve_catalog_path_accepts_cc_switch_owned_file() {
         let base = PathBuf::from("/tmp/.codex");
-        let config = r#"model_catalog_json = "/tmp/.codex/cc-switch-model-catalog.json"
+        let config = r#"model_catalog_json = "/tmp/.codex/zhishu-ccs-model-catalog.json"
 "#;
         let resolved = resolve_cc_switch_catalog_path(config, &base).expect("path resolves");
         assert_eq!(resolved, base.join(CC_SWITCH_CODEX_MODEL_CATALOG_FILENAME));
@@ -5123,7 +5137,7 @@ wire_api = "responses"
             restored(["deepseek-v4-flash", "deepseek-v4-flash"]).as_deref(),
             Some("deepseek-v4-flash")
         );
-        assert_eq!(restored(["ccs-kimi/k3", "ccs-kimi/k3"]), None);
+        assert_eq!(restored(["zccs-kimi/k3", "zccs-kimi/k3"]), None);
         assert_eq!(restored(["deepseek-v4-flash", "deepseek-v4-pro"]), None);
 
         let plain = r#"{ "models": [{ "slug": "deepseek-v4-pro" }] }"#;
@@ -5356,7 +5370,7 @@ wire_api = "responses"
                 )
                 .unwrap();
                 let model = &stacked["models"][0];
-                assert_eq!(model["slug"], "ccs-gemini/gemini-3.8-flash-high");
+                assert_eq!(model["slug"], "zccs-gemini/gemini-3.8-flash-high");
                 assert_eq!(model["context_window"], window);
                 assert_eq!(model["auto_compact_token_limit"], window * 9 / 10);
 
@@ -5559,7 +5573,7 @@ wire_api = "responses"
         });
         // 两家都有 GPT-6 Sol：各一条，内容都是官方的。
         assert_eq!(models[0]["slug"], "gpt-6-sol");
-        assert_eq!(models[1]["slug"], "ccs-relay/gpt-6-sol");
+        assert_eq!(models[1]["slug"], "zccs-relay/gpt-6-sol");
         for model in &models {
             assert_eq!(
                 model["model_messages"]["instructions_template"],
@@ -5740,7 +5754,7 @@ wire_api = "responses"
                 "gpt-6-astra",
                 "gpt-6-sol",
                 "gpt-5.5",
-                "ccs-ds/deepseek-v4-pro"
+                "zccs-ds/deepseek-v4-pro"
             ]
         );
         assert_eq!(
@@ -5827,7 +5841,7 @@ wire_api = "responses"
         let catalog = r#"{
             "models": [
                 { "slug": "deepseek/deepseek-v4" },
-                { "slug": "ccs-kimi/kimi-k3" }
+                { "slug": "zccs-kimi/kimi-k3" }
             ]
         }"#;
         let result = build_simplified_catalog_from_texts("", catalog).expect("entries");
@@ -5877,7 +5891,7 @@ wire_api = "responses"
         .unwrap();
         let models = stacked["models"].as_array().unwrap();
         assert_eq!(models[0]["slug"], "deepseek-v4-pro");
-        assert_eq!(models[1]["slug"], "ccs-ds/deepseek-v4-pro");
+        assert_eq!(models[1]["slug"], "zccs-ds/deepseek-v4-pro");
         for model in models {
             assert_eq!(model["comp_hash"], "cc-switch", "{}", model["slug"]);
         }
@@ -5926,7 +5940,11 @@ wire_api = "responses"
         let slugs: Vec<&str> = models.iter().map(|m| m["slug"].as_str().unwrap()).collect();
         assert_eq!(
             slugs,
-            vec!["gpt-6-sol", "ccs-relay/gpt-6-sol", "ccs-ds/deepseek-v4-pro"]
+            vec![
+                "gpt-6-sol",
+                "zccs-relay/gpt-6-sol",
+                "zccs-ds/deepseek-v4-pro"
+            ]
         );
         let mirrored = &direct["models"][0];
         assert_eq!(mirrored["tool_mode"], "code_mode_only");
@@ -5971,7 +5989,7 @@ wire_api = "responses"
         let models = catalog["models"].as_array().unwrap();
         assert_eq!(models.len(), 2);
         let stacked = &models[1];
-        assert_eq!(stacked["slug"], "ccs-anth/claude-opus-5");
+        assert_eq!(stacked["slug"], "zccs-anth/claude-opus-5");
         assert_eq!(stacked["display_name"], "claude-opus-5（Anth）");
         assert_eq!(stacked["description"], "claude-opus-5 · 400K");
         assert_eq!(stacked["shell_type"], "shell_command");
@@ -6317,7 +6335,7 @@ wire_api = "responses"
         .expect("write models cache");
 
         let settings = json!({ "modelCatalog": { "models": [{ "model": "glm-5.3" }] } });
-        let config_text = "model_provider = \"custom\"\nmodel = \"glm-5.3\"\n\n[model_providers.custom]\nname = \"x\"\nbase_url = \"https://open.bigmodel.cn/api/coding/paas/v4\"\nwire_api = \"chat\"\n";
+        let config_text = "model_provider = \"zhishu\"\nmodel = \"glm-5.3\"\n\n[model_providers.zhishu]\nname = \"x\"\nbase_url = \"https://open.bigmodel.cn/api/coding/paas/v4\"\nwire_api = \"chat\"\n";
         let catalog = codex_model_catalog_from_settings(
             &settings,
             config_text,
@@ -6350,8 +6368,8 @@ wire_api = "responses"
 
     #[test]
     fn resolve_catalog_finds_relative_filename() {
-        let config_text = r#"model_provider = "custom"
-model_catalog_json = "cc-switch-model-catalog.json"
+        let config_text = r#"model_provider = "zhishu"
+model_catalog_json = "zhishu-ccs-model-catalog.json"
 "#;
         let base_dir = PathBuf::from("/home/user/.codex");
         let result = resolve_cc_switch_catalog_path(config_text, &base_dir);
@@ -6364,7 +6382,7 @@ model_catalog_json = "cc-switch-model-catalog.json"
 
     #[test]
     fn resolve_catalog_rejects_absolute_path_outside_config_dir() {
-        let config_text = r#"model_catalog_json = "/tmp/secret/cc-switch-model-catalog.json"
+        let config_text = r#"model_catalog_json = "/tmp/secret/zhishu-ccs-model-catalog.json"
 "#;
         let base_dir = PathBuf::from("/home/user/.codex");
         let result = resolve_cc_switch_catalog_path(config_text, &base_dir);
@@ -6376,7 +6394,7 @@ model_catalog_json = "cc-switch-model-catalog.json"
 
     #[test]
     fn resolve_catalog_accepts_absolute_path_inside_config_dir() {
-        let config_text = r#"model_catalog_json = "/home/user/.codex/cc-switch-model-catalog.json"
+        let config_text = r#"model_catalog_json = "/home/user/.codex/zhishu-ccs-model-catalog.json"
 "#;
         let base_dir = PathBuf::from("/home/user/.codex");
         let result = resolve_cc_switch_catalog_path(config_text, &base_dir);
@@ -6389,7 +6407,7 @@ model_catalog_json = "cc-switch-model-catalog.json"
 
     #[test]
     fn resolve_catalog_rejects_traversal_to_parent_directory() {
-        let config_text = r#"model_catalog_json = "../cc-switch-model-catalog.json"
+        let config_text = r#"model_catalog_json = "../zhishu-ccs-model-catalog.json"
 "#;
         let base_dir = PathBuf::from("/home/user/.codex");
         let result = resolve_cc_switch_catalog_path(config_text, &base_dir);
@@ -6402,7 +6420,7 @@ model_catalog_json = "cc-switch-model-catalog.json"
     #[test]
     fn resolve_catalog_rejects_symlink_escaping_config_dir() {
         // 词法包含可被符号链接绕过：~/.codex/link -> 外部目录，
-        // "link/cc-switch-model-catalog.json" 词法上在 base 内，真实读取却落到
+        // "link/zhishu-ccs-model-catalog.json" 词法上在 base 内，真实读取却落到
         // base 外。canonicalize 之后的二次校验必须拒绝。
         let temp = tempfile::tempdir().expect("tempdir");
         let base_dir = temp.path().join("codex");
@@ -6423,7 +6441,7 @@ model_catalog_json = "cc-switch-model-catalog.json"
             return;
         }
 
-        let config_text = r#"model_catalog_json = "link/cc-switch-model-catalog.json"
+        let config_text = r#"model_catalog_json = "link/zhishu-ccs-model-catalog.json"
 "#;
         let result = resolve_cc_switch_catalog_path(config_text, &base_dir);
         let via_link = base_dir
@@ -6453,7 +6471,7 @@ model_catalog_json = "cc-switch-model-catalog.json"
         let catalog_file = base_dir.join(CC_SWITCH_CODEX_MODEL_CATALOG_FILENAME);
         fs::write(&catalog_file, r#"{"models":[]}"#).expect("write catalog");
 
-        let config_text = r#"model_catalog_json = "cc-switch-model-catalog.json"
+        let config_text = r#"model_catalog_json = "zhishu-ccs-model-catalog.json"
 "#;
         let result = resolve_cc_switch_catalog_path(config_text, &base_dir);
         let resolved = result.expect("real file inside config dir should be accepted");

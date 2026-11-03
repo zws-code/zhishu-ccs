@@ -26,6 +26,7 @@ mod omp;
 mod opencode_tests;
 mod pi;
 mod usage;
+use crate::zhishu::integrations::ccswitch::workbuddy;
 
 use indexmap::IndexMap;
 use regex::Regex;
@@ -48,6 +49,10 @@ pub use live::{
 
 pub fn import_pi_providers_from_live(state: &AppState) -> Result<usize, AppError> {
     pi::import_from_live(state)
+}
+
+pub fn import_workbuddy_providers_from_live(state: &AppState) -> Result<usize, AppError> {
+    workbuddy::import_from_live(state)
 }
 
 pub fn import_omp_providers_from_live(state: &AppState) -> Result<usize, AppError> {
@@ -339,8 +344,8 @@ mod tests {
                 "OPENAI_API_KEY": api_key
             },
             "config": format!(
-                "model_provider = \"custom\"\n\
-                 [model_providers.custom]\n\
+                "model_provider = \"zhishu\"\n\
+                 [model_providers.zhishu]\n\
                  name = \"custom\"\n\
                  base_url = \"{base_url}\"\n\
                  wire_api = \"chat\"\n"
@@ -393,8 +398,8 @@ mod tests {
                 .expect("keyless managed Copilot preview");
                 let text = view.settings["config"].as_str().expect("config text");
                 let parsed: toml::Value = toml::from_str(text).expect("preview TOML");
-                let route = &parsed["model_providers"]["custom"];
-                assert_eq!(parsed["model_provider"].as_str(), Some("custom"));
+                let route = &parsed["model_providers"]["zhishu"];
+                assert_eq!(parsed["model_provider"].as_str(), Some("zhishu"));
                 assert_eq!(route["wire_api"].as_str(), Some("responses"));
                 assert!(route.get("requires_openai_auth").is_none());
                 assert!(route.get("experimental_bearer_token").is_none());
@@ -1038,7 +1043,7 @@ mod tests {
             );
 
             // 旧版「统一会话历史」注入进 live、又被回填进行里的形态，保存时剥掉。
-            unbound.settings_config["config"] = Value::String("model_provider = \"custom\"\n\n[model_providers.custom]\nname = \"OpenAI\"\nrequires_openai_auth = true\nsupports_websockets = true\nwire_api = \"responses\"\n".to_string());
+            unbound.settings_config["config"] = Value::String("model_provider = \"zhishu\"\n\n[model_providers.zhishu]\nname = \"OpenAI\"\nrequires_openai_auth = true\nsupports_websockets = true\nwire_api = \"responses\"\n".to_string());
             ProviderService::update(state, AppType::Codex, Some(provider_id), unbound)
                 .expect("unbind managed account");
 
@@ -1296,6 +1301,55 @@ mod tests {
                 "DEBUG": "1"
             }})
         );
+    }
+
+    /// 手动供应商只发布显式字段，平台模型档位由上层组装。
+    #[tokio::test]
+    #[serial]
+    async fn switching_manual_claude_provider_keeps_missing_model_slots_absent() {
+        let _home = TempHome::new();
+        crate::settings::reload_settings().expect("reload settings");
+
+        let db = Arc::new(Database::memory().expect("init db"));
+        let state = AppState::new(db.clone());
+        let bare = Provider::with_id(
+            "gw".into(),
+            "Gateway".into(),
+            json!({ "env": {
+                "ANTHROPIC_BASE_URL": "https://gw.example",
+                "ANTHROPIC_AUTH_TOKEN": "sk-gw",
+                "ANTHROPIC_MODEL": "glm-5.2"
+            }}),
+            None,
+        );
+        db.save_provider("claude", &bare).expect("save provider");
+        ProviderService::switch(&state, AppType::Claude, "gw").expect("switch");
+
+        let live: Value = read_json_file(&get_claude_settings_path()).expect("read live");
+        let env = |key: &str| live["env"][key].as_str();
+        assert_eq!(env("ANTHROPIC_DEFAULT_HAIKU_MODEL"), None);
+        assert_eq!(env("ANTHROPIC_DEFAULT_SONNET_MODEL"), None);
+        assert_eq!(env("ANTHROPIC_DEFAULT_OPUS_MODEL"), None);
+
+        let preview = claude_editor::view(&state, &bare.settings_config).expect("editor preview");
+        for key in [
+            "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+            "ANTHROPIC_DEFAULT_SONNET_MODEL",
+            "ANTHROPIC_DEFAULT_OPUS_MODEL",
+        ] {
+            assert!(preview.settings["env"].get(key).is_none(), "{key}");
+        }
+
+        // 持久化配置保持用户原样。
+        let row = db
+            .get_all_providers("claude")
+            .expect("providers")
+            .get("gw")
+            .expect("row")
+            .clone();
+        assert!(row.settings_config["env"]
+            .get("ANTHROPIC_DEFAULT_SONNET_MODEL")
+            .is_none());
     }
 
     /// 文件已经写成目标供应商、指针还没改时崩溃：下次启动按 pending 补完指针，
@@ -2014,7 +2068,7 @@ disable_response_storage = true
 model_reasoning_effort = "high"
 approval_policy = "on-request"
 experimental_bearer_token = "sk-live-secret"
-model_catalog_json = "cc-switch-model-catalog.json"
+model_catalog_json = "zhishu-ccs-model-catalog.json"
 web_search = "disabled"
 
 [agents]
@@ -2188,7 +2242,7 @@ command = "legacy-cmd"
         let env = &live["env"];
         // 行里只配了 `ANTHROPIC_API_KEY`（供上游跳用 x-api-key），本地占位符仍落在
         // `ANTHROPIC_AUTH_TOKEN`，且本地不出现 `ANTHROPIC_API_KEY`（#8104）。
-        assert_eq!(env["ANTHROPIC_AUTH_TOKEN"], "PROXY_MANAGED");
+        assert_eq!(env["ANTHROPIC_AUTH_TOKEN"], "ZHISHU_CCS_PROXY_MANAGED");
         assert_eq!(
             env.get("ANTHROPIC_API_KEY"),
             None,
@@ -2227,10 +2281,10 @@ command = "legacy-cmd"
             "Codex A".into(),
             json!({
                 "auth": { "OPENAI_API_KEY": "token-a" },
-                "config": r#"model_provider = "custom"
+                "config": r#"model_provider = "zhishu"
 model = "old-model"
 
-[model_providers.custom]
+[model_providers.zhishu]
 name = "Codex A"
 base_url = "https://api.a.example/v1"
 wire_api = "responses"
@@ -2270,10 +2324,10 @@ requires_openai_auth = true
 
         let mut updated = original.clone();
         updated.settings_config["config"] = json!(
-            r#"model_provider = "custom"
+            r#"model_provider = "zhishu"
 model = "gpt-5.4"
 
-[model_providers.custom]
+[model_providers.zhishu]
 name = "Codex A"
 base_url = "https://api.updated.example/v1"
 wire_api = "responses"
@@ -5411,7 +5465,10 @@ impl ProviderService {
             .live_config_managed = Some(managed);
     }
 
-    fn normalize_usage_script_credential_overrides(app_type: &AppType, provider: &mut Provider) {
+    pub(crate) fn normalize_usage_script_credential_overrides(
+        app_type: &AppType,
+        provider: &mut Provider,
+    ) {
         let current_credentials = provider.resolve_usage_credentials(app_type);
 
         let Some(usage_script) = provider
@@ -5492,6 +5549,9 @@ impl ProviderService {
         }
         if app_type == AppType::Pi {
             return pi::list(state);
+        }
+        if app_type == AppType::WorkBuddy {
+            return workbuddy::list(state);
         }
         if app_type == AppType::Omp {
             return omp::list(state);
@@ -5662,6 +5722,21 @@ impl ProviderService {
         provider: Provider,
         add_to_live: bool,
     ) -> Result<bool, AppError> {
+        let app = app_type.as_str().to_string();
+        crate::config_history::with_operation_action(app, "add_provider", || {
+            Self::add_inner(state, app_type, provider, add_to_live)
+        })
+    }
+
+    /// Original body of `add`; the public entry stamps the user operation
+    /// label so history records read "add/remove provider" instead of the
+    /// mechanical switch/apply write action.
+    fn add_inner(
+        state: &AppState,
+        app_type: AppType,
+        provider: Provider,
+        add_to_live: bool,
+    ) -> Result<bool, AppError> {
         let _native_guard = lock_native_provider_operations(state, &app_type);
         if app_type == AppType::Kimi
             && crate::kimi_config::is_official_provider(&provider.settings_config)
@@ -5672,6 +5747,9 @@ impl ProviderService {
         }
         if app_type == AppType::Pi {
             return pi::add(state, provider, add_to_live);
+        }
+        if app_type == AppType::WorkBuddy {
+            return workbuddy::add(state, provider, add_to_live);
         }
 
         if app_type == AppType::Omp {
@@ -5931,6 +6009,22 @@ impl ProviderService {
     /// 从编辑器新增供应商。Claude Code、Codex、Gemini CLI、Grok Build 按关键字段拆开保存
     /// （见各自的 `*_editor`），其余应用和 `add` 一样。
     pub fn add_from_editor(
+        state: &AppState,
+        app_type: AppType,
+        provider: Provider,
+        add_to_live: bool,
+        editor: Option<EditorSave>,
+    ) -> Result<bool, AppError> {
+        let app = app_type.as_str().to_string();
+        crate::config_history::with_operation_action(app, "add_provider", || {
+            Self::add_from_editor_inner(state, app_type, provider, add_to_live, editor)
+        })
+    }
+
+    /// Original body of `add_from_editor`; the public entry stamps the user operation
+    /// label so history records read "add/remove provider" instead of the
+    /// mechanical switch/apply write action.
+    fn add_from_editor_inner(
         state: &AppState,
         app_type: AppType,
         provider: Provider,
@@ -6245,6 +6339,25 @@ impl ProviderService {
         Self::keep_row_if_written(state, &app_type, &provider.id, existing.as_ref(), written)
     }
 
+    /// Update metadata without publishing native configuration or replacing the provider row.
+    pub(crate) fn update_metadata(
+        state: &AppState,
+        app_type: AppType,
+        id: &str,
+        update: impl FnOnce(&mut Value) -> Result<(), AppError>,
+    ) -> Result<bool, AppError> {
+        let _guard = if app_type.has_route_mode() {
+            crate::mode::controller::lock_settled_blocking(state, &app_type)?
+        } else {
+            Some(futures::executor::block_on(
+                state.proxy_service.lock_switch_for_app(app_type.as_str()),
+            ))
+        };
+        state
+            .db
+            .update_provider_metadata(app_type.as_str(), id, update)
+    }
+
     /// Update a provider
     pub fn update(
         state: &AppState,
@@ -6276,6 +6389,9 @@ impl ProviderService {
         }
         if app_type == AppType::Pi {
             return pi::update(state, original_id, provider);
+        }
+        if app_type == AppType::WorkBuddy {
+            return workbuddy::update(state, original_id, provider);
         }
 
         if app_type == AppType::Omp {
@@ -6564,11 +6680,24 @@ impl ProviderService {
     /// 直连指针或代理路由指着的供应商不能删（见 `mode::current::is_referenced`）。
     /// 对于累加模式应用（OpenCode, OpenClaw），可以随时删除任意供应商，同时从 live 配置中移除。
     pub fn delete(state: &AppState, app_type: AppType, id: &str) -> Result<(), AppError> {
+        let app = app_type.as_str().to_string();
+        crate::config_history::with_operation_action(app, "remove_provider", || {
+            Self::delete_inner(state, app_type, id)
+        })
+    }
+
+    /// Original body of `delete`; the public entry stamps the user operation
+    /// label so history records read "add/remove provider" instead of the
+    /// mechanical switch/apply write action.
+    fn delete_inner(state: &AppState, app_type: AppType, id: &str) -> Result<(), AppError> {
         let _native_guard = lock_native_provider_operations(state, &app_type);
         if app_type == AppType::Pi {
             return pi::delete(state, id);
         }
-        if matches!(app_type, AppType::Dsh) {
+        if app_type == AppType::WorkBuddy {
+            return workbuddy::delete(state, id);
+        }
+        if app_type == AppType::Dsh {
             return crate::dsh_config::save_and_commit(id, None, false, || {
                 state.db.delete_provider(app_type.as_str(), id)
             });
@@ -6676,6 +6805,20 @@ impl ProviderService {
         app_type: AppType,
         id: &str,
     ) -> Result<(), AppError> {
+        let app = app_type.as_str().to_string();
+        crate::config_history::with_operation_action(app, "add_provider", || {
+            Self::add_to_live_config_inner(state, app_type, id)
+        })
+    }
+
+    /// Original body of `add_to_live_config`; the public entry stamps the user operation
+    /// label so history records read "add/remove provider" instead of the
+    /// mechanical switch/apply write action.
+    fn add_to_live_config_inner(
+        state: &AppState,
+        app_type: AppType,
+        id: &str,
+    ) -> Result<(), AppError> {
         let _native_guard = lock_native_provider_operations(state, &app_type);
         if app_type != AppType::Kimi {
             return Err(AppError::InvalidInput(format!(
@@ -6704,11 +6847,28 @@ impl ProviderService {
         app_type: AppType,
         id: &str,
     ) -> Result<(), AppError> {
+        let app = app_type.as_str().to_string();
+        crate::config_history::with_operation_action(app, "remove_provider", || {
+            Self::remove_from_live_config_inner(state, app_type, id)
+        })
+    }
+
+    /// Original body of `remove_from_live_config`; the public entry stamps the user operation
+    /// label so history records read "add/remove provider" instead of the
+    /// mechanical switch/apply write action.
+    fn remove_from_live_config_inner(
+        state: &AppState,
+        app_type: AppType,
+        id: &str,
+    ) -> Result<(), AppError> {
         let _native_guard = lock_native_provider_operations(state, &app_type);
         if app_type == AppType::Pi {
             return pi::remove(state, id);
         }
-        if matches!(app_type, AppType::Dsh) {
+        if app_type == AppType::WorkBuddy {
+            return workbuddy::remove(state, id);
+        }
+        if app_type == AppType::Dsh {
             return crate::dsh_config::save_and_commit(id, None, false, || {
                 if let Some(mut provider) = state.db.get_provider_by_id(id, app_type.as_str())? {
                     Self::set_provider_live_config_managed(&mut provider, false);
@@ -6824,7 +6984,9 @@ impl ProviderService {
     ///   操作里提交；累加式应用按各自的规则写入。
     pub fn switch(state: &AppState, app_type: AppType, id: &str) -> Result<SwitchResult, AppError> {
         let app = app_type.as_str().to_string();
-        let result = Self::switch_inner(state, app_type, id);
+        let result = crate::config_history::with_audit_context(&app, "switch", || {
+            Self::switch_inner(state, app_type, id)
+        });
         match &result {
             Ok(result) if result.warnings.is_empty() => {
                 log::info!("[SWITCH] {app} 切到 {id} 完成");
@@ -6858,6 +7020,9 @@ impl ProviderService {
         let _native_guard = lock_native_provider_operations(state, &app_type);
         if app_type == AppType::Pi {
             return pi::enable(state, id);
+        }
+        if app_type == AppType::WorkBuddy {
+            return workbuddy::enable(state, id);
         }
         // Antigravity 的卡只作用于它打开的终端，没有「启用」（见 agy_config 模块说明）。
         if app_type == AppType::Agy {
@@ -6978,6 +7143,10 @@ impl ProviderService {
             )
             .ok()
             .flatten();
+            // Record the pointer movement so a group restore can move the app
+            // window's current selection back together with the files. Proxy
+            // route switches never reach this branch: the pointer stays.
+            crate::config_history::set_provider_pointer(app_type.as_str(), previous.as_deref(), id);
             log::info!(
                 "[SWITCH] {} 直连：{} → {id}，写客户端配置",
                 app_type.as_str(),
@@ -7333,11 +7502,12 @@ impl ProviderService {
             AppType::OpenClaw => Self::extract_openclaw_common_config(&provider.settings_config),
             AppType::Hermes => Ok(String::new()), // Hermes doesn't use common config snippets
             AppType::Pi
+            | AppType::WorkBuddy
             | AppType::Mcode
             | AppType::Kimi
             | AppType::Dsh
-            | AppType::Omp
-            | AppType::Agy => Ok(String::new()),
+            | AppType::Agy
+            | AppType::Omp => Ok(String::new()),
         }
     }
 
@@ -7356,11 +7526,12 @@ impl ProviderService {
             AppType::OpenClaw => Self::extract_openclaw_common_config(settings_config),
             AppType::Hermes => Ok(String::new()), // Hermes doesn't use common config snippets
             AppType::Pi
+            | AppType::WorkBuddy
             | AppType::Mcode
             | AppType::Kimi
             | AppType::Dsh
-            | AppType::Omp
-            | AppType::Agy => Ok(String::new()),
+            | AppType::Agy
+            | AppType::Omp => Ok(String::new()),
         }
     }
 
@@ -7991,7 +8162,10 @@ impl ProviderService {
         .await
     }
 
-    fn validate_provider_settings(app_type: &AppType, provider: &Provider) -> Result<(), AppError> {
+    pub(crate) fn validate_provider_settings(
+        app_type: &AppType,
+        provider: &Provider,
+    ) -> Result<(), AppError> {
         icon::validate_icon(provider.icon.as_deref())?;
         match app_type {
             AppType::Claude => {
@@ -8135,6 +8309,9 @@ impl ProviderService {
             }
             AppType::Pi => {
                 crate::pi_config::validate_provider_node(&provider.id, &provider.settings_config)?;
+            }
+            AppType::WorkBuddy => {
+                crate::workbuddy_config::validate_provider_node(&provider.settings_config)?;
             }
             AppType::Omp => {
                 crate::omp_config::validate_provider(&provider.id, &provider.settings_config)?;
@@ -8387,6 +8564,21 @@ impl ProviderService {
                     .unwrap_or("")
                     .to_string();
 
+                Ok((api_key, base_url))
+            }
+            AppType::WorkBuddy => {
+                let api_key = provider
+                    .settings_config
+                    .get("apiKey")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
+                let base_url = provider
+                    .settings_config
+                    .get("url")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
                 Ok((api_key, base_url))
             }
         }

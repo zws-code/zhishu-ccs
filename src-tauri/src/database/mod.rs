@@ -96,7 +96,7 @@ fn register_db_change_hook(conn: &Connection) {
 impl Database {
     /// 初始化数据库连接并创建表
     ///
-    /// 数据库文件位于 `~/.cc-switch/cc-switch.db`
+    /// 数据库文件位于 `~/.zhishu-ccs/cc-switch.db`
     pub fn init() -> Result<Self, AppError> {
         let db_path = get_app_config_dir().join("cc-switch.db");
         let db_exists = db_path.exists();
@@ -129,12 +129,17 @@ impl Database {
         {
             let conn = lock_conn!(db.conn);
             let version = Self::get_user_version(&conn)?;
+            let reconcile_omp =
+                version <= SCHEMA_VERSION && Self::needs_omp_schema_reconciliation(&conn)?;
             drop(conn);
-            if version > 0 && version < SCHEMA_VERSION {
+            if version > 0 && (version < SCHEMA_VERSION || reconcile_omp) {
                 log::info!(
                     "Creating pre-migration database backup (v{version} → v{SCHEMA_VERSION})"
                 );
                 if let Err(e) = db.backup_database_file() {
+                    if reconcile_omp {
+                        return Err(e);
+                    }
                     log::warn!("Pre-migration backup failed, continuing migration: {e}");
                 }
             }

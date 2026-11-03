@@ -74,6 +74,17 @@ pub fn run(
         recovered: recover(store, guard, commit_target)?,
         ..OperationReport::default()
     };
+    if matches!(op, state::op::ATTACH | state::op::DETACH)
+        && crate::zhishu::coexistence::has_receipt(store, guard.app())
+        && !crate::zhishu::coexistence::unchanged(store, guard.app())
+    {
+        if let Some(change) = changes.first() {
+            return Err(LiveWriteError::Conflict {
+                path: change.file.path.clone(),
+            }
+            .into());
+        }
+    }
 
     // 1. 在内存里算好每个文件；任何一个解析失败都不写。
     let mut plans = Vec::with_capacity(changes.len());
@@ -85,6 +96,7 @@ pub fn run(
     }
     if plans.is_empty() {
         commit_target(&target)?;
+        record_ownership(store, guard.app(), changes);
         return Ok(report);
     }
 
@@ -155,6 +167,18 @@ pub fn run(
                 break;
             }
 
+            if matches!(op, state::op::ATTACH | state::op::DETACH) {
+                // A background attach/detach must not rebase its ownership over
+                // a different manager's concurrent write. Pending recovery will
+                // preserve that external content under the existing hash rules.
+                return Err(give_up_on_conflict(
+                    store,
+                    guard,
+                    &pending,
+                    published_any,
+                    &current_planned.file.path,
+                ));
+            }
             replans += 1;
             if replans > MAX_REPLANS {
                 return Err(give_up_on_conflict(
@@ -201,7 +225,19 @@ pub fn run(
     })?;
     failpoint::hit("target")?;
     state::set_pending(store, guard.app(), None)?;
+    record_ownership(store, guard.app(), changes);
     Ok(report)
+}
+
+fn record_ownership(store: &DeviceStore, app: &str, changes: &[FileChange<'_>]) {
+    let paths: Vec<_> = changes
+        .iter()
+        .map(|change| change.file.path.clone())
+        .collect();
+    if let Err(error) = crate::zhishu::coexistence::record(store, app, &paths) {
+        // The original commit succeeded. Missing evidence disables background writes.
+        log::warn!("[{app}] 无法记录配置归属，后台恢复将保守跳过: {error}");
+    }
 }
 
 /// 补完或放弃这个应用上一次未完成的操作。调用方持有这个应用的写锁。
@@ -374,8 +410,10 @@ impl<'a> AppWrite<'a> {
         changes: &[FileChange<'_>],
         target: PendingTarget,
     ) -> Result<OperationReport, AppError> {
-        run(&self.store, &self.guard, op, changes, target, &|target| {
-            self.commit(target)
+        crate::config_history::with_audit_context(self.guard.app(), op, || {
+            run(&self.store, &self.guard, op, changes, target, &|target| {
+                self.commit(target)
+            })
         })
     }
 }
@@ -1150,6 +1188,51 @@ mod tests {
         assert_eq!(fx.read(&fx.b), json!({"key": "new", "added": true}));
         assert_eq!(*pointer.borrow(), Some("B".into()));
         assert!(fx.temp_files().is_empty());
+    }
+
+    #[test]
+    fn coexistence_background_writes_do_not_replan_over_another_manager() {
+        for op in [state::op::ATTACH, state::op::DETACH] {
+            for changed_index in [0, 1] {
+                let fx = Fixture::new();
+                let external = if changed_index == 0 {
+                    fx.a.clone()
+                } else {
+                    fx.b.clone()
+                };
+                let changed_path = external.clone();
+                failpoint::on_before_publish(Some(Box::new(move |index, _| {
+                    if index == changed_index {
+                        fs::write(&changed_path, br#"{"key":"other-manager"}"#).unwrap();
+                    }
+                })));
+                let patch = set_key("new");
+                let guard = lock_app(&fx.app);
+                let result = run(
+                    &fx.store,
+                    &guard,
+                    op,
+                    &[
+                        FileChange {
+                            file: LiveFile::shared(&fx.a),
+                            patch: &patch,
+                        },
+                        FileChange {
+                            file: LiveFile::shared(&fx.b),
+                            patch: &patch,
+                        },
+                    ],
+                    PendingTarget::default(),
+                    &|_| Ok(()),
+                );
+                failpoint::on_before_publish(None);
+                assert!(result.is_err());
+                assert_eq!(fx.read(&external), json!({"key":"other-manager"}));
+                recover(&fx.store, &guard, &|_| Ok(())).unwrap();
+                assert_eq!(fx.read(&external), json!({"key":"other-manager"}));
+                assert!(state::pending(&fx.store, &fx.app).unwrap().is_none());
+            }
+        }
     }
 
     #[test]

@@ -286,6 +286,7 @@ fn strip_unsupported_pi_metadata(provider: &mut Provider) {
         return;
     };
     provider.meta = Some(ProviderMeta {
+        platform_managed: meta.platform_managed,
         usage_script: meta.usage_script,
         is_partner: meta.is_partner,
         partner_promotion_key: meta.partner_promotion_key,

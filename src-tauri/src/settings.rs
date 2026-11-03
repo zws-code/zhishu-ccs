@@ -51,6 +51,8 @@ pub struct VisibleApps {
     pub hermes: bool,
     #[serde(default = "default_true")]
     pub pi: bool,
+    #[serde(default = "default_true")]
+    pub workbuddy: bool,
     #[serde(default)]
     pub omp: bool,
     #[serde(default = "default_true")]
@@ -75,6 +77,7 @@ impl Default for VisibleApps {
             openclaw: true,
             hermes: false, // 默认不显示，需用户手动启用
             pi: true,
+            workbuddy: true,
             mcode: true,
             kimi: true,
             dsh: true,
@@ -97,6 +100,7 @@ impl VisibleApps {
             AppType::OpenClaw => self.openclaw,
             AppType::Hermes => self.hermes,
             AppType::Pi => self.pi,
+            AppType::WorkBuddy => self.workbuddy,
             AppType::Mcode => self.mcode,
             AppType::Kimi => self.kimi,
             AppType::Dsh => self.dsh,
@@ -125,6 +129,11 @@ pub struct WebDavSyncStatus {
 }
 
 fn default_remote_root() -> String {
+    crate::zhishu::identity::SYNC_ROOT.to_string()
+}
+// A missing persisted field used the upstream default before namespace isolation.
+// Keep that destination visible and blocked until the user changes it explicitly.
+fn legacy_remote_root() -> String {
     "cc-switch-sync".to_string()
 }
 fn default_profile() -> String {
@@ -145,7 +154,7 @@ pub struct WebDavSyncSettings {
     pub username: String,
     #[serde(default)]
     pub password: String,
-    #[serde(default = "default_remote_root")]
+    #[serde(default = "legacy_remote_root")]
     pub remote_root: String,
     #[serde(default = "default_profile")]
     pub profile: String,
@@ -170,6 +179,7 @@ impl Default for WebDavSyncSettings {
 
 impl WebDavSyncSettings {
     pub fn validate(&self) -> Result<(), crate::error::AppError> {
+        crate::zhishu::identity::validate_sync_root(&self.remote_root)?;
         if self.base_url.trim().is_empty() {
             return Err(crate::error::AppError::localized(
                 "webdav.base_url.required",
@@ -224,7 +234,7 @@ pub struct S3SyncSettings {
     pub secret_access_key: String,
     #[serde(default)]
     pub endpoint: String,
-    #[serde(default = "default_remote_root")]
+    #[serde(default = "legacy_remote_root")]
     pub remote_root: String,
     #[serde(default = "default_profile")]
     pub profile: String,
@@ -251,6 +261,7 @@ impl Default for S3SyncSettings {
 
 impl S3SyncSettings {
     pub fn validate(&self) -> Result<(), crate::error::AppError> {
+        crate::zhishu::identity::validate_sync_root(&self.remote_root)?;
         if self.bucket.trim().is_empty() {
             return Err(crate::error::AppError::localized(
                 "s3.bucket.required",
@@ -450,7 +461,7 @@ pub struct UsageDisplaySettings {
 
 /// 应用设置结构
 ///
-/// 存储设备级别设置，保存在本地 `~/.cc-switch/settings.json`，不随数据库同步。
+/// 存储设备级别设置，保存在本地 `~/.zhishu-ccs/settings.json`，不随数据库同步。
 /// 这确保了云同步场景下多设备可以独立运作。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -603,6 +614,8 @@ pub struct AppSettings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pi_config_dir: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workbuddy_config_dir: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub omp_config_dir: Option<String>,
 
     // ===== 当前供应商 ID（设备级）=====
@@ -742,6 +755,7 @@ impl Default for AppSettings {
             openclaw_config_dir: None,
             hermes_config_dir: None,
             pi_config_dir: None,
+            workbuddy_config_dir: None,
             omp_config_dir: None,
             current_provider_claude: None,
             current_provider_claude_desktop: None,
@@ -774,11 +788,7 @@ impl AppSettings {
 
     fn settings_path() -> Option<PathBuf> {
         // settings.json 保留用于旧版本迁移和无数据库场景
-        Some(
-            crate::config::get_home_dir()
-                .join(".cc-switch")
-                .join("settings.json"),
-        )
+        Some(crate::config::get_device_data_dir().join("settings.json"))
     }
 
     fn normalize_paths(&mut self) {
@@ -833,6 +843,13 @@ impl AppSettings {
 
         self.pi_config_dir = self
             .pi_config_dir
+            .as_ref()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
+
+        self.workbuddy_config_dir = self
+            .workbuddy_config_dir
             .as_ref()
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
@@ -1352,6 +1369,15 @@ pub fn get_omp_override_dir() -> Option<PathBuf> {
         .map(|path| resolve_override_path(path))
 }
 
+#[cfg_attr(test, allow(dead_code))]
+pub fn get_workbuddy_override_dir() -> Option<PathBuf> {
+    let settings = settings_store().read().ok()?;
+    settings
+        .workbuddy_config_dir
+        .as_ref()
+        .map(|path| resolve_override_path(path))
+}
+
 pub fn preserve_codex_official_auth_on_switch() -> bool {
     settings_store()
         .read()
@@ -1434,7 +1460,12 @@ pub fn get_current_provider(app_type: &AppType) -> Option<String> {
         AppType::OpenClaw => settings.current_provider_openclaw.clone(),
         AppType::Hermes => settings.current_provider_hermes.clone(),
         AppType::Agy => settings.current_provider_agy.clone(),
-        AppType::Pi | AppType::Mcode | AppType::Kimi | AppType::Dsh | AppType::Omp => None,
+        AppType::Pi
+        | AppType::WorkBuddy
+        | AppType::Mcode
+        | AppType::Kimi
+        | AppType::Dsh
+        | AppType::Omp => None,
     }
 }
 
@@ -1443,6 +1474,9 @@ pub fn get_current_provider(app_type: &AppType) -> Option<String> {
 /// 这是设备级别的设置，不随数据库同步。
 /// 传入 `None` 会清除当前供应商设置。
 pub fn set_current_provider(app_type: &AppType, id: Option<&str>) -> Result<(), AppError> {
+    if matches!(app_type, AppType::Pi | AppType::WorkBuddy) {
+        return Ok(());
+    }
     let id_owned = id.map(|s| s.to_string());
     mutate_settings(|settings| match app_type {
         AppType::Claude => settings.current_provider_claude = id_owned.clone(),
@@ -1454,7 +1488,12 @@ pub fn set_current_provider(app_type: &AppType, id: Option<&str>) -> Result<(), 
         AppType::OpenClaw => settings.current_provider_openclaw = id_owned.clone(),
         AppType::Hermes => settings.current_provider_hermes = id_owned.clone(),
         AppType::Agy => settings.current_provider_agy = id_owned.clone(),
-        AppType::Pi | AppType::Mcode | AppType::Kimi | AppType::Dsh | AppType::Omp => {}
+        AppType::Pi
+        | AppType::WorkBuddy
+        | AppType::Mcode
+        | AppType::Kimi
+        | AppType::Dsh
+        | AppType::Omp => {}
     })
 }
 
