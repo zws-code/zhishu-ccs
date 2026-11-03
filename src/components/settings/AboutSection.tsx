@@ -20,7 +20,7 @@ import { useUpdate } from "@/contexts/UpdateContext";
 import { Badge } from "@/components/ui/badge";
 import { WhatsNewDialog } from "@/components/WhatsNewDialog";
 import { WHATS_NEW_ENTRIES, entriesUpTo } from "@/lib/whatsNew";
-import ccswitchLogo from "@/assets/icons/logo.svg";
+import ccswitchLogo from "@/zhishu/assets/logo.png";
 import { extractErrorMessage } from "@/utils/errorUtils";
 
 interface AboutSectionProps {
@@ -32,6 +32,7 @@ let appVersionCache: string | null = null;
 
 // 邀 Star 条关掉后记在本机（纯界面偏好，不进库、不随云同步）
 const STAR_PROMPT_DISMISSED_KEY = "ccswitch:about:starPromptDismissed";
+const zhishuDownloadPage = `${(import.meta.env.VITE_PLATFORM_WEB_URL || "http://127.0.0.1:3081").replace(/\/+$/, "")}/download`;
 
 function readStarPromptDismissed(): boolean {
   try {
@@ -104,13 +105,13 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
 
       if (!displayVersion) {
         await settingsApi.openExternal(
-          "https://github.com/farion1231/cc-switch/releases",
+          "https://github.com/zws-code/zhishu-ccs/releases",
         );
         return;
       }
 
       await settingsApi.openExternal(
-        `https://github.com/farion1231/cc-switch/releases/tag/${displayVersion}`,
+        `https://github.com/zws-code/zhishu-ccs/releases/tag/${displayVersion}`,
       );
     } catch (error) {
       console.error("[AboutSection] Failed to open release notes", error);
@@ -119,7 +120,7 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
   }, [t, updateInfo?.availableVersion, version]);
 
   const handleOpenGithub = useCallback(() => {
-    void settingsApi.openExternal("https://github.com/farion1231/cc-switch");
+    void settingsApi.openExternal("https://github.com/zws-code/zhishu-ccs");
   }, []);
 
   const handleDismissStarPrompt = useCallback(() => {
@@ -135,9 +136,7 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
     if (hasUpdate) {
       if (isPortable) {
         try {
-          await settingsApi.openPortableUpdateDownload(
-            updateInfo?.availableVersion ?? "",
-          );
+          await settingsApi.openExternal(zhishuDownloadPage);
         } catch (error) {
           console.error("[AboutSection] Portable update failed", error);
         }
@@ -158,7 +157,7 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
           closeButton: true,
         });
         try {
-          await settingsApi.checkUpdates();
+          await settingsApi.openExternal(zhishuDownloadPage);
         } catch (fallbackError) {
           console.error(
             "[AboutSection] Failed to open fallback updater",
@@ -201,10 +200,10 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
           src={ccswitchLogo}
           alt=""
           draggable={false}
-          className="h-10 w-10 shrink-0 p-1"
+          className="h-16 w-16 shrink-0 object-contain dark:invert"
         />
         <div className="min-w-0 flex-1">
-          <div className="text-title text-fg-1">CC Switch</div>
+          <div className="text-title text-fg-1">Zhishu CC Switch</div>
           <div className="flex flex-wrap items-center gap-2 text-caption text-fg-2">
             {isLoadingVersion ? (
               <Loader2 className="h-3 w-3 animate-spin" />
