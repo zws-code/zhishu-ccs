@@ -28,6 +28,7 @@ const DIRECTORY_FIELD: Record<DirectoryAppId, keyof Settings> = {
   openclaw: "openclawConfigDir",
   hermes: "hermesConfigDir",
   pi: "piConfigDir",
+  workbuddy: "workbuddyConfigDir",
   omp: "ompConfigDir",
 };
 
@@ -40,6 +41,7 @@ const DIRECTORY_PLACEHOLDER: Record<DirectoryAppId, string> = {
   openclaw: "settings.browsePlaceholderOpenclaw",
   hermes: "settings.browsePlaceholderHermes",
   pi: "settings.browsePlaceholderPi",
+  workbuddy: "settings.browsePlaceholderWorkbuddy",
   omp: "settings.browsePlaceholderOmp",
 };
 
@@ -52,6 +54,7 @@ const DIRECTORY_APPS: DirectoryAppId[] = [
   "openclaw",
   "hermes",
   "pi",
+  "workbuddy",
   "omp",
 ];
 

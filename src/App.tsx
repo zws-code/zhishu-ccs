@@ -37,6 +37,7 @@ import {
 } from "@/lib/api";
 import { checkAllEnvConflicts, checkEnvConflicts } from "@/lib/api/env";
 import { useProviderActions } from "@/hooks/useProviderActions";
+import { usePlatformProviderDeletion } from "@/zhishu/models/usePlatformProviderDeletion";
 import { openclawKeys, useOpenClawHealth } from "@/hooks/useOpenClaw";
 import { hermesKeys, useOpenHermesWebUI } from "@/hooks/useHermes";
 import { hermesApi } from "@/lib/api/hermes";
@@ -79,6 +80,10 @@ import { WindowControls } from "@/components/shell/WindowControls";
 import { APP_DISPLAY_NAME, AppGlyph } from "@/components/shell/AppGlyph";
 import { ProfileSwitcher } from "@/components/profiles/ProfileSwitcher";
 import { ProviderList } from "@/components/providers/ProviderList";
+import { PlatformConnectButton } from "@/zhishu/models/components/PlatformConnectButton";
+import { PlatformBulkSyncButtons } from "@/zhishu/models/components/PlatformBulkSyncButtons";
+import { PlatformProviderDeletionMenuItem } from "@/zhishu/models/components/PlatformProviderDeletionMenuItem";
+import { PlatformCatalogPage } from "@/zhishu/models/components/PlatformCatalogPage";
 import { AddProviderDialog } from "@/components/providers/AddProviderDialog";
 import {
   hasOpencodeDefinition,
@@ -88,6 +93,7 @@ import { EditProviderDialog } from "@/components/providers/EditProviderDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { OpenTerminalDialog } from "@/components/providers/OpenTerminalDialog";
 import { discardUnsavedChanges, hasUnsavedChanges } from "@/lib/unsavedChanges";
+import { AppConfigHistoryButton } from "@/zhishu/config-history/AppConfigHistoryButton";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { AuthCenterPanel } from "@/components/settings/AuthCenterPanel";
 import { RefreshAllQuotaButton } from "@/components/settings/auth/RefreshAllQuotaButton";
@@ -164,7 +170,6 @@ function App() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { hasUpdate } = useUpdate();
-
   const [activeApp, setActiveApp] = useState<AppId>(getInitialApp);
   const sharedFeatureApp = sharedFeatureAppOf(activeApp);
   const [currentView, setCurrentView] = useState<View>(readStoredView);
@@ -331,6 +336,7 @@ function App() {
   });
   const { data: piCurrentState } = usePiCurrentState(activeApp === "pi");
   const providers = useMemo(() => data?.providers ?? {}, [data]);
+  const platformDeletion = usePlatformProviderDeletion(activeApp, providers);
   const currentProviderId = data?.currentProviderId ?? "";
   const isOpenClawView = activeApp === "openclaw" && isAppPage(currentView);
   const { data: openclawHealthWarnings = [] } =
@@ -435,56 +441,32 @@ function App() {
     });
   };
 
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    let active = true;
-
-    const setupListener = async () => {
-      try {
-        const off = await providersApi.onSwitched(
-          async (event: ProviderSwitchEvent) => {
-            // 按前缀失效：故障转移只改路由指针，「路由中」标记读的是
-            // ["providers", app, "mode"]，只 refetch 列表会让它停在旧那家
-            await queryClient.invalidateQueries({
-              queryKey: ["providers", event.appType],
-            });
-            if (event.appType === "pi") {
-              await invalidatePiProviderCaches(queryClient);
-            }
-            if (event.appType === "claude") {
-              // 托盘切卡、应用项目同样可能把默认登录收成新账号
-              await queryClient.invalidateQueries({
-                queryKey: ["managed-auth-status", "claude_official"],
-              });
-            }
-            // 切换会顺带刷新托管 ChatGPT 账号的令牌（托盘切换也一样）：
-            // 重查停在失败上的账号额度，免得主界面一直显示旧的「登录过期」
-            await queryClient.invalidateQueries({
-              predicate: (query) =>
-                query.queryKey[0] === "codex_oauth" &&
-                query.queryKey[1] === "quota" &&
-                (query.state.status === "error" ||
-                  (query.state.data as SubscriptionQuota | undefined)
-                    ?.success === false),
-            });
-          },
-        );
-        if (!active) {
-          off();
-          return;
-        }
-        unsubscribe = off;
-      } catch (error) {
-        console.error("[App] Failed to subscribe provider switch event", error);
-      }
-    };
-
-    void setupListener();
-    return () => {
-      active = false;
-      unsubscribe?.();
-    };
-  }, [queryClient]);
+  useTauriEvent<ProviderSwitchEvent>("provider-switched", async (event) => {
+    // 按前缀失效：故障转移只改路由指针，「路由中」标记读的是
+    // ["providers", app, "mode"]，只 refetch 列表会让它停在旧那家
+    await queryClient.invalidateQueries({
+      queryKey: ["providers", event.appType],
+    });
+    if (event.appType === "pi") {
+      await invalidatePiProviderCaches(queryClient);
+    }
+    if (event.appType === "claude") {
+      // 托盘切卡、应用项目同样可能把默认登录收成新账号
+      await queryClient.invalidateQueries({
+        queryKey: ["managed-auth-status", "claude_official"],
+      });
+    }
+    // 切换会顺带刷新托管 ChatGPT 账号的令牌（托盘切换也一样）：
+    // 重查停在失败上的账号额度，免得主界面一直显示旧的「登录过期」
+    await queryClient.invalidateQueries({
+      predicate: (query) =>
+        query.queryKey[0] === "codex_oauth" &&
+        query.queryKey[1] === "quota" &&
+        (query.state.status === "error" ||
+          (query.state.data as SubscriptionQuota | undefined)?.success ===
+            false),
+    });
+  });
 
   useTauriEvent("universal-provider-synced", async () => {
     await queryClient.invalidateQueries({ queryKey: ["providers"] });
@@ -1016,6 +998,10 @@ function App() {
       ]);
     } else if (app === "mcode" || app === "dsh" || app === "kimi") {
       await queryClient.invalidateQueries({ queryKey: ["providers", app] });
+    } else if (app === "workbuddy") {
+      await queryClient.invalidateQueries({
+        queryKey: ["providers", "workbuddy"],
+      });
     }
   };
 
@@ -1254,10 +1240,10 @@ function App() {
     const isPiGlobalDefault =
       activeApp === "pi" &&
       piCurrentState?.defaultProviderId === confirmAction.provider.id;
-
-    return isPiGlobalDefault
-      ? `${message}\n\n${t("confirm.piDefaultProviderWarning")}`
-      : message;
+    if (isPiGlobalDefault) {
+      return `${message}\n\n${t("confirm.piDefaultProviderWarning")}`;
+    }
+    return message;
   }, [activeApp, confirmAction, piCurrentState?.defaultProviderId, t]);
 
   const handleImportSuccess = async () => {
@@ -1340,12 +1326,27 @@ function App() {
             {t("appPage.viewUsage")}
           </DropdownMenuItem>
         )}
+        <DropdownMenuItem
+          onSelect={() => {
+            settingsApi.openConfigFolder(activeApp).catch((error: unknown) => {
+              toast.error(
+                t("appPage.openDirectoryFailed", {
+                  defaultValue: "打开目录失败",
+                }),
+                { description: extractErrorMessage(error) || undefined },
+              );
+            });
+          }}
+        >
+          {t("appPage.browseDirectory")}
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => openSettings("appConfig", activeApp)}>
           {t("appPage.configDirectory")}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => openPage("apps")}>
           {t("appPage.installAndUpgrade")}
         </DropdownMenuItem>
+        <PlatformProviderDeletionMenuItem deletion={platformDeletion} />
         <DropdownMenuSeparator />
         <DropdownMenuItem
           disabled={Object.values(visibleApps).filter(Boolean).length <= 1}
@@ -1389,6 +1390,7 @@ function App() {
       }
       actions={
         <>
+          <AppConfigHistoryButton key={activeApp} app={activeApp} />
           {currentView === "providers" &&
             activeApp !== "mcode" &&
             activeApp !== "dsh" &&
@@ -1425,6 +1427,19 @@ function App() {
                 </Button>
               </HoverTip>
             )}
+          {currentView === "providers" && (
+            <>
+              <PlatformConnectButton
+                app={activeApp}
+                disabled={platformDeletion.pending}
+              />
+              <PlatformBulkSyncButtons
+                app={activeApp}
+                modeView={modeAppId ? (currentModeView ?? null) : null}
+                providers={Object.values(providers)}
+              />
+            </>
+          )}
           {currentView === "providers" && (
             <Button
               variant="solid"
@@ -1557,6 +1572,7 @@ function App() {
               activeApp === "openclaw" ||
               activeApp === "hermes" ||
               activeApp === "pi" ||
+              activeApp === "workbuddy" ||
               activeApp === "mcode" ||
               activeApp === "kimi" ||
               activeApp === "dsh" ||
@@ -1654,6 +1670,8 @@ function App() {
 
   const renderGlobalPage = () => {
     switch (currentView) {
+      case "platformCatalog":
+        return <PlatformCatalogPage />;
       case "usage":
         return (
           <UsagePage

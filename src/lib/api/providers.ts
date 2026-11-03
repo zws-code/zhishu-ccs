@@ -180,6 +180,10 @@ export const providersApi = {
     return await invoke("get_claude_desktop_status");
   },
 
+  async getWorkBuddyInstalled(): Promise<boolean> {
+    return await invoke("get_workbuddy_installed");
+  },
+
   async getClaudeDesktopDefaultRoutes(): Promise<ClaudeDesktopDefaultRoute[]> {
     return await invoke("get_claude_desktop_default_routes");
   },
@@ -279,6 +283,10 @@ export const providersApi = {
    */
   async importHermesFromLive(): Promise<number> {
     return await invoke("import_hermes_providers_from_live");
+  },
+
+  async importWorkBuddyFromLive(): Promise<number> {
+    return await invoke("import_workbuddy_providers_from_live");
   },
 };
 

@@ -18,6 +18,7 @@ type AppDirectoryKey =
   | "openclaw"
   | "hermes"
   | "pi"
+  | "workbuddy"
   | "omp";
 type DirectoryKey = "appConfig" | AppDirectoryKey;
 
@@ -31,6 +32,7 @@ export interface ResolvedDirectories {
   openclaw: string;
   hermes: string;
   pi: string;
+  workbuddy: string;
   omp: string;
 }
 
@@ -47,6 +49,7 @@ const APP_DIRECTORY_META: Record<
   openclaw: { key: "openclaw", defaultFolder: ".openclaw" },
   hermes: { key: "hermes", defaultFolder: ".hermes" },
   pi: { key: "pi", defaultFolder: ".pi/agent" },
+  workbuddy: { key: "workbuddy", defaultFolder: ".workbuddy" },
   omp: { key: "omp", defaultFolder: ".omp/agent" },
 };
 
@@ -62,6 +65,7 @@ const DIRECTORY_KEY_TO_SETTINGS_FIELD: Record<
   openclaw: "openclawConfigDir",
   hermes: "hermesConfigDir",
   pi: "piConfigDir",
+  workbuddy: "workbuddyConfigDir",
   omp: "ompConfigDir",
 };
 
@@ -74,7 +78,7 @@ const sanitizeDir = (value?: string | null): string | undefined => {
 const computeDefaultAppConfigDir = async (): Promise<string | undefined> => {
   try {
     const home = await homeDir();
-    return await join(home, ".cc-switch");
+    return await join(home, ".zhishu-ccs");
   } catch (error) {
     console.error(
       "[useDirectorySettings] Failed to resolve default app config dir",
@@ -152,6 +156,7 @@ export function useDirectorySettings({
     openclaw: "",
     hermes: "",
     pi: "",
+    workbuddy: "",
     omp: "",
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -166,6 +171,7 @@ export function useDirectorySettings({
     openclaw: "",
     hermes: "",
     pi: "",
+    workbuddy: "",
     omp: "",
   });
   // 已保存的数据目录（保存按钮和「需要重启」都和它比）。ref 给回调用，state 让比较它的
@@ -196,6 +202,7 @@ export function useDirectorySettings({
           openclawDir,
           hermesDir,
           piDir,
+          workbuddyDir,
           ompDir,
           defaultAppConfig,
           defaultClaudeDir,
@@ -206,6 +213,7 @@ export function useDirectorySettings({
           defaultOpenclawDir,
           defaultHermesDir,
           defaultPiDir,
+          defaultWorkbuddyDir,
           defaultOmpDir,
         ] = await Promise.all([
           settingsApi.getAppConfigDirOverride(),
@@ -217,6 +225,7 @@ export function useDirectorySettings({
           settingsApi.getConfigDir("openclaw"),
           settingsApi.getConfigDir("hermes"),
           settingsApi.getConfigDir("pi"),
+          settingsApi.getConfigDir("workbuddy"),
           settingsApi.getConfigDir("omp"),
           computeDefaultAppConfigDir(),
           computeDefaultConfigDir("claude"),
@@ -227,6 +236,7 @@ export function useDirectorySettings({
           computeDefaultConfigDir("openclaw"),
           computeDefaultConfigDir("hermes"),
           computeDefaultConfigDir("pi"),
+          computeDefaultConfigDir("workbuddy"),
           computeDefaultConfigDir("omp"),
         ]);
 
@@ -244,6 +254,7 @@ export function useDirectorySettings({
           openclaw: defaultOpenclawDir ?? "",
           hermes: defaultHermesDir ?? "",
           pi: defaultPiDir ?? "",
+          workbuddy: defaultWorkbuddyDir ?? "",
           omp: defaultOmpDir ?? "",
         };
 
@@ -260,6 +271,7 @@ export function useDirectorySettings({
           openclaw: openclawDir || defaultsRef.current.openclaw,
           hermes: hermesDir || defaultsRef.current.hermes,
           pi: piDir || defaultsRef.current.pi,
+          workbuddy: workbuddyDir || defaultsRef.current.workbuddy,
           omp: ompDir || defaultsRef.current.omp,
         });
       } catch (error) {
@@ -473,6 +485,7 @@ export function useDirectorySettings({
         openclaw: overrides?.openclaw ?? defaultsRef.current.openclaw,
         hermes: overrides?.hermes ?? defaultsRef.current.hermes,
         pi: overrides?.pi ?? defaultsRef.current.pi,
+        workbuddy: overrides?.workbuddy ?? defaultsRef.current.workbuddy,
         omp: overrides?.omp ?? defaultsRef.current.omp,
       });
     },

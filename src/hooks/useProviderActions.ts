@@ -268,6 +268,7 @@ export function useProviderActions(
           } else if (
             activeApp === "opencode" ||
             activeApp === "openclaw" ||
+            activeApp === "workbuddy" ||
             activeApp === "mcode"
           ) {
             messageKey = "notifications.addToConfigSuccess";

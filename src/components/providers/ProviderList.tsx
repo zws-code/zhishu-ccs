@@ -188,6 +188,7 @@ export function ProviderList({
         case "kimi":
         case "dsh":
         case "mcode":
+        case "workbuddy":
           return provider.meta?.liveConfigManaged === true;
         case "opencode":
           return opencodeLiveIds?.includes(provider.id) ?? false;
@@ -236,6 +237,9 @@ export function ProviderList({
       }
       if (appId === "claude-desktop") {
         return (await providersApi.importClaudeDesktopFromClaude()) > 0;
+      }
+      if (appId === "workbuddy") {
+        return (await providersApi.importWorkBuddyFromLive()) > 0;
       }
       return providersApi.importDefault(appId);
     },
