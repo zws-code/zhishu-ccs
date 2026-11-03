@@ -1,0 +1,8 @@
+{
+  "platformApiUrl": "",
+  "platformWebUrl": "",
+  "platformAllowInsecureHttp": false,
+  "updateUrl": "",
+  "updatePublicKey": "",
+  "updateAllowInsecureHttp": false
+}

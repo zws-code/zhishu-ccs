@@ -27,6 +27,9 @@ export async function checkForUpdate(
 ): Promise<
   { status: "up-to-date" } | { status: "available"; info: UpdateInfo }
 > {
+  if (import.meta.env.VITE_ZHISHU_UPDATES_ENABLED !== "true") {
+    throw new Error("此构建尚未配置智枢客户端更新服务");
+  }
   // 动态引入，避免在未安装插件时导致打包期问题
   const { check } = await import("@tauri-apps/plugin-updater");
 
