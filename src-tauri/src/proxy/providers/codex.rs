@@ -1256,8 +1256,8 @@ mod tests {
 
         let ordinary = create_provider(json!({
             "config": r#"
-model_provider = "custom"
-[model_providers.custom]
+model_provider = "zhishu"
+[model_providers.zhishu]
 base_url = "https://relay.example.com/v1"
 wire_api = "responses"
 "#
@@ -1290,8 +1290,8 @@ wire_api = "responses"
             .unwrap();
             let config = projection.catalog_input_text();
             let parsed: TomlValue = toml::from_str(&config).unwrap();
-            assert_eq!(parsed["model_provider"].as_str(), Some("custom"));
-            let route = &parsed["model_providers"]["custom"];
+            assert_eq!(parsed["model_provider"].as_str(), Some("zhishu"));
+            let route = &parsed["model_providers"]["zhishu"];
             assert_eq!(route["wire_api"].as_str(), Some("responses"));
             assert!(route.get("requires_openai_auth").is_none());
 
@@ -1424,7 +1424,7 @@ context_window = 500000
 
         let mut unmarked_custom = create_provider(json!({
             "auth": {},
-            "config": "model_provider = \"custom\"\n[model_providers.custom]\nbase_url = \"https://example.com/v1\""
+            "config": "model_provider = \"zhishu\"\n[model_providers.zhishu]\nbase_url = \"https://example.com/v1\""
         }));
         unmarked_custom.category = Some("official".to_string());
         assert!(!is_codex_official_provider(&unmarked_custom));
@@ -1454,7 +1454,7 @@ context_window = 500000
         let mut unified_session = create_provider(json!({
             "auth": {},
             // 旧版「统一会话历史」注入进 live、又被回填进行里的形态。
-            "config": "model_provider = \"custom\"\n\n[model_providers.custom]\nname = \"OpenAI\"\nrequires_openai_auth = true\nsupports_websockets = true\nwire_api = \"responses\"\n"
+            "config": "model_provider = \"zhishu\"\n\n[model_providers.zhishu]\nname = \"OpenAI\"\nrequires_openai_auth = true\nsupports_websockets = true\nwire_api = \"responses\"\n"
         }));
         unified_session.category = Some("official".to_string());
         assert!(is_codex_official_provider(&unified_session));
@@ -1476,8 +1476,8 @@ context_window = 500000
     fn prompt_cache_routing_auto_enables_known_upstreams_only() {
         let kimi = create_provider(json!({
             "config": r#"
-model_provider = "custom"
-[model_providers.custom]
+model_provider = "zhishu"
+[model_providers.zhishu]
 base_url = "https://api.kimi.com/coding/v1"
 wire_api = "responses"
 "#
@@ -1641,9 +1641,9 @@ base_url="https://relay.example.com/v1/"
             "auth": {
                 "OPENAI_API_KEY": ""
             },
-            "config": r#"model_provider = "custom"
+            "config": r#"model_provider = "zhishu"
 
-[model_providers.custom]
+[model_providers.zhishu]
 experimental_bearer_token = "sk-config-key"
 "#
         }));
@@ -1697,9 +1697,9 @@ experimental_bearer_token = "sk-config-key"
     #[test]
     fn test_uses_anthropic_from_toml_wire_api() {
         let provider = create_provider(json!({
-            "config": r#"model_provider = "custom"
+            "config": r#"model_provider = "zhishu"
 
-[model_providers.custom]
+[model_providers.zhishu]
 wire_api = "anthropic"
 "#
         }));
@@ -1754,9 +1754,9 @@ wire_api = "anthropic"
         // resolve to the Anthropic catalog profile — this is the routing/catalog
         // divergence that let apply_patch leak through.
         let toml_anthropic = create_provider(json!({
-            "config": r#"model_provider = "custom"
+            "config": r#"model_provider = "zhishu"
 
-[model_providers.custom]
+[model_providers.zhishu]
 wire_api = "anthropic"
 "#
         }));
@@ -1803,7 +1803,7 @@ wire_api = "anthropic"
             create_provider(json!({
                 "apiFormat": "openai_chat",
                 "config": format!(
-                    "model_provider = \"custom\"\n\n[model_providers.custom]\nname = \"zhipu_glm\"\nbase_url = \"{base_url}\"\nwire_api = \"responses\"\n"
+                    "model_provider = \"zhishu\"\n\n[model_providers.zhishu]\nname = \"zhipu_glm\"\nbase_url = \"{base_url}\"\nwire_api = \"responses\"\n"
                 )
             }))
         };
@@ -1936,10 +1936,10 @@ wire_api = "anthropic"
         // This only works because the forwarder no longer strips [1m] before this call
         // on the Anthropic path.
         let provider = create_provider(json!({
-            "config": r#"model_provider = "custom"
+            "config": r#"model_provider = "zhishu"
 model = "claude-opus-4-1"
 
-[model_providers.custom]
+[model_providers.zhishu]
 wire_api = "anthropic"
 "#,
             "modelCatalog": {
@@ -2476,7 +2476,7 @@ wire_api = "chat"
             "config": r#"
 model = "grok-4.5"
 
-[model_providers.custom]
+[model_providers.zhishu]
 name = "xai"
 base_url = "https://attacker.example/v1"
 wire_api = "responses"
@@ -2529,10 +2529,10 @@ wire_api = "responses"
         let grok_key = create_provider(json!({
             "auth": { "OPENAI_API_KEY": "sk-x" },
             "config": r#"
-model_provider = "custom"
+model_provider = "zhishu"
 model = "grok-4.6"
 
-[model_providers.custom]
+[model_providers.zhishu]
 name = "xai"
 base_url = "https://api.x.ai/v1"
 wire_api = "responses"
@@ -2544,7 +2544,7 @@ wire_api = "responses"
         let other = create_provider(json!({
             "auth": { "OPENAI_API_KEY": "sk-x" },
             "config": r#"
-[model_providers.custom]
+[model_providers.zhishu]
 base_url = "https://api.deepseek.com"
 wire_api = "responses"
 "#

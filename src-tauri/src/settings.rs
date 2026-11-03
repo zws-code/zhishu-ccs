@@ -129,6 +129,11 @@ pub struct WebDavSyncStatus {
 }
 
 fn default_remote_root() -> String {
+    crate::zhishu::identity::SYNC_ROOT.to_string()
+}
+// A missing persisted field used the upstream default before namespace isolation.
+// Keep that destination visible and blocked until the user changes it explicitly.
+fn legacy_remote_root() -> String {
     "cc-switch-sync".to_string()
 }
 fn default_profile() -> String {
@@ -149,7 +154,7 @@ pub struct WebDavSyncSettings {
     pub username: String,
     #[serde(default)]
     pub password: String,
-    #[serde(default = "default_remote_root")]
+    #[serde(default = "legacy_remote_root")]
     pub remote_root: String,
     #[serde(default = "default_profile")]
     pub profile: String,
@@ -174,6 +179,7 @@ impl Default for WebDavSyncSettings {
 
 impl WebDavSyncSettings {
     pub fn validate(&self) -> Result<(), crate::error::AppError> {
+        crate::zhishu::identity::validate_sync_root(&self.remote_root)?;
         if self.base_url.trim().is_empty() {
             return Err(crate::error::AppError::localized(
                 "webdav.base_url.required",
@@ -228,7 +234,7 @@ pub struct S3SyncSettings {
     pub secret_access_key: String,
     #[serde(default)]
     pub endpoint: String,
-    #[serde(default = "default_remote_root")]
+    #[serde(default = "legacy_remote_root")]
     pub remote_root: String,
     #[serde(default = "default_profile")]
     pub profile: String,
@@ -255,6 +261,7 @@ impl Default for S3SyncSettings {
 
 impl S3SyncSettings {
     pub fn validate(&self) -> Result<(), crate::error::AppError> {
+        crate::zhishu::identity::validate_sync_root(&self.remote_root)?;
         if self.bucket.trim().is_empty() {
             return Err(crate::error::AppError::localized(
                 "s3.bucket.required",

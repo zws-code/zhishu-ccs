@@ -65,6 +65,40 @@ pub async fn upload(
     let dir_segs = remote_dir_segments(settings, RemoteLayout::Current);
     ensure_remote_directories(&settings.base_url, &dir_segs, &auth).await?;
 
+    let manifest_url = remote_file_url(settings, RemoteLayout::Current, REMOTE_MANIFEST)?;
+    if let Some((bytes, _)) = get_bytes(&manifest_url, &auth, MAX_MANIFEST_BYTES).await? {
+        super::sync_protocol::validate_upload_destination(&bytes)?;
+    } else if let Some((owner, _)) = get_bytes(
+        &remote_file_url(
+            settings,
+            RemoteLayout::Current,
+            super::sync_protocol::REMOTE_OWNER,
+        )?,
+        &auth,
+        MAX_MANIFEST_BYTES,
+    )
+    .await?
+    {
+        super::sync_protocol::validate_upload_owner(&owner)?;
+    } else {
+        for artifact in [REMOTE_DB_SQL, REMOTE_SKILLS_ZIP] {
+            let url = remote_file_url(settings, RemoteLayout::Current, artifact)?;
+            if get_bytes(&url, &auth, 1).await?.is_some() {
+                return Err(super::sync_protocol::unowned_destination_error());
+            }
+        }
+        put_bytes(
+            &remote_file_url(
+                settings,
+                RemoteLayout::Current,
+                super::sync_protocol::REMOTE_OWNER,
+            )?,
+            &auth,
+            super::sync_protocol::OWNER_BYTES.to_vec(),
+            MANIFEST_CONTENT_TYPE,
+        )
+        .await?;
+    }
     let snapshot = build_local_snapshot(db)?;
 
     // Upload order: artifacts first, manifest last (best-effort consistency)
@@ -309,22 +343,22 @@ mod tests {
     #[test]
     fn remote_dir_segments_uses_current_layout() {
         let settings = WebDavSyncSettings {
-            remote_root: "cc-switch-sync".to_string(),
+            remote_root: "zhishu-ccs-sync".to_string(),
             profile: "default".to_string(),
             ..WebDavSyncSettings::default()
         };
         let segs = remote_dir_segments(&settings, RemoteLayout::Current);
-        assert_eq!(segs, vec!["cc-switch-sync", "v2", "db-v6", "default"]);
+        assert_eq!(segs, vec!["zhishu-ccs-sync", "v2", "db-v6", "default"]);
     }
 
     #[test]
     fn remote_dir_segments_uses_legacy_layout() {
         let settings = WebDavSyncSettings {
-            remote_root: "cc-switch-sync".to_string(),
+            remote_root: "zhishu-ccs-sync".to_string(),
             profile: "default".to_string(),
             ..WebDavSyncSettings::default()
         };
         let segs = remote_dir_segments(&settings, RemoteLayout::Legacy);
-        assert_eq!(segs, vec!["cc-switch-sync", "v2", "default"]);
+        assert_eq!(segs, vec!["zhishu-ccs-sync", "v2", "default"]);
     }
 }

@@ -4593,7 +4593,7 @@ mod stack_tests {
     #[tokio::test]
     async fn gemini_http_overflow_reaches_codex_as_a_failed_stream() {
         let state = proxy_state();
-        let model = "ccs-gemini/gemini-3.8-flash-high";
+        let model = "zccs-gemini/gemini-3.8-flash-high";
         let provider =
             crate::provider::Provider::with_id("gemini".into(), "Gemini".into(), json!({}), None);
         let ctx = RequestContext::new(
@@ -4672,7 +4672,7 @@ mod stack_tests {
 
         let response = handle_messages(
             State(state.clone()),
-            post("/v1/messages", "ccs-claude-kimi--kimi-k3"),
+            post("/v1/messages", "zccs-claude-kimi--kimi-k3"),
         )
         .await
         .expect("response");
@@ -4683,24 +4683,24 @@ mod stack_tests {
         assert!(body["error"]["message"]
             .as_str()
             .unwrap()
-            .contains("ccs-claude-kimi--kimi-k3"));
+            .contains("zccs-claude-kimi--kimi-k3"));
 
         for response in [
             handle_responses(
                 State(state.clone()),
-                post("/v1/responses", "ccs-kimi/kimi-k3"),
+                post("/v1/responses", "zccs-kimi/kimi-k3"),
             )
             .await
             .expect("responses"),
             handle_responses_compact(
                 State(state.clone()),
-                post("/v1/responses/compact", "ccs-kimi/kimi-k3"),
+                post("/v1/responses/compact", "zccs-kimi/kimi-k3"),
             )
             .await
             .expect("compact"),
             handle_chat_completions(
                 State(state.clone()),
-                post("/v1/chat/completions", "ccs-kimi/kimi-k3"),
+                post("/v1/chat/completions", "zccs-kimi/kimi-k3"),
             )
             .await
             .expect("chat"),
@@ -4720,7 +4720,7 @@ mod stack_tests {
         assert!(routed.is_err());
         let routed = handle_grokbuild_responses(
             State(state),
-            post("/grokbuild/v1/responses", "ccs-kimi/kimi-k3"),
+            post("/grokbuild/v1/responses", "zccs-kimi/kimi-k3"),
         )
         .await;
         assert!(routed.is_err(), "Grok Build model ids are not decoded");
@@ -4746,7 +4746,7 @@ mod stack_tests {
         let target = crate::mode::stack::StackTarget {
             provider: kimi,
             upstream_model: "kimi-k3".to_string(),
-            original_model: "ccs-claude-kimi--kimi-k3".to_string(),
+            original_model: "zccs-claude-kimi--kimi-k3".to_string(),
         };
         let body = json!({ "model": "kimi-k3", "messages": [] });
 
@@ -4770,7 +4770,7 @@ mod stack_tests {
                 .collect::<Vec<_>>(),
             vec!["kimi"]
         );
-        assert_eq!(ctx.request_model, "ccs-claude-kimi--kimi-k3");
+        assert_eq!(ctx.request_model, "zccs-claude-kimi--kimi-k3");
         assert!(!ctx.app_config.auto_failover_enabled);
         let streaming = ctx.streaming_timeout_config();
         assert_eq!(

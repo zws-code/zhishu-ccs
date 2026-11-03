@@ -18,8 +18,8 @@ use crate::mode::stack::DesktopStackModel;
 use crate::mode::state::{self, PendingTarget};
 use crate::provider::{ClaudeDesktopMode, Provider};
 
-pub const PROFILE_ID: &str = "00000000-0000-4000-8000-000000157210";
-pub const PROFILE_NAME: &str = "CC Switch";
+pub const PROFILE_ID: &str = "00000000-0000-4000-8000-000000257210";
+pub const PROFILE_NAME: &str = "Zhishu CC Switch";
 
 #[cfg(any(target_os = "macos", windows, target_os = "linux", test))]
 const CONFIG_FILE: &str = "claude_desktop_config.json";
@@ -3037,6 +3037,34 @@ mod tests {
             json!([{"id": "other-1", "name": "Mine"}, {"id": "other-2", "name": "Also mine"}])
         );
         assert_eq!(meta["appliedId"], json!("other-1"));
+    }
+
+    #[test]
+    fn coexistence_preserves_the_original_cc_switch_desktop_profile() {
+        let tmp = TempDir::new().unwrap();
+        let paths = test_paths(tmp.path());
+        fs::create_dir_all(&paths.config_library_path).unwrap();
+        let original_id = "00000000-0000-4000-8000-000000157210";
+        let original = paths
+            .config_library_path
+            .join(format!("{original_id}.json"));
+        let original_bytes = br#"{"name":"CC Switch","inferenceGatewayApiKey":"fixture"}"#;
+        fs::write(&original, original_bytes).unwrap();
+        crate::config::write_json_file(
+            &paths.meta_path,
+            &json!({
+                "entries":[{"id":original_id,"name":"CC Switch"}], "appliedId":original_id
+            }),
+        )
+        .unwrap();
+        apply_provider_to_paths(&test_db(), &direct_provider("a"), &paths).unwrap();
+        assert_eq!(fs::read(&original).unwrap(), original_bytes);
+        let meta: Value = read_json_file(&paths.meta_path).unwrap();
+        assert_eq!(meta["entries"][0]["id"], original_id);
+        restore_official(&paths).unwrap();
+        assert_eq!(fs::read(&original).unwrap(), original_bytes);
+        let meta: Value = read_json_file(&paths.meta_path).unwrap();
+        assert_eq!(meta["appliedId"], original_id);
     }
 
     #[cfg(unix)]

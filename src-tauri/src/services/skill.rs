@@ -1657,6 +1657,33 @@ impl SkillService {
         let skill = current_skill;
 
         let dest = ssot_dir.join(&skill.directory);
+        // Verify old copies before replacing the source. This also records the
+        // pre-upgrade copies that predate deployment receipts, so legitimate
+        // copy-mode updates remain possible without accepting foreign edits.
+        for app in skill
+            .apps
+            .enabled_apps()
+            .into_iter()
+            .filter(Self::is_sync_managed_app)
+        {
+            if matches!(
+                app,
+                AppType::Mcode | AppType::Agy | AppType::Kimi | AppType::Dsh
+            ) {
+                continue;
+            }
+            let destination =
+                Self::get_distinct_app_skills_dir(&ssot_dir, &app)?.join(&skill.directory);
+            if let Some(PiSkillDeployment::Copy { expected_hash }) =
+                Self::inspect_pi_skill_destination(&dest, &destination, &skill.directory)?
+            {
+                crate::zhishu::coexistence::remember_skill_copy(
+                    &dest,
+                    &destination,
+                    expected_hash,
+                )?;
+            }
+        }
         let mut deployments = Vec::new();
         for app in [
             AppType::Pi,
@@ -2670,7 +2697,13 @@ impl SkillService {
                 Self::compute_pi_deployment_hash(destination),
                 Self::compute_pi_deployment_hash(source),
             ) {
-                if destination_hash == source_hash {
+                if destination_hash == source_hash
+                    || crate::zhishu::coexistence::owns_skill_copy(
+                        source,
+                        destination,
+                        &destination_hash,
+                    )
+                {
                     return Ok(Some(PiSkillDeployment::Copy {
                         expected_hash: destination_hash,
                     }));
@@ -2679,7 +2712,7 @@ impl SkillService {
         }
 
         Err(anyhow!(
-            "Pi 中已存在同名但内容不同的 Skill，拒绝覆盖或删除: {directory}"
+            "工具中已存在来自其他目录或内容不同的同名 Skill，拒绝覆盖或删除: {directory}"
         ))
     }
 
@@ -2774,16 +2807,7 @@ impl SkillService {
 
         let dest = app_dir.join(&directory);
 
-        if matches!(
-            app,
-            AppType::Pi
-                | AppType::Mcode
-                | AppType::Agy
-                | AppType::Kimi
-                | AppType::Dsh
-                | AppType::Omp
-        ) && (dest.exists() || Self::is_symlink(&dest))
-        {
+        if dest.exists() || Self::is_symlink(&dest) {
             Self::ensure_pi_skill_destination_matches(&source, &dest, &directory)?;
         }
 
@@ -2801,6 +2825,7 @@ impl SkillService {
             SyncMethod::Auto => {
                 if dest.exists() && !Self::is_symlink(&dest) {
                     Self::replace_dest_with_copy(&source, &dest, &directory)?;
+                    Self::remember_skill_copy(&source, &dest)?;
                     log::debug!("Skill {directory} 已通过复制同步到 {app:?}");
                     return Ok(());
                 }
@@ -2825,6 +2850,7 @@ impl SkillService {
                 }
                 // Fallback 到 copy
                 Self::replace_dest_with_copy(&source, &dest, &directory)?;
+                Self::remember_skill_copy(&source, &dest)?;
                 log::debug!("Skill {directory} 已通过复制同步到 {app:?}");
             }
             SyncMethod::Symlink => {
@@ -2836,10 +2862,17 @@ impl SkillService {
             }
             SyncMethod::Copy => {
                 Self::replace_dest_with_copy(&source, &dest, &directory)?;
+                Self::remember_skill_copy(&source, &dest)?;
                 log::debug!("Skill {directory} 已通过复制同步到 {app:?}");
             }
         }
 
+        Ok(())
+    }
+
+    fn remember_skill_copy(source: &Path, destination: &Path) -> Result<()> {
+        let hash = Self::compute_pi_deployment_hash(destination)?;
+        crate::zhishu::coexistence::remember_skill_copy(source, destination, hash)?;
         Ok(())
     }
 
@@ -2982,15 +3015,7 @@ impl SkillService {
         }
 
         if skill_path.exists() || Self::is_symlink(&skill_path) {
-            if matches!(
-                app,
-                AppType::Pi
-                    | AppType::Mcode
-                    | AppType::Agy
-                    | AppType::Kimi
-                    | AppType::Dsh
-                    | AppType::Omp
-            ) {
+            {
                 let source = ssot_dir.join(&directory);
                 Self::ensure_pi_skill_destination_matches(&source, &skill_path, &directory)?;
             }
@@ -3078,7 +3103,18 @@ impl SkillService {
 
                 if let Some(skill) = indexed_skills.get(&dir_name.to_lowercase()) {
                     if !skill.apps.is_enabled_for(app) {
-                        Self::remove_path(&path)?;
+                        let source = ssot_dir.join(&skill.directory);
+                        match Self::ensure_pi_skill_destination_matches(
+                            &source,
+                            &path,
+                            &skill.directory,
+                        ) {
+                            Ok(()) => Self::remove_path(&path)?,
+                            Err(error) => failed.push(SkillSyncFailure {
+                                directory: skill.directory.clone(),
+                                error: format!("{error:#}"),
+                            }),
+                        }
                     }
                     continue;
                 }
@@ -5054,6 +5090,25 @@ pub fn migrate_skills_to_ssot(db: &Arc<Database>) -> Result<usize> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    #[serial_test::serial]
+    fn coexistence_shared_cli_skills_preserve_foreign_copies() {
+        let temp = tempfile::tempdir().unwrap();
+        let _home = TestHomeGuard::set(temp.path());
+        for app in [AppType::Claude, AppType::Codex, AppType::Gemini] {
+            let source = SkillService::get_ssot_dir().unwrap().join("shared-skill");
+            write_skill(&source, "ours");
+            let destination = SkillService::get_app_skills_dir(&app)
+                .unwrap()
+                .join("shared-skill");
+            write_skill(&destination, "foreign");
+            let before = fs::read(destination.join("SKILL.md")).unwrap();
+            assert!(SkillService::sync_to_app_dir("shared-skill", &app).is_err());
+            assert!(SkillService::remove_from_app("shared-skill", &app).is_err());
+            assert_eq!(fs::read(destination.join("SKILL.md")).unwrap(), before);
+        }
+    }
+
     use super::*;
     use tempfile::tempdir;
 

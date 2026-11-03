@@ -1394,7 +1394,7 @@ mod tests {
     fn operation_summary_groups_standalone_and_is_not_restorable() {
         let dir = tempfile::tempdir().unwrap();
         let store = HistoryStore::at(dir.path());
-        let path = Path::new("/isolated/cc-switch-model-catalog.json");
+        let path = Path::new("/isolated/zhishu-ccs-model-catalog.json");
         store.write(&summary_record("0001", "codex", path)).unwrap();
         store
             .write(&record("0002", "2026-10-25T13:00:00+08:00", "a", "b"))
