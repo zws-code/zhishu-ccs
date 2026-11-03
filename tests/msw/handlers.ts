@@ -1,6 +1,5 @@
 import { http, HttpResponse } from "msw";
 import type { AppId } from "@/lib/api/types";
-import { MODELS_DEV_API_URL } from "@/lib/modelsDev";
 import type { McpServer, Provider, Settings } from "@/types";
 import {
   addProvider,
@@ -51,7 +50,9 @@ export const handlers = [
   http.post(`${TAURI_ENDPOINT}/get_config_change_history`, () => success(null)),
   http.post(`${TAURI_ENDPOINT}/clear_config_change_history`, () => success(0)),
   http.post(`${TAURI_ENDPOINT}/restore_config_change_history`, () => success({ files: [], changed: false, pointerRestored: false })),
-  http.get(MODELS_DEV_API_URL, () => success({})),
+  http.post(`${TAURI_ENDPOINT}/fetch_models_dev`, () =>
+    success(JSON.stringify({})),
+  ),
   http.post(`${TAURI_ENDPOINT}/get_migration_result`, () => success(false)),
   http.post(`${TAURI_ENDPOINT}/get_skills_migration_result`, () =>
     success(null),

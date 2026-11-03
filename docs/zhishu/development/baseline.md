@@ -1,14 +1,14 @@
 # Zhishu CCS 当前代码基线与限制
 
-> Git、版本与远程核对：2026-11-03；其余模块说明沿用 2026-10-31 的核对范围，具体实现以当前代码为准。依据本地工作区、Git 引用和配置文件；未联网 fetch 或重新核验生产发布状态。
+> Git、版本与远程核对：2026-11-03；本轮联网获取并核验上游 v4.0.25，未重新核验生产发布状态。其余模块说明沿用各次任务的核对范围，具体实现以当前代码为准。
 
 ## 版本、上游与远程
 
 | 项目 | 当前本地事实 | 依据 |
 | --- | --- | --- |
 | 产品版本 | `0.0.6` | `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json` |
-| 分支 / 核对时 HEAD | `ccs-dev` / `c5d3f2c99b4748c6041135c8ba35835e94675ddc`；远程整理前工作区干净，整理后的文档/脚本改动未提交 | `git branch --show-current`、`git rev-parse HEAD`、`git status --short` |
-| 已合入上游 | `4.0.23` / `66d530d6efb68e57f51a97217b0146684f1990bd` | 本地版本分支；`git merge-base HEAD 4.0.23` 等于该提交，合并提交 `2092b400` |
+| 产品分支 / 同步起点 | `ccs-dev` / `1da9fa8bf36400fbcf6043908c1dbdc59a06812b`；在独立 `sync/upstream-4.0.25` 合并后集成，详见同步报告 | `git log`、`git status` |
+| 已合入上游 | `v4.0.25` / `a3eafa408ae679db2e3401fca767ed2b89d9a2b2` | 官方 tag 联网核验；合并保留祖先关系，见 [同步报告](../upstream-sync/2026-11-03.md) |
 | 官方 remote | `upstream` → `git@github.com:farion1231/cc-switch.git` | `git remote -v` |
 | 自有 GitHub | `origin` → `git@github.com:zws-code/zhishu-ccs.git` | 同上；发布 tag 使用此 remote |
 | 自有 GitLab | `gitlab` → `http://172.16.32.4:8929/hunanzs/zhishu-ccs.git` | 同上 |
@@ -16,11 +16,11 @@
 
 2026-11-03 按用户授权执行 `git remote rename`：旧 `origin` → `upstream`、旧 `zhishu-git` → `origin`、旧 `zhishu-origin` → `gitlab`。fetch/push 地址不变，远程跟踪引用随改名迁移；本地分支、tag 和 HEAD 保持不变。本任务未 fetch、pull、push 或修改服务器配置。
 
-重命名后的初检保留原目标：`main` → `upstream/main`，`ccs-dev` → `gitlab/ccw-dev`。最终复核发现并行操作将 `ccs-dev` 改为跟踪 `origin/ccs-dev`，并将该远程缓存引用从 `59b437af` 更新至当前 HEAD `c5d3f2c9`；已保留，不能据此声称本任务已核验远端同步。当前本地缓存显示 `ccs-dev` 与 `origin/ccs-dev` 一致，相比 `gitlab/ccw-dev` 仍领先 210、落后 9；改名不解决 GitLab 分歧。发布脚本只接受指向 `zws-code/zhishu-ccs` 的 `origin` 唯一 push URL，仍拒绝官方地址和多个 push URL。
+重命名任务当时的初检保留原目标：`main` → `upstream/main`，`ccs-dev` → `gitlab/ccw-dev`。当时最终复核发现并行操作将 `ccs-dev` 改为跟踪 `origin/ccs-dev`，并将该远程缓存引用从 `59b437af` 更新至 `c5d3f2c9`；该历史结果不代表此后的远端同步状态。2026-11-03 本轮同步开始时，本地产品 HEAD 已为 `1da9fa8b`，相对 `origin/ccs-dev` 缓存领先 4、落后 1；本轮未获取自有远程或处理既有分歧。改名和上游同步都不解决 GitLab 分歧。发布脚本只接受指向 `zws-code/zhishu-ccs` 的 `origin` 唯一 push URL，仍拒绝官方地址和多个 push URL。
 
 其他克隆应先核对旧配置再按上述顺序迁移，脚本与文档须一起更新。回退顺序：`git remote rename origin zhishu-git` → `git remote rename upstream origin` → `git remote rename gitlab zhishu-origin`，并恢复本轮发布脚本/当前操作文档；无需改动提交历史或真实用户数据。
 
-历史 [4.0.22 同步报告](../upstream-sync/2026-10-31.md)、[ADR-0007](../adr/ADR-0007-merge-4.0.22.md) 及版本发布证据中的远程旧名保留原事实，不表示当前配置。
+历史 [4.0.22 同步报告](../upstream-sync/2026-10-31.md)、[ADR-0007](../adr/ADR-0007-merge-4.0.22.md) 及版本发布证据中的远程旧名保留原事实，不表示当前配置。当前 v4.0.25 合并依据 [ADR-0011](../adr/ADR-0011-merge-4.0.25.md)。
 
 ## 身份、目录与凭据
 
@@ -46,7 +46,7 @@
 - 平台登录允许 HTTP(S)，移除 URL 用户信息、查询和片段；HTTP 不是加密传输。生产构建地址检查与登录输入校验分别执行，HTTPS 证书校验及拒绝重定向仍保留。
 - 普通退出保留本机模型 Key；显式清理退出仅处理当前账号目录、托管供应商和本次会话，安全保留项及其他账号不删除。没有多活动会话或未验证离线入口。
 - 发布工作流构建 macOS universal 与 Windows x64/ARM64 NSIS EXE；Linux 暂停新包。操作入口见 [发布指南](../releases/README.md)，历史验签与例外见各版本记录。
-- OAuth keep-alive 替换测试曾出现 `IncompleteMessage` 偶发失败；保留历史失败及复测结果，不把单次复测等同稳定性问题消失。
+- OAuth keep-alive 替换测试曾出现 `IncompleteMessage` 偶发失败；v4.0.25 已吸收上游对失效连接的测试重试修复，保留历史失败及复测结果，不把单次复测等同稳定性问题消失。
 - `src-tauri/src/commands/misc.rs` 仍有便携更新地址 TODO；原便携版不在当前新包矩阵中，后续恢复该渠道时须独立验收。
 - 真实 keyring、跨平台安装升级、CLI 模型调用和共存验证按具体记录判断；本次只核对源码和文档，不补记未执行的验收。
 

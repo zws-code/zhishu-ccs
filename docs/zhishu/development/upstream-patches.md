@@ -2,6 +2,20 @@
 
 > 这是按基线/事件累积的补丁台账。222 项清单针对 2026-10-29 的 4.0.21 快照，后续变更按事件追加；旧路径、版本和分支描述仅适用于该段，不是当前 4.0.22 的完整重新统计。当前现状见 [代码基线](baseline.md)。
 
+## 2026-11-03：合并上游 v4.0.25
+
+依据 [ADR-0011](../adr/ADR-0011-merge-4.0.25.md)，从 4.0.23 三方合入官方 v4.0.25，保留双方祖先关系。复用上游 Provider、CLI 投影、MCP、代理、用量、DAO、IPC 和原子写入，平台业务继续位于自有命名空间；本次没有新增平台业务核心补丁。
+
+| ID / 既有补丁 | 上游文件 | 复核与不能仅包装的原因 | 等级 | 验证 |
+| --- | --- | --- | --- | --- |
+| SYNC-20261103-01 / ZS-044、ZS-046、ZS-047、ZS-148 | package / Cargo 清单及锁文件、Tauri 配置 | 工具固定入口必须保留智枢 0.0.6 与身份，同时接入上游依赖；锁文件由工具更新 | L1 | frozen install、Cargo check/Clippy、发布脚本 |
+| SYNC-20261103-02 / COEXIST-20261103-01、02 | `live/project/claude.rs`、`mode/{controller,stack}.rs`、`claude_desktop_config.rs`、`services/provider/mod.rs` | 投影和内部调用须吸收上游模型说明及 AUTH_TOKEN 修复，保留智枢占位符、Stack/Profile 和写入归属，纯外层包装不能替换核心调用；冲突测试采用双方语义 | L3 | Claude/模式/Provider/共存及金标回归 |
+| SYNC-20261103-03 | `.github/dependabot.yml`、`assets/partners/logos/dit-banner.png` | 仓库规则要求保留上游文件；保留未引用资源与空 updates 配置，复用上游撤下赞助/预设及停用更新行为 | L1 | 文件/引用审查、前端全量与 renderer |
+| SYNC-20261103-04 / ZS-158 | `src/App.tsx` | 完整格式检查发现两处既存 Prettier 问题，只修正换行，不改挂载或运行行为；包装无法修正固定入口的格式 | L1（纯格式） | typecheck、format:check、前端全量 |
+| SYNC-20261103-05 | `tests/msw/handlers.ts` | 共享 mock 固定数组同时保留智枢配置历史与上游 models.dev IPC，新下载路径不再使用浏览器 HTTP mock | L0 测试 | 292 文件、3742 项前端测试 |
+
+既有 lib 注册、设置、MCP/DSH、代理转发及五语补丁均保留，新增通用功能按上游实现吸收，不另建平行服务。数据库 schema 24 和 OMP 协调、OAuth2 凭据/平台 API、产品更新渠道不变。实际验证、未验收和回退见 [同步报告](../upstream-sync/2026-11-03.md)。
+
 ## 2026-11-03：移除自有 macOS 开发签名辅助
 
 用户明确要求删除三份自有开发签名脚本及测试，同时保留 OAuth2 自动恢复。删除 `scripts/zhishu/dev-macos.sh`、`macos-dev-sign.mjs`、`macos-dev-sign.test.mjs` 和失去入口的开发签名文档；清理命令和当前文档引用，更新既有 ADR-0010。复用上游 Tauri CLI 开发启动与现有 Rust `platform_session` 会话存储，不新增包装或替代脚本。

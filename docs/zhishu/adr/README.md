@@ -14,5 +14,6 @@
 | [ADR-0008：平台与上游边界收敛](ADR-0008-upstream-patch-convergence.md) | Claude 平台档位、平台适配/夹具迁出、通用元数据更新和无效补丁撤回 |
 | [ADR-0009：产品共存隔离](ADR-0009-product-coexistence.md) | 派生资源命名、配置归属、后台恢复、云同步与共享 Skills 保护 |
 | [ADR-0010：移除开发隔离](ADR-0010-remove-development-isolation.md) | 正常开发路径、保留签名/测试隔离、旧开发数据不自动迁移 |
+| [ADR-0011：合并上游 v4.0.25](ADR-0011-merge-4.0.25.md) | 4.0.23 → v4.0.25，代理/MCP/投影/用量更新与智枢身份、共存边界 |
 
 ADR 保留做出决策时的事实；当前代码能力见 [基线](../development/baseline.md)，实际执行结果见 [验证记录](../history/validation.md)。

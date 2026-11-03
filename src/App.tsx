@@ -999,7 +999,9 @@ function App() {
     } else if (app === "mcode" || app === "dsh" || app === "kimi") {
       await queryClient.invalidateQueries({ queryKey: ["providers", app] });
     } else if (app === "workbuddy") {
-      await queryClient.invalidateQueries({ queryKey: ["providers", "workbuddy"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["providers", "workbuddy"],
+      });
     }
   };
 
@@ -1021,9 +1023,7 @@ function App() {
               ? translateKimiProviderMutationError(detail, t)
               : "") || detail;
         // 默认模型可能在客户端里改过、页面还是旧的：失败了也重读，让「默认」和移除按钮跟上
-        void refreshAdditiveLiveState(activeApp).catch(
-          () => undefined,
-        );
+        void refreshAdditiveLiveState(activeApp).catch(() => undefined);
         toast.error(t("notifications.removeFromConfigFailed"), {
           description: description || t("common.unknown"),
           closeButton: true,

@@ -2,6 +2,22 @@
 
 > 本页保留各次任务的执行结果和未验证项；测试数量、代码路径、分支状态及临时资料均属于当时快照。本次文档整理没有重跑这些历史测试。当前行为以 [代码基线](../development/baseline.md)、功能说明和源码为准。
 
+## 合并上游 v4.0.25（2026-11-03）
+
+从干净产品 HEAD `1da9fa8b` 在独立同步分支合入官方 v4.0.25 / `a3eafa40`；联网获取并核验 tag，保留智枢 0.0.6、OAuth2、平台两阶段同步、WorkBuddy、配置历史及共存隔离。最高 L3，依据 [ADR-0011](../adr/ADR-0011-merge-4.0.25.md)，冲突、依赖和回退详见[同步报告](../upstream-sync/2026-11-03.md)。
+
+本轮实际执行：
+
+- `pnpm install --frozen-lockfile`、`pnpm typecheck`、`pnpm format:check` 通过；两处既存 App.tsx 格式问题只修正换行。
+- `pnpm test:unit --maxWorkers=4 --minWorkers=1 --silent`：292 文件、3742 项通过。
+- `pnpm build:renderer` 通过，仍有现有大 chunk 提示。
+- Rust fmt、check、`cargo clippy --locked --offline --manifest-path src-tauri/Cargo.toml -- -D warnings` 通过。
+- 临时 `CC_SWITCH_TEST_HOME` 下串行 `cargo test --locked --offline --manifest-path src-tauri/Cargo.toml -- --test-threads=1`：4820 通过（4602 库 + 218 集成）、11 忽略；金标 44 项通过，没有生成或手改快照。Cargo 清单关闭 doctest，未执行文档测试。
+- `pnpm test:release`：57 通过；`pnpm test:release-cos`：23 项，21 通过、2 跳过，均为本机模拟。
+- 产品版本、清单解析、当前修改范围 81 处本地文档链接、冲突标记与索引、无文件删除和 `git diff --check` 核对通过。
+
+未运行桌面应用、真实 CLI 请求或真实系统 keyring；Windows/Linux 编译、UI、安装升级与真实平台/共存端到端待验收。未修改真实配置或凭据，未推送/发布或处理 `origin/ccs-dev` 既有历史分歧。本机回归不替代目标平台发布验收。
+
 ## 移除 macOS 开发签名辅助（2026-11-03，后续要求）
 
 用户要求删除自有 macOS 开发签名三件套，同时保留 OAuth2 自动恢复。删除开发启动签名脚本、签名 helper、对应测试与专用操作文档；移除 `package.json` 的 `test:dev-signing`，同步 AGENTS、开发入口、维护索引和 ADR-0010。上游 Tauri CLI 继续管理开发启动；Rust `platform_session` 保持系统 keyring 存储与恢复。自有脚本/文档 L0，固定 package/维护入口 L1，补丁及回退见[登记](../development/upstream-patches.md)。
