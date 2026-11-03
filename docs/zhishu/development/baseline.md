@@ -32,12 +32,12 @@
 | 登录 access / 2FA token | Rust 内存 | `src-tauri/src/zhishu/services/platform_auth.rs` |
 | refresh token / 记住密码 | 两个独立的系统 keyring service；元数据文件不含 token 或密码 | `src-tauri/src/zhishu/storage/platform_session.rs`、`platform_login_history.rs` |
 | 平台目录与模型 Key | 账号独立的 `platform-catalogs/<账号摘要>.json` v2；Unix 0600 私密原子写入，仍为明文 | `src-tauri/src/zhishu/services/platform_models/base_data.rs` |
-| 设备文件位置 | 正常使用 Tauri `app_local_data_dir()`；开发隔离沿用 `get_app_config_dir()` | `src-tauri/src/zhishu/storage/platform_storage.rs` |
+| 设备文件位置 | 使用 Tauri `app_local_data_dir()` | `src-tauri/src/zhishu/storage/platform_storage.rs` |
 | 普通供应商 Key | SQLite 的 `settings_config`，生效后可能进入 CLI 原生配置 | 上游 ProviderService、DAO 与配置适配器 |
 
 平台模型 Key 的目录、供应商行、原生配置及部分历史/备份副本不等于 keyring 加密存储。标准 §4.2 是安全目标，当前实现仍有差异；本次整理不迁移、删除或改写任何真实凭据。详情见 [功能说明](../features/platform-managed-models.md) 和 [ADR-0005](../adr/ADR-0005-account-local-cleanup.md)。
 
-`pnpm dev` 仅隔离应用数据与 Codex，其他 CLI 仍可写真实用户目录；测试需使用独立 `CC_SWITCH_TEST_HOME` 及目标工具覆盖变量。见 [隔离开发](dev-isolation.md)。
+`pnpm dev` 使用正常数据和工具配置路径，不注入目录覆盖；测试需使用独立 `CC_SWITCH_TEST_HOME` 及目标工具覆盖变量。见 [开发启动](development.md) 和 [ADR-0010](../adr/ADR-0010-remove-development-isolation.md)。
 
 ## 当前能力与已知边界
 

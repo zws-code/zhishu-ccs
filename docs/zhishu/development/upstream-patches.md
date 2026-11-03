@@ -2,6 +2,29 @@
 
 > 这是按基线/事件累积的补丁台账。222 项清单针对 2026-10-29 的 4.0.21 快照，后续变更按事件追加；旧路径、版本和分支描述仅适用于该段，不是当前 4.0.22 的完整重新统计。当前现状见 [代码基线](baseline.md)。
 
+## 2026-11-03：自有发布与签名脚本去冗余
+
+按用户确认清理 `scripts/zhishu/`：从 `release-artifacts.mjs` 删除没有生产调用的 `configFingerprint`、`walkFiles`、`oneFile`、`saveReceipt`、`validateReceipt`、`assembleRelease` 及无用依赖；删除两项仅验证旧合包/`build.json` 链路的测试，现用夹具不再生成旧收据，缺失签名回归直接调用 `collectUpdaterPlatforms`。当前版本/目标/签名/哈希与历史发布恢复校验继续复用现有实现。
+
+将 `macos-dev-sign-runner.sh` 合并到既有 `dev-macos.sh --run` 分支并删除独立文件；签名 helper、身份选择、签名失败停止、应用参数与退出码保持原约定，已有测试增加启动入口与共享 runner 的接线验证。目录由 20 个文件减为 19 个，不新增脚本或测试文件。
+
+本轮均为自有脚本/测试与文档的 L0 清理，没有修改上游文件、package 命令、工作流或签名策略，无新增上游补丁或 ADR。回退只恢复这些自有脚本及测试，不移动版本、产物、tag 或真实凭据；实际检查见[验证记录](../history/validation.md)。
+
+## 2026-11-03：移除开发启动隔离
+
+依据用户明确要求及 [ADR-0010](../adr/ADR-0010-remove-development-isolation.md) 撤回开发隔离。复用既有 Tauri CLI、macOS 签名 runner、正常目录解析、设置覆盖、测试隔离和受控写入；不删除上游能力，不迁移或清理真实数据。
+
+| ID | 文件 | 改动与不能仅新增/包装的原因 | 等级 | 验证入口 |
+| --- | --- | --- | --- | --- |
+| DEV-20261103-01 | `package.json` | 固定 `dev` 命令直接复用 `tauri dev`，删除开发隔离测试入口；按用户反馈不保留通用包装脚本 | L1 | 命令指向、Tauri CLI 帮助、已有签名回归 |
+| DEV-20261103-02 | `src-tauri/src/config.rs`、`codex_config.rs` | 撤回函数内部优先执行的开发目录分支，保留测试 home、用户设置和平台兼容路径；外层 Adapter 无法撤回强制覆盖 | L3 | config 路径回归、Provider、golden |
+| DEV-20261103-03 | `src-tauri/src/lib.rs` | 删除固定启动流程中已失效的隔离日志 | L1 | Rust 编译与相关回归 |
+| DEV-20261103-04 | `src-tauri/src/live/engine.rs`、`AGENTS.md` | 删除已过期的开发隔离说明，保留设备状态目录语义与测试隔离要求 | L0 文档 | 源码引用及文档链接核对 |
+
+删除自有 `scripts/zhishu/dev-isolated{,.test}.mjs`，不保留通用启动器和对应测试；macOS 签名显式复用既有 `dev-macos.sh`。`zhishu/storage/platform_storage.rs` 移除开发分支，统一 Tauri 本地目录；`platform_session.rs` 仅更新目录摘要注释，凭据 ID 与 keyring 协议不变。当前操作文档改为[开发启动](development.md)，历史测试和迁移记录保留原事实。原 ZS-106、ZS-111 等累积台账中的“开发隔离”仅记录当时补丁，本事件撤回其专用运行时分支。
+
+验收和未执行项见[验证记录](../history/validation.md)。回退仅恢复代码与旧入口，保留旧开发目录和正常目录各自数据，不做全目录覆盖或凭据迁移。
+
 ## 2026-11-03：按二开标准统一 Git 远程命名
 
 用户授权整理远程名称和地址。旧 `origin` → `upstream`（官方）、旧 `zhishu-git` → `origin`（智枢 GitHub）、旧 `zhishu-origin` → `gitlab`（内网 GitLab），URL 保持原值。复用 Git 原生 `remote rename`、既有发布脚本和 URL 白名单；发布脚本/回归位于自有 `scripts/zhishu/`，L0，仍校验唯一 push URL、原子推送独立分支与 tag。根 `AGENTS.md` 仅更新固定维护入口中的远程说明（L1），新增旁路文档无法消除该入口中的过期指令；其他修订为自有标准、基线、发布指南及验证记录（L0）。没有上游运行时代码补丁，无需新增 L3 ADR。

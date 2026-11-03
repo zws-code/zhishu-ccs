@@ -63,8 +63,8 @@
 | --- | --- |
 | 安装依赖 | `pnpm install --frozen-lockfile` |
 | 桌面开发 | `pnpm dev` |
-| 检查开发启动参数，不启动程序 | `pnpm dev --dry-run` |
-| 开发启动脚本回归 | `pnpm test:dev-isolation` |
+| 查看开发启动参数，不启动程序 | `pnpm dev --help` |
+| macOS 开发签名回归 | `pnpm test:dev-signing` |
 | 本机正式构建与打包 | `pnpm build` |
 | 仅构建前端 | `pnpm build:renderer` |
 | 前端类型检查 | `pnpm typecheck` |
@@ -75,8 +75,8 @@
 | Rust 测试，macOS/Linux 隔离示例 | `CC_SWITCH_TEST_HOME="$(mktemp -d)" cargo test --manifest-path src-tauri/Cargo.toml` |
 
 - 前端单元测试使用 `pnpm test:unit`。
-- `pnpm dev` 使用 `scripts/zhishu/dev-isolated.mjs`，默认目录为 `~/.zhishu-ccs-dev-home`，可用绝对路径 `ZHISHU_CCS_DEV_HOME` 指定。**只隔离应用数据和 Codex**；Claude、Gemini 及其他 CLI 默认仍走真实用户目录，不能把整个开发环境视为全量隔离。
-- 启动器只为子进程设置隔离 `CODEX_HOME`，不复制真实凭证，并为新 Codex 目录初始化文件凭证模式。其他工具写入测试需使用各自目录覆盖/夹具；Rust 测试用 `CC_SWITCH_TEST_HOME`，同时检查已有目录覆盖和 `WORKBUDDY_CONFIG_DIR` 等变量，不能修改智能体自身的 `HOME`/`CODEX_HOME` 来隔离。
+- `pnpm dev` 直接调用 `tauri dev`，沿用正常应用数据和工具配置路径，不使用自有通用启动器。macOS 需要稳定开发签名时运行已有 `sh scripts/zhishu/dev-macos.sh`。详见[开发启动](docs/zhishu/development/development.md)。
+- 工具写入测试需使用各自目录覆盖/夹具；Rust 测试用 `CC_SWITCH_TEST_HOME`，同时检查已有目录覆盖和 `WORKBUDDY_CONFIG_DIR` 等变量，不能修改智能体自身的 `HOME`/`CODEX_HOME` 来隔离。
 - Rust 编译前需存在 `dist/`；打包始终启用更新包签名，需要配置发布私钥，具体配置见[底层打包命令](docs/zhishu/releases/README.md#打包命令)。CI 后端使用 nextest；本地未安装该扩展时使用上表的 `cargo test`，不要把扩展缺失报告成代码失败。
 
 ### 打包、发布与更新
@@ -132,7 +132,7 @@
 - 普通供应商 Key 随 `settings_config` 以 JSON 文本存入 SQLite，默认数据库为 `~/.zhishu-ccs/cc-switch.db`；生效时还可能写入 CLI 配置，不能宣称统一由 keyring 加密。
 - Codex 原生登录需尊重 `cli_auth_credentials_store` 的 `file/keyring/auto/ephemeral` 语义；沿用 `codex_config.rs` 和 `services/provider/codex_direct.rs` 的判断。
 - 平台 access token 和 2FA 临时 token 仅驻 Rust 内存；refresh token 默认持久化到系统 keyring，service 为 `com.zhishu.ccswitch.desktop.platform-session`。它们均不返回前端，不进入 localStorage、SQLite、配置导出或云同步；不要恢复为每次重启都需登录的旧实现。
-- `platform-session.json` 只保存平台地址、用户 ID、凭据条目 ID 和最后使用时间；正常位于 Tauri `app_local_data_dir()`，开发隔离时使用 `get_app_config_dir()`。凭据 ID 按存储目录区分，文件使用私密原子写入。
+- `platform-session.json` 只保存平台地址、用户 ID、凭据条目 ID 和最后使用时间；位于 Tauri `app_local_data_dir()`。凭据 ID 按存储目录区分，文件使用私密原子写入。
 - “记住密码”独立使用 keyring service `com.zhishu.ccswitch.desktop.platform-login`；`platform-login-history.json` 与会话元数据遵循相同目录规则，不含密码。保持登录不依赖勾选记住密码，也不使用已保存密码自动登录或跳过 2FA。
 - 平台分组模型 Key 则保存在设备本地按平台地址和用户 ID 分隔的 `platform-catalogs/<账号摘要>.json`（旧单文件 v2 可按归属迁移），应用后还可能在供应商 SQLite 行和 CLI 配置中出现；目录文件使用私密原子写入（Unix 0600），不是 keyring 加密存储，不进入数据库导出或云同步。普通目录摘要不含 Key；只有 `platform_get_catalog_key` 显式查看/复制入口返回单个分组 Key，不得放入前端查询缓存。
 - 授权中心另有 `codex_oauth_auth.json`、`copilot_auth.json`、`xai_oauth_auth.json` 文件存储；不要与平台会话或记住密码的存储/清理规则混用。

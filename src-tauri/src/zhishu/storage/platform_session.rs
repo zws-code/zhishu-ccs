@@ -194,7 +194,7 @@ impl SessionStore {
                     "平台未返回刷新凭证，本次登录无法跨重启保持",
                 ));
             }
-            // 凭据引用包含存储路径摘要，让开发隔离目录与正式目录使用不同条目。
+            // 凭据引用包含存储路径摘要，让不同存储目录使用不同条目。
             let scope = format!(
                 "{:x}",
                 Sha256::digest(store.path.to_string_lossy().as_bytes())

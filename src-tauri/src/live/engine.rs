@@ -25,8 +25,7 @@ use super::patch::{LivePatch, LiveWriteError};
 /// 这台设备自己的状态目录：`live-state.json` 和首写备份都放在这里。
 ///
 /// 路径固定为设备数据目录，和 `settings.json` 一样不跟随配置目录覆盖：覆盖目录
-/// 可能指向网盘同步目录，而写前意图和备份都是这台设备的事实。隔离开发时该目录
-/// 跟随 `ZHISHU_CCS_DEV_HOME`。
+/// 可能指向网盘同步目录，而写前意图和备份都是这台设备的事实。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeviceStore {
     root: PathBuf,

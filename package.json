@@ -4,8 +4,7 @@
   "description": "All-in-One Assistant for Claude Code, Codex & Gemini CLI",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/zhishu/dev-isolated.mjs",
-    "test:dev-isolation": "node --test scripts/zhishu/dev-isolated.test.mjs",
+    "dev": "tauri dev",
     "test:dev-signing": "node --test scripts/zhishu/macos-dev-sign.test.mjs",
     "build": "node scripts/zhishu/build-release.mjs",
     "tauri": "tauri",

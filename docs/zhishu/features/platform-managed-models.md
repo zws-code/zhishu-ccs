@@ -23,7 +23,7 @@ IPC：`platform_get_catalog()` 只读本机摘要，返回 `null` 或 `{ baseUrl
 
 获取专用 Key 的唯一入口是 `POST /api/zhishu/v1/client/access`，使用当前会话的 access token，请求不指定用户、分组、Key 名称或额度。服务端负责分组授权和共享 Key 的整理；客户端没有 Key 列表、创建、替换、撤销或旧 credentials 回退代码。目录失败、Key 过期或额度耗尽都不会触发客户端补偿建 Key。
 
-Key 和登录令牌分离。快照版本为 **2**，按平台地址和用户 ID 分别保存于设备 `app_local_data_dir()/platform-catalogs/<账号摘要>.json`，开发隔离沿用已有路径。有效的旧单文件 v2 快照仅在归属匹配时迁移，先原子写入再移除旧文件；不同账号不会覆盖彼此。复用私密原子写入，Unix 权限 `0600`；快照不包含 JWT，不进入数据库导出或云同步。`syncedAt` 来自服务端 RFC3339 时间转 Unix 毫秒。版本 1 或其他旧版本只读返回无目录，不迁移字段、不接管旧凭证，也不自动删文件；需重新同步。
+Key 和登录令牌分离。快照版本为 **2**，按平台地址和用户 ID 分别保存于设备 `app_local_data_dir()/platform-catalogs/<账号摘要>.json`，开发版使用相同路径。有效的旧单文件 v2 快照仅在归属匹配时迁移，先原子写入再移除旧文件；不同账号不会覆盖彼此。复用私密原子写入，Unix 权限 `0600`；快照不包含 JWT，不进入数据库导出或云同步。`syncedAt` 来自服务端 RFC3339 时间转 Unix 毫秒。版本 1 或其他旧版本只读返回无目录，不迁移字段、不接管旧凭证，也不自动删文件；需重新同步。
 
 摘要中的 `keyAvailable` 仅表示凭证明文存在，与 `quota.available` 独立；`quota.reasons`、`subscriptions` 和不含 Key 的 `credential` 元数据用于展示过期、禁用、余额及周期额度状态。整体请求或格式校验失败保留原快照；成功空分组才代表当前授权集合为空。单组模型失败记录 `failed`，不会借用其他本地模型扩大授权范围。
 

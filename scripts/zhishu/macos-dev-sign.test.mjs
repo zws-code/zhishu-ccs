@@ -12,7 +12,10 @@ import {
   signExecutable,
 } from "./macos-dev-sign.mjs";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const root = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
 const hash = "A".repeat(40);
 const otherHash = "B".repeat(40);
 const name = "Apple Development: Test (TEAM123456)";
@@ -122,6 +125,39 @@ function fixture(t) {
 }
 
 test(
+  "development entry selects the shared runner and forwards signing identity and Tauri arguments",
+  { skip: process.platform === "win32" },
+  (t) => {
+    const dir = fixture(t);
+    fs.writeFileSync(
+      path.join(dir, "node"),
+      `#!/bin/sh\n[ "$2" = "--identity" ] || exit 42\nprintf '%s\\n' '${hash}'\n`,
+      { mode: 0o700 },
+    );
+    fs.writeFileSync(
+      path.join(dir, "rustc"),
+      "#!/bin/sh\nprintf 'host: aarch64-apple-darwin\\n'\n",
+      { mode: 0o700 },
+    );
+    fs.writeFileSync(
+      path.join(dir, "pnpm"),
+      '#!/bin/sh\nprintf \'<%s>\\n\' "$CARGO_TARGET_AARCH64_APPLE_DARWIN_RUNNER" "$MACOS_DEV_SIGNING_IDENTITY" "$@"\nexit 17\n',
+      { mode: 0o700 },
+    );
+    const script = path.join(root, "scripts/zhishu/dev-macos.sh");
+    const result = spawnSync("/bin/sh", [script, "--no-watch", "hello world"], {
+      env: { ...process.env, PATH: `${dir}:/usr/bin:/bin` },
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 17, result.stderr);
+    assert.equal(
+      result.stdout,
+      `</bin/sh ${script} --run>\n<${hash}>\n<tauri>\n<dev>\n<--no-watch>\n<hello world>\n`,
+    );
+  },
+);
+
+test(
   "Cargo runner stops on signer failure and preserves application arguments and exit status",
   { skip: process.platform === "win32" },
   (t) => {
@@ -133,7 +169,8 @@ test(
       mode: 0o700,
     });
     const args = [
-      path.join(root, "scripts/zhishu/macos-dev-sign-runner.sh"),
+      path.join(root, "scripts/zhishu/dev-macos.sh"),
+      "--run",
       app,
       "hello world",
       "--flag",
@@ -142,6 +179,9 @@ test(
       env: { ...process.env, PATH: `${dir}:/usr/bin:/bin` },
       encoding: "utf8",
     };
+    const missing = spawnSync("/bin/sh", args.slice(0, 2), options);
+    assert.equal(missing.status, 1);
+    assert.match(missing.stderr, /missing executable path/);
     let result = spawnSync("/bin/sh", args, options);
     assert.equal(result.status, 42);
     assert.equal(result.stdout, "");

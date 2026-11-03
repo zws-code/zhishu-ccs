@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import {
-  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -15,12 +14,8 @@ import { join } from "node:path";
 import { test } from "node:test";
 import {
   artifactNames,
-  assembleRelease,
   collectUpdaterPlatforms,
-  hashFile,
-  saveReceipt,
   targets,
-  validateReceipt,
   verifySignature,
   versionNumber,
 } from "./release-artifacts.mjs";
@@ -72,7 +67,7 @@ const publish = {
   downloadBaseUrl: "http://192.168.20.10:8081",
   allowInsecureHttp: true,
 };
-function buildFixture(dir, id, version, config, key) {
+function buildFixture(dir, id, version, key) {
   const out = join(dir, `v${version}-${id}`);
   mkdirSync(out, { recursive: true });
   const target = targets[id];
@@ -92,17 +87,8 @@ function buildFixture(dir, id, version, config, key) {
     if (!name.endsWith(".dmg") && !name.endsWith(".zip"))
       writeFileSync(join(out, name + ".sig"), key.signature(bytes));
   }
-  saveReceipt(out, id, version, config);
   return out;
 }
-function assembled(dir, version = "4.0.20", ids = ["macos"], key = identity()) {
-  const config = configFor(key.key);
-  const inputs = ids.map((id) => buildFixture(dir, id, version, config, key));
-  const out = join(dir, `.staging/${version}/payload`);
-  assembleRelease(inputs, out, version, config, publish);
-  return { out, config, inputs, key };
-}
-
 test("validates stable versions and all supported build targets", () => {
   assert.equal(versionNumber("v4.0.20"), "4.0.20");
   for (const value of [
@@ -157,42 +143,12 @@ test("verifies prehashed and legacy minisign signatures; rejects tampering and w
       /签名/,
     );
   }));
-test("build receipts reject changed files and a different production endpoint", () =>
-  fixture((dir) => {
-    const { inputs, config } = assembled(dir);
-    assert.throws(
-      () =>
-        validateReceipt(inputs[0], "4.0.20", {
-          ...config,
-          platformApiUrl: "https://other.zhishu.cn",
-        }),
-      /不一致/,
-    );
-    writeFileSync(join(inputs[0], "Zhishu-Ccs-v4.0.20-macOS.dmg"), "changed");
-    assert.throws(() => validateReceipt(inputs[0], "4.0.20", config), /损坏/);
-  }));
-test("assembles macOS and both Windows EXE architectures without Linux with real checksums and verified signatures", () =>
-  fixture((dir) => {
-    const { out } = assembled(dir, "4.0.20", Object.keys(targets));
-    const website = JSON.parse(readFileSync(join(out, "client-release.json")));
-    const latest = JSON.parse(readFileSync(join(out, "latest.json")));
-    assert.equal(website.allowInsecureHttp, true);
-    assert.equal(website.files.length, 4);
-    assert.equal(Object.keys(latest.platforms).length, 4);
-    assert.equal(
-      latest.platforms["darwin-aarch64"].url,
-      latest.platforms["darwin-x86_64"].url,
-    );
-    for (const file of website.files)
-      assert.equal(file.sha256, hashFile(join(out, file.name)));
-  }));
 test("build validation verifies every target in place without creating completion receipts or copies", () =>
   fixture((dir) => {
     const key = identity();
     const config = configFor(key.key);
     for (const id of Object.keys(targets)) {
-      const input = buildFixture(dir, id, "4.0.20", config, key);
-      rmSync(join(input, "build.json"));
+      const input = buildFixture(dir, id, "4.0.20", key);
       const before = readdirSync(input).sort();
       const platforms = collectUpdaterPlatforms(
         input,
@@ -218,7 +174,7 @@ test("build validation rejects missing installers and bad signatures before comp
   fixture((dir) => {
     const key = identity();
     const config = configFor(key.key);
-    const input = buildFixture(dir, "windows-x64", "4.0.20", config, key);
+    const input = buildFixture(dir, "windows-x64", "4.0.20", key);
     const installer = join(input, "Zhishu-Ccs-v4.0.20-Windows.exe");
     writeFileSync(
       installer + ".sig",
@@ -252,12 +208,17 @@ test("a missing signature cannot become a published updater", () =>
   fixture((dir) => {
     const key = identity();
     const config = configFor(key.key);
-    const input = buildFixture(dir, "windows-x64", "4.0.20", config, key);
+    const input = buildFixture(dir, "windows-x64", "4.0.20", key);
     rmSync(join(input, "Zhishu-Ccs-v4.0.20-Windows.exe.sig"));
-    saveReceipt(input, "windows-x64", "4.0.20", config);
     assert.throws(
       () =>
-        assembleRelease([input], join(dir, "out"), "4.0.20", config, publish),
+        collectUpdaterPlatforms(
+          input,
+          ["windows-x64"],
+          "4.0.20",
+          config,
+          publish,
+        ),
       /ENOENT/,
     );
   }));

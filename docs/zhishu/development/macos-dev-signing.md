@@ -6,7 +6,7 @@
 
 原来的 `Zhishu CC Switch Dev` 自签名证书只能固定 designated requirement，不能提供 Apple Team ID。2026-10-26 本机排查确认：即使旧条目已允许该自签名身份，钥匙串的 partition list 仍绑定旧 `cdhash`；系统日志出现 `ACL partition mismatch`，每次重编译又要求授权。因此仅创建自签名证书、将它设为信任或对旧程序点击“始终允许”，都不足以解决这个问题。
 
-开发启动现在使用 Apple 签发的代码签名证书，让钥匙串识别稳定的团队身份。平台会话和“记住密码”继续使用系统钥匙串。
+下述显式签名入口使用 Apple 签发的代码签名证书，让钥匙串识别稳定的团队身份。平台会话和“记住密码”继续使用系统钥匙串。
 
 ## 本机准备与启动
 
@@ -18,23 +18,23 @@
 security find-identity -v -p codesigning
 ```
 
-使用正常的开发入口：
+需要稳定签名时使用已有入口：
 
 ```sh
-pnpm dev
+sh scripts/zhishu/dev-macos.sh
 ```
 
-`pnpm dev` 在 macOS 上自动使用开发签名逻辑。开发隔离范围见 [隔离开发](dev-isolation.md)。直接运行 `pnpm tauri dev` 会绕过该签名流程。
+普通 `pnpm dev` 直接调用 `tauri dev`，不执行这套自定义签名流程。数据路径见 [开发启动](development.md)。
 
 启动器按以下顺序选择有效身份：Apple Development、Mac Developer、Developer ID Application、Apple Distribution、3rd Party Mac Developer Application。同一优先级有多个身份时会停止并列出指纹，需明确指定；也可主动指定完整名称或 SHA-1 指纹：
 
 ```sh
-MACOS_DEV_SIGNING_IDENTITY='<证书的完整 SHA-1 指纹>' pnpm dev
+MACOS_DEV_SIGNING_IDENTITY='<证书的完整 SHA-1 指纹>' sh scripts/zhishu/dev-macos.sh
 ```
 
-`scripts/zhishu/dev-macos.sh` 将选中的指纹传给 Cargo target runner。每次编译启动前，`scripts/zhishu/macos-dev-sign.mjs` 对二进制签名，并检查 Apple 信任链、Team ID 和应用标识；缺少证书、签名或校验失败都会停止启动。`MACOS_DEV_SIGNING_IDENTIFIER` 可覆盖默认应用标识 `com.zhishu.ccswitch.desktop`，日常开发应保持同一标识和签名团队。
+`scripts/zhishu/dev-macos.sh` 将选中的指纹传给 Cargo target runner，runner 复用同一脚本的内部 `--run` 分支。每次编译启动前，`scripts/zhishu/macos-dev-sign.mjs` 对二进制签名，并检查 Apple 信任链、Team ID 和应用标识；缺少证书、签名或校验失败都会停止启动。`MACOS_DEV_SIGNING_IDENTIFIER` 可覆盖默认应用标识 `com.zhishu.ccswitch.desktop`，日常开发应保持同一标识和签名团队。
 
-修改启动脚本或签名身份后，需要退出当前开发进程，重新运行 `pnpm dev`；已有 watcher 仍携带旧的签名环境变量。
+修改签名脚本或签名身份后，需要退出当前开发进程，重新运行 `sh scripts/zhishu/dev-macos.sh`；已有 watcher 仍携带旧的签名环境变量。
 
 ## 首次切换时的授权
 
@@ -52,7 +52,6 @@ MACOS_DEV_SIGNING_IDENTITY='<证书的完整 SHA-1 指纹>' pnpm dev
 
 ```sh
 pnpm test:dev-signing
-pnpm test:dev-isolation
 ```
 
 在已配置证书的 macOS 上，可显式执行真实系统验证：

@@ -381,3 +381,54 @@ CC_SWITCH_TEST_HOME="$(mktemp -d /tmp/zhishu-client-api.XXXXXX)" cargo test --of
 最终检查期间，快照比对发现并行操作把 `origin/ccs-dev` 从 `59b437af` 更新到当前 HEAD `c5d3f2c9`，并修改了 `ccs-dev` 的跟踪配置；本任务未执行这些操作，已保留并按实际状态更新文档。本地引用更新不等于本任务已联网核验远端。
 
 本任务未执行 fetch/pull/push、正式发布、服务器权限或默认分支调整、真实 GitHub/GitLab 连通性、全量前端/Rust/跨平台安装升级。`ccs-dev` 与内网旧分支的分歧仍在；其他克隆须核对地址并同步迁移远程名称。本轮脚本/文档未提交。回退按 [基线](../development/baseline.md) 的逆向改名顺序并恢复本轮文件即可，不涉及凭据、CLI 配置、数据库或提交历史迁移。
+
+
+## 2026-11-03 移除开发启动隔离
+
+用户要求“去掉开发隔离相关代码”。依据 [ADR-0010](../adr/ADR-0010-remove-development-isolation.md)，将启动器改为自有 `scripts/zhishu/dev.mjs`，移除目录准备、Codex 凭据模式初始化、子进程目录环境注入和 Rust 开发路径分支；平台文件统一使用 Tauri 本地目录。保留正常目录设置覆盖、Windows 路径兼容、测试专用 `CC_SWITCH_TEST_HOME`、macOS 签名和进程清理。路径分派按 L3 登记，命令/启动接线 L1，自有模块和文档 L0；补丁记录 DEV-20261103-01～04 已更新。
+
+| 本次已执行检查 | 结果 |
+| --- | --- |
+| `node --test scripts/zhishu/dev.test.mjs scripts/zhishu/macos-dev-sign.test.mjs` | 9 项通过，真实钥匙串测试按默认条件跳过 1 项；含跨平台命令选择、配置参数转发、假 CLI 环境继承、无目录初始化、子进程失败退出码 |
+| `node scripts/zhishu/dev.mjs --dry-run` | 通过，仅预览正常 macOS 签名入口，不启动应用 |
+| `node node_modules/typescript/bin/tsc --noEmit` | 通过，直接运行已安装 TypeScript，等价于现有 typecheck 脚本 |
+| `cargo fmt --check --manifest-path src-tauri/Cargo.toml` | 通过 |
+| 临时 `CC_SWITCH_TEST_HOME` 下 `cargo test --offline --manifest-path src-tauri/Cargo.toml --lib config::tests:: -- --test-threads=1` | 351 项通过，1 项既有真实 API Key 测试跳过；过滤包含各配置模块，覆盖默认 Codex 目录、显式设置覆盖、原文件保留和设备路径 |
+| Rust `app_config_load` | 4 项通过 |
+| Rust `provider_commands` | 13 项通过 |
+| Rust `golden` | 最终 44 项全部通过，不更新金标；覆盖格式、未知字段/MCP 保留、文件权限、认证及代理退出 |
+| Rust `zhishu::storage::platform_session::tests::` | 8 项通过，使用内存 vault 与临时文件，不访问真实 keyring |
+| `cargo clippy --offline --manifest-path src-tauri/Cargo.toml -- -D warnings` | 通过 |
+| 修改的 Node 脚本与 `package.json` Prettier、Node / shell 语法、`git diff --check` | 通过 |
+| 运行时代码残留与文档引用 | 源码、脚本和命令入口无专用开发隔离变量/函数；90 处当前维护文档本地链接可达，历史记录保留原事实 |
+
+Rust 共 420 项通过、1 项跳过；Node 共 9 项通过、1 项跳过。金标首轮在沙箱中为 42 通过、2 失败，失败原因均是代理回环监听被拒绝（`Operation not permitted`）；允许本机监听后重跑 44 项全部通过，不将首轮环境限制归为代码失败。
+
+未执行全量前端/Rust 测试、前端构建、正式打包发布、真实 GUI/CLI 请求、系统 keyring 和 Windows/Linux 实机验收。本轮未启动真实开发应用、迁移或删除旧 `~/.zhishu-ccs-dev-home`，未改动真实数据库、CLI 配置或凭据。以后开发启动使用正常数据路径；旧开发登录不会自动迁入。本节记录当时的临时启动器及测试；该包装层随后按用户反馈撤回，当前入口见下节。回退方案见 ADR-0010。
+
+
+## 2026-11-03 开发入口收敛（补充）
+
+用户反馈不应继续堆积开发脚本。删除上一轮新增的 `dev.mjs` 和 `dev.test.mjs`，`package.json` 的 `dev` 直接使用 `tauri dev`，删除 `test:dev`，不再提供自有 dry-run 或 Vite 清理。通用启动、参数和生命周期复用 Tauri CLI；需要 macOS 稳定签名时显式调用既有 `sh scripts/zhishu/dev-macos.sh`。本补充仅为 L0 文档和 L1 命令入口收敛，更新既有 ADR-0010 / DEV-20261103-01，不新增脚本、测试文件或 ADR；上一轮 Rust 路径改动保持不变。
+
+已执行：直接调用本地 Tauri CLI 的 `dev --help` 成功，未启动应用；既有 `macos-dev-sign.test.mjs` 6 项通过、真实 keyring 测试按默认条件跳过 1 项；`package.json` Prettier、签名脚本 shell 语法、62 处本地文档链接及 `git diff --check` 通过。静态断言确认 `dev` 直接调用 Tauri、旧隔离和通用包装脚本均不存在、相应测试命令已移除。更新 AGENTS 和开发/签名文档，使显式签名与普通启动入口一致。
+
+本补充未重跑前端/Rust 全量检查或真实 GUI、keyring 和跨平台启动；前节 420 项 Rust 测试仍仅作为前轮后端改动验证。普通 `pnpm dev` 不再自动使用自定义 macOS 签名 runner；稳定钥匙串授权需使用上述显式签名入口。回退此补充只需恢复上一轮入口与包装层，不涉及数据或凭据。
+
+
+## 2026-11-03 自有脚本去冗余
+
+用户确认处理脚本检查结果。删除 `release-artifacts.mjs` 中六个无生产调用的旧收据/合包及文件遍历函数，文件从 355 行减至 179 行；移除两项只覆盖旧链路的测试，现用测试夹具直接创建签名产物，缺失签名回归改用正式工作流调用的 `collectUpdaterPlatforms`。保留当前版本/平台/哈希/签名校验、`collectReceiptUpdaterPlatforms` 及其 MSI/Linux 历史恢复兼容。
+
+删除独立 `macos-dev-sign-runner.sh`，Cargo runner 改用已有 `dev-macos.sh --run`；普通签名入口不变。在既有签名测试中验证身份与 runner 环境、Tauri 参数和退出码传递，并保留签名失败不启动、应用含空格参数及缺少可执行文件的检查。目录从 20 个文件降为 19 个，无新增脚本、测试文件或依赖。L0 自有脚本/文档清理，补丁台账已补充事件；没有修改上游源码、package 命令、工作流、平台请求或签名策略。
+
+| 本轮已执行检查 | 结果 |
+| --- | --- |
+| 现有 Node 发布五份回归加 macOS 签名回归（`node --test` 直接运行对应六份文件） | 64 项通过、0 失败；真实钥匙串测试默认跳过 1 项 |
+| `python3 -B -m unittest discover -s scripts/zhishu -p 'test_publish_cos.py'` | 21 项通过，2 项 COS SDK 契约测试因未安装 SDK 跳过；使用内存上传模拟 |
+| 修改的三份 Node 文件 Prettier / Node 语法，`dev-macos.sh` shell 语法，`git diff --check` | 通过 |
+| 调用与引用检查 | scripts/工作流没有调用已删除函数或 runner 文件；保留历史 ADR 中当时的路径事实 |
+
+首轮 Node 回归发现测试中仍需使用的 `readFileSync` import 被一并清理，补回后完整重跑通过。没有改变测试断言来掩盖失败。
+
+未执行真实 Apple 签名/keyring、GUI 启动、GitHub Actions 构建、COS 上传或发布验收；前端与 Rust 源码未在本补充中修改，未重跑对应全量检查。测试使用临时文件、假命令和本地 bare Git 仓库，未操作真实发布分支/tag、远程桶或用户凭据。回退只恢复自有脚本和对应测试，无数据迁移。
