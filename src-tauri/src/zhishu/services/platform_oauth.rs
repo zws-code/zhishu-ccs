@@ -11,6 +11,7 @@ use tauri_plugin_opener::OpenerExt;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::oneshot;
+use tokio::task::JoinSet;
 use url::Url;
 
 const OAUTH_PREFIX: &str = "/api/zhishu/v1/oauth";
@@ -18,9 +19,10 @@ const CALLBACK_PATH: &str = "/callback";
 const CALLBACK_TIMEOUT: Duration = Duration::from_secs(300);
 const CONNECTION_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_REQUEST_BYTES: usize = 8 * 1024;
+const MAX_CONNECTIONS: usize = 16;
 const DEFAULT_SCOPE: &str = "client";
 
-const SUCCESS_PAGE: &str = "<!doctype html><meta charset=\"utf-8\"><title>登录成功</title><p>授权已完成，请返回智枢客户端。</p>";
+const SUCCESS_PAGE: &str = "<!doctype html><meta charset=\"utf-8\"><title>授权已接收</title><p>客户端已收到授权回调，正在验证登录，请返回智枢客户端查看结果。</p>";
 const DENIED_PAGE: &str = "<!doctype html><meta charset=\"utf-8\"><title>授权已取消</title><p>你已拒绝本次授权，可以关闭此页面并返回客户端重试。</p>";
 const INVALID_PAGE: &str = "<!doctype html><meta charset=\"utf-8\"><title>授权回调无效</title><p>授权回调无效或已过期，请返回客户端重新登录。</p>";
 
@@ -94,21 +96,37 @@ impl OAuthAttempt {
         cancel: oneshot::Receiver<()>,
     ) -> Result<String, PlatformAuthError> {
         let deadline = tokio::time::Instant::now() + CALLBACK_TIMEOUT;
+        let mut connections = JoinSet::new();
         tokio::pin!(cancel);
         loop {
             tokio::select! {
+                biased;
                 _ = &mut cancel => {
+                    log::info!("[platform-oauth] callback cancelled");
                     return Err(error("OAUTH_CANCELLED", "已取消授权登录"));
                 }
                 _ = tokio::time::sleep_until(deadline) => {
-                    return Err(error("OAUTH_TIMEOUT", "授权等待超时，请重新登录"));
+                    log::warn!("[platform-oauth] callback timed out; no valid callback received");
+                    return Err(error("OAUTH_TIMEOUT", "未收到浏览器授权回调，请检查浏览器是否拦截本机访问后重新登录"));
                 }
-                accepted = self.listener.accept() => {
-                    let (mut stream, _) = accepted
-                        .map_err(|_| error("OAUTH_UNAVAILABLE", "无法接收授权回调"))?;
-                    if let Some(result) = read_callback(&mut stream, &self.state).await {
+                completed = connections.join_next(), if !connections.is_empty() => {
+                    if let Some(Ok(Some(result))) = completed {
+                        log::info!("[platform-oauth] validated callback received");
                         return result;
                     }
+                }
+                accepted = self.listener.accept(), if connections.len() < MAX_CONNECTIONS => {
+                    let (mut stream, _) = accepted
+                        .map_err(|_| error("OAUTH_UNAVAILABLE", "无法接收授权回调"))?;
+                    let state = self.state.clone();
+                    // 浏览器可能先预连接但不发送请求；每个连接独立读取，不能阻塞真正回调。
+                    // JoinSet 离开作用域时取消全部连接，响应写入也受连接总时限约束。
+                    connections.spawn(async move {
+                        tokio::time::timeout(CONNECTION_TIMEOUT, read_callback(&mut stream, &state))
+                            .await
+                            .ok()
+                            .flatten()
+                    });
                 }
             }
         }
@@ -123,13 +141,16 @@ pub(crate) async fn login(
 ) -> Result<(String, Value), PlatformAuthError> {
     let base = normalize_base_url(&base_url)?;
     let http = client()?;
+    log::info!("[platform-oauth] loading client config");
     let config = client_config(&http, &base).await?;
     let mut attempt = OAuthAttempt::prepare(&config).await?;
+    log::info!("[platform-oauth] opening browser; loopback listener ready");
     handle
         .opener()
         .open_url(&attempt.authorize_url, None::<String>)
         .map_err(|_| error("OAUTH_BROWSER", "无法打开浏览器，请检查系统默认浏览器设置"))?;
     let code = attempt.wait_for_callback(cancel).await?;
+    log::info!("[platform-oauth] exchanging authorization code");
     let tokens = exchange_code(
         &http,
         &base,
@@ -201,21 +222,35 @@ async fn read_callback(
     stream: &mut TcpStream,
     expected_state: &str,
 ) -> Option<Result<String, PlatformAuthError>> {
-    let mut buffer = vec![0u8; MAX_REQUEST_BYTES];
-    let read = tokio::time::timeout(CONNECTION_TIMEOUT, stream.read(&mut buffer)).await;
-    let count = match read {
-        Ok(Ok(count)) if count > 0 => count,
-        _ => {
-            respond(stream, "400 Bad Request", INVALID_PAGE).await;
+    let mut buffer = [0u8; MAX_REQUEST_BYTES];
+    let mut count = 0;
+    loop {
+        let read = match stream.read(&mut buffer[count..]).await {
+            Ok(read) if read > 0 => read,
+            _ => return None,
+        };
+        count += read;
+        if buffer[..count].windows(4).any(|bytes| bytes == b"\r\n\r\n") {
+            break;
+        }
+        if count == MAX_REQUEST_BYTES {
+            respond(stream, "431 Request Header Fields Too Large", INVALID_PAGE).await;
             return None;
         }
-    };
-    let request = String::from_utf8_lossy(&buffer[..count]);
-    let mut parts = request.lines().next().unwrap_or("").split_whitespace();
-    let method = parts.next().unwrap_or("");
-    let target = parts.next().unwrap_or("");
+    }
+    let mut headers = [httparse::EMPTY_HEADER; 64];
+    let mut request = httparse::Request::new(&mut headers);
+    if !matches!(
+        request.parse(&buffer[..count]),
+        Ok(httparse::Status::Complete(_))
+    ) {
+        respond(stream, "400 Bad Request", INVALID_PAGE).await;
+        return None;
+    }
+    let method = request.method.unwrap_or("");
+    let target = request.path.unwrap_or("");
     let url = match Url::parse(&format!("http://127.0.0.1{target}")) {
-        Ok(url) if method == "GET" && url.path() == CALLBACK_PATH => url,
+        Ok(url) if method == "GET" && target.starts_with('/') && url.path() == CALLBACK_PATH => url,
         _ => {
             respond(stream, "404 Not Found", INVALID_PAGE).await;
             return None;
@@ -375,6 +410,151 @@ mod tests {
         });
         let failure = attempt.wait_for_callback(receiver).await.unwrap_err();
         assert_eq!(failure.code, "OAUTH_DENIED");
+    }
+
+    #[tokio::test]
+    async fn callback_waits_for_fragmented_http_headers() {
+        let mut attempt = OAuthAttempt::prepare(&config("https://portal.test/oauth/authorize"))
+            .await
+            .unwrap();
+        let port = attempt.listener.local_addr().unwrap().port();
+        let state = attempt.state.clone();
+        let (_cancel, receiver) = oneshot::channel();
+        let waiting = tokio::spawn(async move { attempt.wait_for_callback(receiver).await });
+        let mut stream = TokioTcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        stream.write_all(b"GET /call").await.unwrap();
+        let mut first = [0u8; 1];
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), stream.read(&mut first))
+                .await
+                .is_err(),
+            "an incomplete request must not receive an error response"
+        );
+        stream
+            .write_all(
+                format!("back?code=fragmented&state={state} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+                    .as_bytes(),
+            )
+            .await
+            .unwrap();
+        let code = tokio::time::timeout(Duration::from_secs(1), waiting)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(code, "fragmented");
+        let mut response = String::new();
+        stream.read_to_string(&mut response).await.unwrap();
+        assert!(response.starts_with("HTTP/1.1 200 OK"));
+    }
+
+    #[tokio::test]
+    async fn idle_preconnection_does_not_block_valid_callback() {
+        let mut attempt = OAuthAttempt::prepare(&config("https://portal.test/oauth/authorize"))
+            .await
+            .unwrap();
+        let port = attempt.listener.local_addr().unwrap().port();
+        let state = attempt.state.clone();
+        // 保持先到达的浏览器预连接为空，真实请求从第二条连接发送。
+        let _idle = TokioTcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        let mut browser = TokioTcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        browser
+            .write_all(
+                format!(
+                    "GET /callback?code=good&state={state} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"
+                )
+                .as_bytes(),
+            )
+            .await
+            .unwrap();
+        let (_cancel, receiver) = oneshot::channel();
+        let code =
+            tokio::time::timeout(Duration::from_secs(1), attempt.wait_for_callback(receiver))
+                .await
+                .unwrap()
+                .unwrap();
+        assert_eq!(code, "good");
+    }
+
+    #[tokio::test]
+    async fn cancellation_interrupts_incomplete_connection() {
+        let mut attempt = OAuthAttempt::prepare(&config("https://portal.test/oauth/authorize"))
+            .await
+            .unwrap();
+        let port = attempt.listener.local_addr().unwrap().port();
+        let mut browser = TokioTcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        browser.write_all(b"GET /call").await.unwrap();
+        let (cancel, receiver) = oneshot::channel();
+        let mut waiting = tokio::spawn(async move { attempt.wait_for_callback(receiver).await });
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), &mut waiting)
+                .await
+                .is_err()
+        );
+        cancel.send(()).unwrap();
+        let failure = tokio::time::timeout(Duration::from_secs(1), waiting)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(failure.code, "OAUTH_CANCELLED");
+        let mut byte = [0u8; 1];
+        assert_eq!(
+            tokio::time::timeout(Duration::from_secs(1), browser.read(&mut byte))
+                .await
+                .unwrap()
+                .unwrap(),
+            0
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn missing_callback_reaches_overall_deadline() {
+        let mut attempt = OAuthAttempt::prepare(&config("https://portal.test/oauth/authorize"))
+            .await
+            .unwrap();
+        let (_cancel, receiver) = oneshot::channel();
+        let started = tokio::time::Instant::now();
+        let failure = attempt.wait_for_callback(receiver).await.unwrap_err();
+        assert_eq!(failure.code, "OAUTH_TIMEOUT");
+        assert_eq!(started.elapsed(), CALLBACK_TIMEOUT);
+    }
+
+    #[tokio::test]
+    async fn oversized_request_does_not_end_authorization() {
+        let mut attempt = OAuthAttempt::prepare(&config("https://portal.test/oauth/authorize"))
+            .await
+            .unwrap();
+        let port = attempt.listener.local_addr().unwrap().port();
+        let state = attempt.state.clone();
+        let (_cancel, receiver) = oneshot::channel();
+        let waiting = tokio::spawn(async move { attempt.wait_for_callback(receiver).await });
+        let mut browser = TokioTcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        browser
+            .write_all(&vec![b'x'; MAX_REQUEST_BYTES])
+            .await
+            .unwrap();
+        let mut response = String::new();
+        browser.read_to_string(&mut response).await.unwrap();
+        assert!(response.starts_with("HTTP/1.1 431"));
+        let mut browser = TokioTcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        browser
+            .write_all(
+                format!(
+                    "GET /callback?code=good&state={state} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"
+                )
+                .as_bytes(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            tokio::time::timeout(Duration::from_secs(1), waiting)
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap(),
+            "good"
+        );
     }
 
     fn token_server(status_code: u16, body: Value) -> (String, std::thread::JoinHandle<String>) {

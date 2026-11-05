@@ -1,6 +1,6 @@
 # 智枢平台 OAuth2 授权登录：接入契约与已知问题
 
-更新：2026-11-03。适用：`zhishu-ccs`（智枢客户端）、`dsh`（DeepSeek Harness 插件）。
+更新：2026-11-04。适用：`zhishu-ccs`（智枢客户端）、`dsh`（DeepSeek Harness 插件）。
 网关侧实现：`zhishu-proxy` 仓库 `backend/internal/zhishu/clientoauth/`、`backend/internal/zhishu/clientapi/handler.go`、`frontend/src/zhishu/views/OAuthAuthorizeView.vue`。
 网关版本：提交 `840c66206`（含 P0 CSP 修复） + 仓库内未提交的 app 深链改动（`app_url`）。
 
@@ -170,3 +170,51 @@ dsh 仓库的 `DSH登录插件接入.md` 第 1 节与第 9 节仍写着不支持
 - [ ] token 交换成功，`/account`、`/access` 正常，刷新与登出工作。
 - [ ] 错误路径：错误 verifier、错误 redirect_uri、过期码、重复使用、后台模式。
 - [ ] 平台默认 CSP 下的真实浏览器链路（`/oauth/authorize` 已放开 loopback frame-src）。
+
+## 8. Windows / Edge 授权后等待的专项审查（2026-11-04）
+
+### 场景与结论边界
+
+用户报告 Windows 使用 Edge 完成平台授权后客户端持续转圈。本次检查当前 `0.0.7` 源码、前后端调用和测试。随后用户在 Windows 虚拟机复现，提供 IPv6 CSP 警告及两条回调请求标红无响应的观察（见下文）；本次智能体未直接操作该虚拟机，仍缺 loopback 请求的具体 `net::ERR_*` / blocked reason 与 Edge 版本。以下区分代码确定缺陷与待现场验证的原因，不能宣称已解决该用户的真实故障。
+
+### 高优先级：隐藏 iframe 投递可能被 Edge LNA 阻止（未修改网关）
+
+本文件记录的网关投递机制使用隐藏 iframe 请求 loopback；客户端把深链只作为唤醒信号，即使网页向深链附加 code/state，当前客户端也不消费这些参数来完成 OAuth。平台网页授权成功不代表授权码已经送达客户端。
+
+微软[官方 LNA 说明](https://learn.microsoft.com/en-us/deployedge/ms-edge-local-network-access)明确：Edge 143 起默认启用 Local Network Access 限制，覆盖子框架导航、fetch 与子资源请求；当前不覆盖顶层页面导航。请求权限需要安全上下文，HTTP 页面查询该权限始终为 denied。CSP 放行 `frame-src` 不能替代 LNA 权限。
+
+排查必须检查现场 Edge 版本、授权网页实际 HTTPS/HTTP 来源、站点本地网络权限、DevTools 对 loopback 请求的拦截原因，以及网关/反向代理最终 CSP；不能只凭网页显示“登录成功”判断投递成功。跨域 iframe 场景下，仅允许站点权限也可能不够。
+
+网关后续应优先提供标准的 **顶层导航到服务端生成的完整 `redirect_url`**，或明确的用户点击回到客户端入口，避免仅依赖隐藏 iframe。保留 state、PKCE 与原始 redirect_uri 校验。不要让用户全局关闭浏览器安全限制；本仓库的客户端接收修复无法绕过浏览器侧未发送的请求。
+
+### 已修复：客户端回调接收与日志
+
+修改均位于自有模块，侵入等级 **L0**，没有新增上游补丁、依赖、IPC 或存储格式：
+
+- [`platform_oauth.rs`](../../../src-tauri/src/zhishu/services/platform_oauth.rs)：旧代码只 `read` 一次即解析请求，TCP 分段可能把有效回调误判并继续等待。现在在 8 KiB 上限内读完整 HTTP 请求头，复用已有 `httparse` 解析器。
+- 同一文件：旧代码串行接收和读取连接，空预连接最多阻塞后续请求 10 秒，读取及响应期间不能及时响应取消/总超时，响应写入本身也没有超时。现在最多并发 16 个连接，每连接读取和响应共用 10 秒期限，取消与 300 秒总期限独立生效；结束时取消剩余连接。state 不匹配、拒绝授权与 PKCE 行为保持原契约。
+- 同一文件：回环页面改为“授权已接收，正在验证登录”，避免在兑换令牌前宣称已登录。等待超时明确提示未收到回调及浏览器拦截可能。
+- [`platform_auth.rs`](../../../src-tauri/src/zhishu/services/platform_auth.rs) 与 OAuth 模块：新增 `[platform-oauth]` 阶段日志，覆盖操作锁等待、存储初始化、配置读取、浏览器启动、有效回调、令牌兑换、账户验证、旧会话清理、新会话保存及完成/受控错误码。日志不含授权地址、state、授权码、verifier 或 token。
+- [`platform_http_log.rs`](../../../src-tauri/src/zhishu/services/platform_http_log.rs)：发现 OAuth token 请求体的字符串 `code` 未被通用脱敏器识别；现在只在该端点把授权码加入请求/响应已知秘密列表，保留业务响应的数字 `code`。不修改实际发送内容。
+
+### 已确认但本次未修复的相邻问题
+
+1. **跨阶段取消不完整**：取消 receiver 只存活于等待回调阶段。令牌交换期间取消可能返回成功，后端仍继续登录；完成阶段又持有认证锁，取消需等登录完成。前端会丢弃迟到结果，但不能阻止后端已经发布/持久化的会话。等待操作锁或注册通道前的取消同样可能丢失。完整修复需要覆盖整次尝试的取消状态、身份代际以及会话发布屏障，相关现有测试只覆盖前端丢弃结果。
+2. **系统凭据库无界等待**：会话存储等待不可取消的同步 `spawn_blocking` 任务；若 keyring/文件系统挂起，登录 IPC、认证锁与操作锁可能持续占用。没有证据证明该用户命中了 Windows 凭据库问题。不能只加 Promise 超时或丢弃阻塞任务：迟到的 create/touch 仍可能写回会话指针，导致取消/退出后可恢复。需要单独设计提交屏障与慢凭据库测试。
+3. **旧会话清理不可随意降级**：现有清理已允许“会话指针失效”或“旧凭据删除”任一成功。真正失败时两条阻断旧账户恢复的途径都不可靠；不能简单改警告后继续发布新账户。
+
+### 用户虚拟机复现与线上响应头核对（2026-11-04 18:16 后）
+
+- 用户报告：Windows 虚拟机中客户端等待授权，取消后能很快恢复按钮；授权页控制台提示 `frame-src` 中 `http://[::1]:*` 无效并被忽略；自定义协议深链与 IPv4 loopback 回调在 Network 均标红、未显示响应。现场提供的 code/state 不在本文保存，也未被智能体重放。
+- 只读实测：对 `http://43.136.64.205/oauth/authorize` 发 HEAD，HTTP 200，返回单条 CSP，`frame-src` 同时包含 `http://127.0.0.1:*`、`http://localhost:*` 和被浏览器报告无效的 IPv6 项。IPv6 项警告应修正，但浏览器忽略该项不等于忽略整个指令，不能据此认定 IPv4 回调被 CSP 阻止。HEAD 结果仍不能代替现场完整响应头、iframe 属性和浏览器 blocked reason。
+- 自定义协议没有普通 HTTP 响应，Network 标红不能单独证明应用唤醒失败；当前客户端 `is_oauth_wakeup` 只识别路径并聚焦窗口，不消费 code/state，所以深链也不是现有授权码接收的备用通道。
+- 用户对照结果（18:36 反馈）：把失败的完整 HTTP loopback 回调地址粘到浏览器地址栏后，客户端成功登录。这证明该轮 Windows 回环监听、有效回调处理及后续登录链路可用；故障聚焦授权网页的内嵌投递路径，不能再把本次复现归因于监听创建失败或系统凭据库持续挂起。此项是用户实测报告，智能体未重放授权码；仍缺 blocked reason，不能把具体浏览器限制直接定为 LNA 或上述 IPv6 CSP 警告。
+- 修复方向：在网关授权页以顶层导航打开服务端返回的完整 `redirect_url`，复用既有 state / PKCE / redirect_uri 校验，保留明确的用户点击回到客户端入口；不以深链唤醒成功作为授权码送达确认。当前工作区未找到网关的 `useOAuthAuthorize.ts`，本次没有修改或部署网关，客户端接收端的修复不能替代该投递路径改造。
+
+### 定位办法与验证记录
+
+新版本日志最后停在 `opening browser; loopback listener ready`，且没有 `validated callback received`：优先查网页向本机的投递和浏览器限制。停在 `exchanging authorization code` 或 `validating account`：查对应平台 HTTP 请求及受控错误码（单次请求超时 20 秒）。停在 `clearing previous persisted session` 或 `saving new persisted session`：检查系统凭据库与应用数据目录。深链把窗口拉起不足以证明回环已到达。
+
+已执行：平台后端相关回归 **117 项**通过，包含认证/会话、OAuth 回调、HTTP 日志、平台目录/同步/退出清理（OAuth 子集 12 项，含新增 TCP 分段、空预连接、读取中取消、总超时、超限请求 5 项；另新增授权码脱敏测试 1 项）；前端登录及接口回归 **40 项**通过；`cargo fmt --check --manifest-path src-tauri/Cargo.toml` 通过。后端回归使用临时 `CC_SWITCH_TEST_HOME`、模拟服务器和内存凭据库。
+
+本智能体未执行：Windows + Edge 实机操作、用户现场直接复现、真实系统凭据库挂起/恢复、网关代码修复及部署、完整工程 Clippy/全部测试/发布构建。用户已报告 Windows 虚拟机失败及地址栏顶层导航成功，范围见上文；不等同于改造后网关的正式验收。回退可撤销本次自有模块修改，无数据库迁移或凭据迁移；前述待修项在回退前后均存在。

@@ -146,6 +146,25 @@ fn request_parameters(request: &reqwest::Request) -> Value {
     serde_json::json!({"query": query, "body": body})
 }
 
+fn collect_request_secrets(
+    request: &reqwest::Request,
+    parameters: &Value,
+    secrets: &mut Vec<String>,
+) {
+    collect_secrets(parameters, secrets);
+    // OAuth 授权码也是凭据；业务响应的数字 code 仍保留用于诊断。
+    if request.method() == Method::POST
+        && request.url().path().ends_with("/api/zhishu/v1/oauth/token")
+    {
+        if let Some(code) = parameters["body"]["code"]
+            .as_str()
+            .filter(|code| !code.is_empty())
+        {
+            secrets.push(code.to_owned());
+        }
+    }
+}
+
 impl RequestLog {
     pub(crate) async fn send(builder: RequestBuilder) -> Result<(Self, Response), reqwest::Error> {
         let (client, request) = builder.build_split();
@@ -164,7 +183,7 @@ impl RequestLog {
             }
         }
         let parameters = request_parameters(&request);
-        collect_secrets(&parameters, &mut secrets);
+        collect_request_secrets(&request, &parameters, &mut secrets);
         let log = Self {
             id: NEXT_REQUEST_ID.fetch_add(1, Ordering::Relaxed),
             method: request.method().clone(),
@@ -292,6 +311,33 @@ mod tests {
         assert_eq!(logged["query"]["tag"], json!(["first", "中文"]));
         assert_eq!(logged["body"]["group_id"], 42);
         assert_eq!(logged["body"]["email"], "test@example.com");
+        assert_eq!(
+            serde_json::from_slice::<Value>(request.body().unwrap().as_bytes().unwrap()).unwrap(),
+            body
+        );
+    }
+
+    #[test]
+    fn oauth_authorization_code_and_echoes_are_redacted() {
+        let body = json!({"grant_type": "authorization_code", "client_id": "zhishu-ccs",
+            "code": "authorization-code-secret", "code_verifier": "pkce-verifier-secret"});
+        let request = reqwest::Client::new()
+            .post("https://example.com/api/zhishu/v1/oauth/token")
+            .json(&body)
+            .build()
+            .unwrap();
+        let parameters = request_parameters(&request);
+        let mut secrets = Vec::new();
+        collect_request_secrets(&request, &parameters, &mut secrets);
+        let output = body_for_log(&parameters, &secrets);
+        assert!(!output.contains("authorization-code-secret"));
+        assert!(!output.contains("pkce-verifier-secret"));
+        let response = body_for_log(
+            &json!({"code": 0, "message": "echo authorization-code-secret"}),
+            &secrets,
+        );
+        assert!(!response.contains("authorization-code-secret"));
+        assert_eq!(serde_json::from_str::<Value>(&response).unwrap()["code"], 0);
         assert_eq!(
             serde_json::from_slice::<Value>(request.body().unwrap().as_bytes().unwrap()).unwrap(),
             body

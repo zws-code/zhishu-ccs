@@ -237,6 +237,7 @@ async fn finish_login(
     if tokens.access_token.is_empty() {
         return Err(error("INVALID_RESPONSE", "登录响应缺少凭证"));
     }
+    log::info!("[platform-oauth] validating account");
     let user: ClientAccount = request(
         client,
         &base_url,
@@ -252,6 +253,7 @@ async fn finish_login(
     };
     // 发布新会话前先失效旧账户；新凭据持久化失败时保留本次登录，并返回明确警告。
     let (persistence, persistence_warning) = if let Some(store) = &state.store {
+        log::info!("[platform-oauth] clearing previous persisted session");
         store.clear().await?;
         if tokens.refresh_token.is_empty() {
             (
@@ -259,6 +261,7 @@ async fn finish_login(
                 Some("平台未提供刷新令牌，本次登录无法自动续期".into()),
             )
         } else {
+            log::info!("[platform-oauth] saving new persisted session");
             match store
                 .create(
                     base_url.clone(),
@@ -327,18 +330,26 @@ pub async fn platform_login_oauth(
     state: State<'_, PlatformAuthState>,
     base_url: String,
 ) -> Result<LoginResult, PlatformAuthError> {
+    log::info!("[platform-oauth] login requested; waiting for operation lock");
     let _operation = crate::zhishu::services::platform_models::APPLY_LOCK
         .lock()
         .await;
+    log::info!("[platform-oauth] initializing session store");
     let store_result = initialize_session_store(&state.0, &handle).await;
     let (cancel, receiver) = oneshot::channel();
     state.0.lock().await.oauth_cancel = Some(cancel);
     let outcome = super::platform_oauth::login(&handle, base_url, receiver).await;
     let mut auth = state.0.lock().await;
     auth.oauth_cancel = None;
-    let (base, tokens) = outcome?;
+    let (base, tokens) = outcome.inspect_err(|err| {
+        log::warn!("[platform-oauth] authorization failed code={}", err.code);
+    })?;
     let client = client()?;
-    let mut result = finish_login(&mut auth, &client, base, tokens).await?;
+    let mut result = finish_login(&mut auth, &client, base, tokens)
+        .await
+        .inspect_err(|err| {
+            log::warn!("[platform-oauth] login completion failed code={}", err.code);
+        })?;
     if let Err(err) = store_result {
         let LoginResult::Authenticated {
             persistence_warning,
@@ -346,6 +357,14 @@ pub async fn platform_login_oauth(
         } = &mut result;
         *persistence_warning = Some(err.message);
     }
+    let LoginResult::Authenticated {
+        persistence_warning,
+        ..
+    } = &result;
+    log::info!(
+        "[platform-oauth] authenticated persistence_warning={}",
+        persistence_warning.is_some()
+    );
     Ok(result)
 }
 
