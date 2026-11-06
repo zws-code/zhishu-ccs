@@ -2,6 +2,25 @@
 
 > 本页保留各次任务的执行结果和未验证项；测试数量、代码路径、分支状态及临时资料均属于当时快照。本次文档整理没有重跑这些历史测试。当前行为以 [代码基线](../development/baseline.md)、功能说明和源码为准。
 
+## 合并上游 v4.0.26（2026-11-06）
+
+从产品 `8e4ffbf4` / 0.0.7 在 `sync/upstream-4.0.26` 合并官方 `f621d421`，保留祖先、智枢产品身份、OAuth2 与平台两阶段同步、WorkBuddy、配置历史和共存隔离。15 个冲突处理与最高 L3 的依据见 [ADR-0012](../adr/ADR-0012-merge-4.0.26.md) 和 [同步报告](../upstream-sync/2026-11-06.md)。
+
+| 本轮实际执行 | 结果 |
+| --- | --- |
+| frozen install、TypeScript、Prettier | 通过；Tauri CLI 2.12.4 |
+| `pnpm test:unit --maxWorkers=4 --minWorkers=1 --silent` | 296 文件、3780 项通过 |
+| `pnpm build:renderer` | 通过，大 chunk 提示仍存在 |
+| Rust fmt、locked/offline check、Clippy `-D warnings` | 通过 |
+| 临时 `CC_SWITCH_TEST_HOME` 下串行 locked/offline `cargo test` | 4910 通过（4691 库 + 219 集成）、0 失败、14 忽略；金标 44、ProviderService 55、MCP 42、DSH 4 通过 |
+| Node 发布模拟 | 57 通过 |
+| Python COS 模拟 | 23 项：21 通过、2 跳过 |
+| 静态核对 | workflow YAML 与 47 段 shell 语法通过；五语 JSON 无重复键、DSH 文案齐全；清单/锁解析与智枢 0.0.7 一致；自有平台源码/schema 无差异；本轮文档本地链接、冲突、无删除和 diff 检查通过 |
+
+本轮未发生测试失败。初次 pnpm 离线安装因沙箱缓存锁权限受阻，获准执行 frozen install 后成功。忽略项含真实凭据/运行环境用例与性能基准；未运行 doctest。未生成或手改金标快照。
+
+本轮不启动真实应用、CLI、系统 keyring 或浏览器 OAuth2，不执行跨平台编译、安装升级、公证、线上发布和共存实机验收。用户未跟踪目录不提交、不清理；不修改 remote、不处理 `origin/ccs-dev` 既有分歧、不推送或发布。
+
 ## ccs-dev 线性历史重建（2026-11-03）
 
 开发测试阶段按用户要求把 `ccs-dev` 自有提交由 28 条合并为 10 条功能提交：以 `a3eafa40`（v4.0.25）为第一父，整理前 HEAD `a234bc66`。整理后 `531c43b8`（test 提交）的 tree 与整理前及备份分支 `backup/ccs-dev-before-reorg-20261103` 同为 `1b8d2021`，无文件内容差异。本次只重排提交归属、不修改源码；已删除的密码登录/TOTP 与开发隔离启动器等返工不再出现在历史中。详见[提交整理记录](commit-reorganization.md)。
