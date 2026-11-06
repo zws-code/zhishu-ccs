@@ -1,14 +1,14 @@
 # Zhishu CCS 当前代码基线与限制
 
-> Git、版本与远程核对：2026-11-03；本轮联网获取并核验上游 v4.0.25，未重新核验生产发布状态。其余模块说明沿用各次任务的核对范围，具体实现以当前代码为准。
+> Git、版本与远程核对：2026-11-06；本轮联网获取并核验上游 v4.0.26，未重新核验生产发布状态。其余模块说明沿用各次任务的核对范围，具体实现以当前代码为准。
 
 ## 版本、上游与远程
 
 | 项目 | 当前本地事实 | 依据 |
 | --- | --- | --- |
 | 产品版本 | `0.0.7` | `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json` |
-| 产品分支 / 同步起点 | `ccs-dev`：2026-11-03 线性重建后的 10 条自有功能提交；上游基线 `a3eafa408ae679db2e3401fca767ed2b89d9a2b2`（v4.0.25），重建前 HEAD 为 `a234bc66` | `git log`、[提交整理记录](../history/commit-reorganization.md) |
-| 已合入上游 | `v4.0.25` / `a3eafa408ae679db2e3401fca767ed2b89d9a2b2` | 官方 tag 联网核验；合并保留祖先关系，见 [同步报告](../upstream-sync/2026-11-03.md) |
+| 产品分支 / 同步起点 | `ccs-dev`；本轮由 `8e4ffbf48782606b22e578998637b0357581a4c4` 在 `sync/upstream-4.0.26` 合并后快进；此前线性重建历史保留 | `git log`、[提交整理记录](../history/commit-reorganization.md) |
+| 已合入上游 | `v4.0.26` / `f621d4216189ef06bcc6acd3588c84937b9794e1` | 官方 tag 联网核验；合并保留祖先关系，见 [同步报告](../upstream-sync/2026-11-06.md) |
 | 官方 remote | `upstream` → `git@github.com:farion1231/cc-switch.git` | `git remote -v` |
 | 自有 GitHub | `origin` → `git@github.com:zws-code/zhishu-ccs.git` | 同上；发布 tag 使用此 remote |
 | 自有 GitLab | `gitlab` → `http://172.16.32.4:8929/hunanzs/zhishu-ccs.git` | 同上 |
@@ -22,7 +22,9 @@
 
 其他克隆应先核对旧配置再按上述顺序迁移，脚本与文档须一起更新。回退顺序：`git remote rename origin zhishu-git` → `git remote rename upstream origin` → `git remote rename gitlab zhishu-origin`，并恢复本轮发布脚本/当前操作文档；无需改动提交历史或真实用户数据。
 
-历史 [4.0.22 同步报告](../upstream-sync/2026-10-31.md)、[ADR-0007](../adr/ADR-0007-merge-4.0.22.md) 及版本发布证据中的远程旧名保留原事实，不表示当前配置。当前 v4.0.25 合并依据 [ADR-0011](../adr/ADR-0011-merge-4.0.25.md)。
+2026-11-06 同步 v4.0.26 起点为 `8e4ffbf4`，相对 `origin/ccs-dev` 缓存领先 55、落后 26；未 fetch 自有远程或处理该分歧。只核验并合入官方稳定 tag，不移动已有产品发布 tag。
+
+历史 [4.0.22 同步报告](../upstream-sync/2026-10-31.md)、[ADR-0007](../adr/ADR-0007-merge-4.0.22.md) 及版本发布证据中的远程旧名保留原事实，不表示当前配置。当前 v4.0.26 合并依据 [ADR-0012](../adr/ADR-0012-merge-4.0.26.md)。
 
 ## 身份、目录与凭据
 

@@ -75,6 +75,7 @@ describe("useDirectorySettings", () => {
       if (app === "pi") return "/remote/pi";
       if (app === "workbuddy") return "/remote/workbuddy";
       if (app === "omp") return "/remote/omp";
+      if (app === "dsh") return "/remote/dsh";
       return "/remote/hermes";
     });
     selectConfigDirectoryMock.mockReset();
@@ -102,6 +103,7 @@ describe("useDirectorySettings", () => {
       pi: "/remote/pi",
       workbuddy: "/remote/workbuddy",
       omp: "/remote/omp",
+      dsh: "/remote/dsh",
     });
   });
 
@@ -116,6 +118,7 @@ describe("useDirectorySettings", () => {
     ["pi", "piConfigDir"],
     ["workbuddy", "workbuddyConfigDir"],
     ["omp", "ompConfigDir"],
+    ["dsh", "dshConfigDir"],
   ] as const)(
     "syncs the %s display when form drafts are discarded",
     async (app, field) => {

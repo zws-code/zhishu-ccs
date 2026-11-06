@@ -63,6 +63,7 @@ const DIRECTORY_KEYS = [
   "piConfigDir",
   "workbuddyConfigDir",
   "ompConfigDir",
+  "dshConfigDir",
 ] as const;
 
 const sanitizeDir = (value?: string | null): string | undefined => {
@@ -137,6 +138,7 @@ export function useSettings(): UseSettingsResult {
       pi: sanitizeDir(data?.piConfigDir),
       workbuddy: sanitizeDir(data?.workbuddyConfigDir),
       omp: sanitizeDir(data?.ompConfigDir),
+      dsh: sanitizeDir(data?.dshConfigDir),
     });
     setRequiresRestart(false);
   }, [
@@ -228,6 +230,7 @@ export function useSettings(): UseSettingsResult {
           mergedSettings.workbuddyConfigDir,
         );
         const sanitizedOmpDir = sanitizeDir(mergedSettings.ompConfigDir);
+        const sanitizedDshDir = sanitizeDir(mergedSettings.dshConfigDir);
         const {
           webdavSync: _ignoredWebdavSync,
           s3Sync: _ignoredS3Sync,
@@ -245,6 +248,7 @@ export function useSettings(): UseSettingsResult {
           piConfigDir: sanitizedPiDir,
           workbuddyConfigDir: sanitizedWorkBuddyDir,
           ompConfigDir: sanitizedOmpDir,
+          dshConfigDir: sanitizedDshDir,
           language: mergedSettings.language,
         };
 
@@ -369,6 +373,7 @@ export function useSettings(): UseSettingsResult {
           mergedSettings.workbuddyConfigDir,
         );
         const sanitizedOmpDir = sanitizeDir(mergedSettings.ompConfigDir);
+        const sanitizedDshDir = sanitizeDir(mergedSettings.dshConfigDir);
         const previousAppDir = initialAppConfigDir;
         const previousClaudeDir = sanitizeDir(data?.claudeConfigDir);
         const previousCodexDir = sanitizeDir(data?.codexConfigDir);
@@ -379,6 +384,7 @@ export function useSettings(): UseSettingsResult {
         const previousPiDir = sanitizeDir(data?.piConfigDir);
         const previousWorkBuddyDir = sanitizeDir(data?.workbuddyConfigDir);
         const previousOmpDir = sanitizeDir(data?.ompConfigDir);
+        const previousDshDir = sanitizeDir(data?.dshConfigDir);
         const {
           webdavSync: _ignoredWebdavSync,
           s3Sync: _ignoredS3Sync,
@@ -396,6 +402,7 @@ export function useSettings(): UseSettingsResult {
           piConfigDir: sanitizedPiDir,
           workbuddyConfigDir: sanitizedWorkBuddyDir,
           ompConfigDir: sanitizedOmpDir,
+          dshConfigDir: sanitizedDshDir,
           language: mergedSettings.language,
         };
 
@@ -489,6 +496,7 @@ export function useSettings(): UseSettingsResult {
         const workbuddyDirChanged =
           sanitizedWorkBuddyDir !== previousWorkBuddyDir;
         const ompDirChanged = sanitizedOmpDir !== previousOmpDir;
+        const dshDirChanged = sanitizedDshDir !== previousDshDir;
         if (
           !pluginSynced &&
           (claudeDirChanged ||
@@ -516,6 +524,19 @@ export function useSettings(): UseSettingsResult {
         }
         if (ompDirChanged) {
           await invalidatePiDirectoryCaches(queryClient, "omp");
+        }
+        if (dshDirChanged) {
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["providers", "dsh"] }),
+            queryClient.invalidateQueries({
+              queryKey: ["skills", "installed"],
+            }),
+            queryClient.invalidateQueries({ queryKey: ["sessions"] }),
+            // DSH_ACCOUNT_STATUS_KEY：登录凭据也在 DSH 主目录里，不刷新会显示旧目录的账号
+            queryClient.invalidateQueries({
+              queryKey: ["dsh-account-status"],
+            }),
+          ]);
         }
 
         const appDirChanged = sanitizedAppDir !== (previousAppDir ?? undefined);

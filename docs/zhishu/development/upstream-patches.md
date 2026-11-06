@@ -2,6 +2,21 @@
 
 > 这是按基线/事件累积的补丁台账。222 项清单针对 2026-10-29 的 4.0.21 快照，后续变更按事件追加；旧路径、版本和分支描述仅适用于该段，不是当前 4.0.22 的完整重新统计。当前现状见 [代码基线](baseline.md)。
 
+## 2026-11-06：合并上游 v4.0.26
+
+依据 [ADR-0012](../adr/ADR-0012-merge-4.0.26.md)，从当前产品 0.0.7 三方合入官方 v4.0.26，保留双方祖先。直接复用上游 DAO、Provider、IPC、路径函数、模式/代理与原子写入；没有新增平台业务或平行核心。上游内部性能/协议修复必须更新实际调用处，外层新增 Adapter 无法替代内部锁、查询或转发，故最高 L3。
+
+| ID / 既有补丁 | 文件 | 处理与不能仅包装的原因 | 等级 | 验证 |
+| --- | --- | --- | --- | --- |
+| SYNC-20261106-01 / ZS-044、ZS-046、ZS-047、ZS-148 | package、pnpm 锁、Cargo/Tauri 清单 | 固定工具入口保留智枢 0.0.7、身份和命令；采用上游 CLI 2.12.4；Cargo.lock 最终无差异 | L1 | frozen install、TypeScript、Cargo check/Clippy、发布模拟 |
+| SYNC-20261106-02 / ZS-158 | `src/App.tsx`、`useUsageEventBridge.ts`、`windowActivity.ts` | lazy/Suspense 与查询可见性作用于原组件/事件生命周期，保留智枢平台/历史入口和认证门禁，外层包装不能替代内部声明与查询调度 | L2 | App、窗口活动、Hook 与平台前端全量回归 |
+| SYNC-20261106-03 / 既有 WorkBuddy 补丁 | `settings.rs`、`useDirectorySettings.ts`、`useSettings.ts`、`types.ts`、目录组件及测试 | 固定设备设置及目录枚举同时保留 WorkBuddy/OMP 并接入 DSH；DSH 配置读写继续复用既有路径解析器 | L2/L3 | 目录 Hook、设置、DSH/WorkBuddy 隔离回归 |
+| SYNC-20261106-04 / 既有深链补丁 | `deeplink/provider.rs` | 深链 match 是固定分发入口，合并上游新增应用协议与模型构造，保留智枢身份及 WorkBuddy 专属添加路径 | L3 | 深链解析/导入、Provider 全量回归 |
+| SYNC-20261106-05 / 既有发布补丁 | `.github/workflows/release.yml` | stapler 重试在固定 Actions 步骤内接入；保留 Developer ID/adhoc 条件、COS、NSIS 与 Linux 暂停，新增模块无法替换已有签名调用 | L1 | YAML 解析、47 段 shell 语法与 Node/Python 发布模拟 |
+| SYNC-20261106-06 | 五语 JSON、`AGENTS.md` | 共享字典补齐 DSH 提示且避免 OMP 重复键；维护入口更新基线；固定字典/指令不能靠旁路文档替代 | L1 | 五语解析、格式、路径/实现核对 |
+
+自动合并的 commands、database、proxy、services、mode、lib 吸收上游批量查询、后台执行、备份维护和协议修复（L3），保留智枢启动注册、ProviderMeta、配置归属及首写备份/pending。平台自有源码、schema 24、OAuth2 会话和两阶段同步契约不变。15 个冲突的逐项处理、实际测试、未验收与回退见 [同步报告](../upstream-sync/2026-11-06.md)。
+
 ## 2026-11-03：合并上游 v4.0.25
 
 依据 [ADR-0011](../adr/ADR-0011-merge-4.0.25.md)，从 4.0.23 三方合入官方 v4.0.25，保留双方祖先关系。复用上游 Provider、CLI 投影、MCP、代理、用量、DAO、IPC 和原子写入，平台业务继续位于自有命名空间；本次没有新增平台业务核心补丁。
