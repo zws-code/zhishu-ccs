@@ -29,6 +29,8 @@ pub(crate) struct OAuthAttempt {
     redirect_uri: String,
     state: String,
     verifier: String,
+    /// 平台成功页；下发时回环回调改为 302 顶层跳转，避免 Edge LNA 拦截 iframe。
+    success_url: Option<String>,
     listener: TcpListener,
 }
 
@@ -54,6 +56,7 @@ impl OAuthAttempt {
         {
             return Err(error("LOGIN_UNSUPPORTED", "平台授权地址无效"));
         }
+        let success_url = config.oauth_success_url.clone();
         let listener = TcpListener::bind(("127.0.0.1", 0))
             .await
             .map_err(|_| error("OAUTH_UNAVAILABLE", "无法启动本地授权回调端口"))?;
@@ -84,6 +87,7 @@ impl OAuthAttempt {
             redirect_uri,
             state,
             verifier,
+            success_url,
             listener,
         })
     }
@@ -106,7 +110,9 @@ impl OAuthAttempt {
                 accepted = self.listener.accept() => {
                     let (mut stream, _) = accepted
                         .map_err(|_| error("OAUTH_UNAVAILABLE", "无法接收授权回调"))?;
-                    if let Some(result) = read_callback(&mut stream, &self.state).await {
+                    if let Some(result) =
+                        read_callback(&mut stream, &self.state, self.success_url.as_deref()).await
+                    {
                         return result;
                     }
                 }
@@ -200,6 +206,7 @@ struct Envelope {
 async fn read_callback(
     stream: &mut TcpStream,
     expected_state: &str,
+    success_url: Option<&str>,
 ) -> Option<Result<String, PlatformAuthError>> {
     let mut buffer = vec![0u8; MAX_REQUEST_BYTES];
     let read = tokio::time::timeout(CONNECTION_TIMEOUT, stream.read(&mut buffer)).await;
@@ -237,7 +244,11 @@ async fn read_callback(
     }
     match params.get("code").filter(|code| !code.is_empty()) {
         Some(code) => {
-            respond(stream, "200 OK", SUCCESS_PAGE).await;
+            match success_url {
+                // 主框架导航不受 LNA 限制；客户端消费 code 后把浏览器带回平台成功页。
+                Some(location) => respond_redirect(stream, location).await,
+                None => respond(stream, "200 OK", SUCCESS_PAGE).await,
+            }
             Some(Ok(code.clone()))
         }
         None => {
@@ -245,6 +256,14 @@ async fn read_callback(
             None
         }
     }
+}
+
+async fn respond_redirect(stream: &mut TcpStream, location: &str) {
+    let response = format!(
+        "HTTP/1.1 302 Found\r\nLocation: {location}\r\nCache-Control: no-store\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+    );
+    let _ = stream.write_all(response.as_bytes()).await;
+    let _ = stream.shutdown().await;
 }
 
 async fn respond(stream: &mut TcpStream, status: &str, body: &str) {
@@ -288,6 +307,7 @@ mod tests {
             oauth_authorize_url: Some(authorize.into()),
             oauth_client_id: "zhishu-ccs".into(),
             oauth_scopes: vec!["client".into()],
+            oauth_success_url: None,
         }
     }
 
@@ -355,6 +375,34 @@ mod tests {
         let code = attempt.wait_for_callback(receiver).await.unwrap();
         assert_eq!(code, "good");
         browser.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn callback_redirects_to_platform_success_page_when_configured() {
+        let mut cfg = config("https://portal.test/oauth/authorize");
+        cfg.oauth_success_url = Some("https://portal.test/oauth/authorized".into());
+        let mut attempt = OAuthAttempt::prepare(&cfg).await.unwrap();
+        let port = attempt.listener.local_addr().unwrap().port();
+        let state = attempt.state.clone();
+        let (_cancel, receiver) = oneshot::channel();
+        let browser = tokio::spawn(async move {
+            let mut stream = TokioTcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let request = format!(
+                "GET /callback?code=good&state={state} HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n"
+            );
+            stream.write_all(request.as_bytes()).await.unwrap();
+            let mut response = String::new();
+            let _ = stream.read_to_string(&mut response).await;
+            response
+        });
+        let code = attempt.wait_for_callback(receiver).await.unwrap();
+        assert_eq!(code, "good");
+        let response = browser.await.unwrap();
+        assert!(response.starts_with("HTTP/1.1 302 Found"), "{response}");
+        assert!(
+            response.contains("Location: https://portal.test/oauth/authorized"),
+            "{response}"
+        );
     }
 
     #[tokio::test]

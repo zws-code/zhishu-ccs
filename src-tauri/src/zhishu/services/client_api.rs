@@ -367,6 +367,9 @@ pub struct ClientConfig {
     pub oauth_client_id: String,
     #[serde(default)]
     pub oauth_scopes: Vec<String>,
+    /// 回环回调成功后浏览器要返回的平台成功页；旧平台缺省为空，保持原有 HTML 结果页。
+    #[serde(default)]
+    pub oauth_success_url: Option<String>,
 }
 
 impl ClientConfig {
@@ -392,6 +395,17 @@ impl ClientConfig {
             .map(|url| url.to_string());
         self.oauth_authorize_url = self
             .oauth_authorize_url
+            .as_deref()
+            .filter(|value| !value.trim().is_empty())
+            .and_then(|value| origin.join(value).ok())
+            .filter(|url| {
+                matches!(url.scheme(), "http" | "https")
+                    && url.username().is_empty()
+                    && url.password().is_none()
+            })
+            .map(|url| url.to_string());
+        self.oauth_success_url = self
+            .oauth_success_url
             .as_deref()
             .filter(|value| !value.trim().is_empty())
             .and_then(|value| origin.join(value).ok())
