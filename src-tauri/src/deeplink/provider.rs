@@ -835,7 +835,6 @@ fn build_codex_settings(request: &DeepLinkImportRequest) -> Result<serde_json::V
         r#"model_provider = "{route_id}"
 model = {model_name}
 model_reasoning_effort = "high"
-disable_response_storage = true
 
 [model_providers.{route_id}]
 name = {provider_display_name}

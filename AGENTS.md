@@ -99,7 +99,7 @@
 - 为什么：错误的字段、认证形态或整份覆盖会导致 CLI 无法启动，并可能删除用户自己的设置。
 - Claude Code：默认 `~/.claude/settings.json`，兼容已有 `~/.claude/claude.json`；供应商字段主要在 `env`，MCP 默认另存 `~/.claude.json` 的 `mcpServers`。
 - Codex：默认 `~/.codex/config.toml` 和 `auth.json`；供应商行使用 `{ auth, config }`，其中 `config` 是 TOML 字符串。
-- Codex 当前第三方路由投影到智枢独立的 `[model_providers.zhishu]`，Key 写入 `experimental_bearer_token`；旧 `custom` 输入仍可解析，但原版表不自动清理，历史桶不批量改写。派生目录为 `zhishu-ccs-model-catalog.json`；迁移、后台归属和共存边界见 [ADR-0009](docs/zhishu/adr/ADR-0009-product-coexistence.md) 与[共存说明](docs/zhishu/development/coexistence.md)。不要退回仅向 `auth.json.OPENAI_API_KEY` 写 Key 的旧方案。
+- Codex 当前第三方路由投影到智枢独立的 `[model_providers.zhishu]`，Key 写入 `experimental_bearer_token`；上游 4.0.28 起有 ChatGPT 登录时路由/聚合改写为内置 openai 形态（不写选路、顶层 `openai_base_url` 指本地代理），无登录、统一历史开启或行内含内置表达不了的客户端设置时仍写智枢表，任何路径不写 `custom` 表。旧 `custom` 输入仍可解析，但原版表不自动清理，历史桶不批量改写。派生目录为 `zhishu-ccs-model-catalog.json`（上游 4.0.28 起绝对配置目录写绝对指针）；迁移、后台归属和共存边界见 [ADR-0009](docs/zhishu/adr/ADR-0009-product-coexistence.md) 与[共存说明](docs/zhishu/development/coexistence.md)。不要退回仅向 `auth.json.OPENAI_API_KEY` 写 Key 的旧方案。
 - Gemini：默认 `~/.gemini/.env` 和 `settings.json`；行结构为 `{ env, config }`，关注 `GEMINI_API_KEY`、`GOOGLE_GEMINI_BASE_URL`、`security.auth.selectedType`、`model.name`。
 - WorkBuddy：通过 `get_workbuddy_home()` 解析设置覆盖、`WORKBUDDY_CONFIG_DIR` 和默认 `~/.workbuddy`，写入 `models.json`；兼容模型数组和含 `models` 数组的对象，保留无关字段及 `availableModels` 的既有处理。
 - 所有路径必须调用已有路径函数，保留设置覆盖和隔离环境的优先级；不要把上述默认路径硬编码进新逻辑。
@@ -213,7 +213,7 @@
 
 ## 待人工确认项
 
-- 截至 2026-11-06，本地已合入上游 v4.0.26 / `f621d4216189ef06bcc6acd3588c84937b9794e1`，见代码基线与当日同步报告；后续同步前重新核对。官方 remote 为 `upstream`，不能仅凭目录判断文件归属。
+- 截至 2026-11-09，本地已合入上游 v4.0.28 / 提交 `8656ebd91f3eba631837126e29df71e8353b7e43`（tag 对象 `9bd11993`），见代码基线与当日同步报告；后续同步前重新核对。官方 remote 为 `upstream`，不能仅凭目录判断文件归属。注意上游自 4.0.28 起在有 ChatGPT 登录时把 Codex 第三方路由写成内置 openai 形态；本分支无登录等分支仍投影智枢 `zhishu` 表，任何路径不写 `custom` 表。
 - 当前登录失效返回登录页，恢复暂时失败进入重试页；未实现未经验证的离线入口。若改变产品策略须另行确认与评审。
 - 客户端协议以 `docs/zhishu/api/client-api.md` 和 ADR-0004 为准；真实多设备共享 Key、系统凭据库和 CLI 端到端验收仍待执行。
 - TODO：补充 WorkBuddy 目标版本与真实 `models.json` 的运行验收；平台同步已实现，不能再列为尚未接入。

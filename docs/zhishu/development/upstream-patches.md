@@ -2,6 +2,21 @@
 
 > 这是按基线/事件累积的补丁台账。222 项清单针对 2026-10-29 的 4.0.21 快照，后续变更按事件追加；旧路径、版本和分支描述仅适用于该段，不是当前 4.0.22 的完整重新统计。当前现状见 [代码基线](baseline.md)。
 
+## 2026-11-09：合并上游 v4.0.28
+
+依据 [ADR-0013](../adr/ADR-0013-merge-4.0.28.md)，从当前产品 0.0.9 三方合入官方 v4.0.28，保留双方祖先。复用上游 Codex 路由写入、会话迁移、代理、会话索引、settings 与 IPC；没有新增平台业务或平行核心。15 个冲突文件中 5 个为身份/清单类（L1），语义类集中在 Codex 路由形态与历史迁移（L3）。
+
+| ID / 既有补丁 | 文件 | 处理与不能仅包装的原因 | 等级 | 验证 |
+| --- | --- | --- | --- | --- |
+| SYNC-20261109-01 / ZS-044、ZS-046、ZS-047、ZS-148 | `package.json`、`src-tauri/Cargo.toml`、`Cargo.lock`、`tauri.conf.json` | 固定工具入口保留智枢 0.0.9、身份、1420 端口与深链 scheme；上游仅版本号且同样移除 staticlib/cdylib；锁文件删除上游根包条目后 `cargo check --locked` 核验 | L1 | frozen install、Cargo check/Clippy |
+| SYNC-20261109-02 / 既有路由投影补丁（ADR-0009） | `src-tauri/src/mode/controller.rs`、`services/provider/codex_direct.rs`（自动合并）、相关测试 | 上游把「有 ChatGPT 登录的第三方路由」改写为内置 openai 形态；写入路径经 `ROUTE_ID` 常量天然落智枢 `zhishu` 表，无登录/统一历史/客户端设置分支仍投影智枢表。5 个上游测试块的 `custom` 表断言适配为 `zhishu`（本分支不写 `custom` 表）；路由/契约写入在既有核心内部，外层包装无法替换 | L3 | Codex 路由契约/会话/金标全量回归 |
+| SYNC-20261109-03 / 既有统一历史迁移补丁 | `src-tauri/src/codex_history_migration.rs` | 采纳上游启动期每次迁入与 state DB 计数去重；保留多桶支持，兜底标记须命中当前目标桶（`custom` 或 `zhishu`）；切分提示受管桶扩为 openai/custom/zhishu。计数、标记与迁移目标都在迁移实现内部 | L3 | 迁移单测与切换提示回归 |
+| SYNC-20261109-04 / 既有配置历史补丁 | `src-tauri/src/config.rs` | `commit_staged` 先按逻辑路径 `capture_before` 留痕（应用归属/还原入口依赖逻辑路径），再采纳上游软链接写穿；顺序在原子写入核心内部 | L3 | 配置历史与写入引擎回归 |
+| SYNC-20261109-05 | 五语 JSON、金标 `codex_red_lines.rs`、`deeplink-codex.txt` | 统一历史文案采用上游新行为 + 智枢备份路径；金标指针期望改绝对路径但文件名保持 `zhishu-ccs-model-catalog.json`；快照随上游移除 `disable_response_storage`。固定字典/金标不能靠旁路替代 | L1/L0 | 五语解析、金标测试 |
+| SYNC-20261109-06 | `.github/workflows/ci.yml` | 采纳上游四分片 `frontend-tests` 作业；智枢发布脚本与 COS 模拟步骤保留在 frontend 作业。固定工作流入口 | L1 | YAML 解析 |
+
+自动合并复核的 `lib.rs` 注册、`settings.rs`（WorkBuddy/DSH 保留）、`App.tsx`（平台/配置历史入口保留）、`deeplink/provider.rs`、`live/project/codex.rs`（`CATALOG_FILENAME` 指向智枢常量）及 `switch_provider` 契约（增量可选 `codexHistorySplit`）见 [同步报告](../upstream-sync/2026-11-09.md)。平台自有源码、schema 24、OAuth2 会话和两阶段同步契约不变。
+
 ## 2026-11-06：合并上游 v4.0.26
 
 依据 [ADR-0012](../adr/ADR-0012-merge-4.0.26.md)，从当前产品 0.0.7 三方合入官方 v4.0.26，保留双方祖先。直接复用上游 DAO、Provider、IPC、路径函数、模式/代理与原子写入；没有新增平台业务或平行核心。上游内部性能/协议修复必须更新实际调用处，外层新增 Adapter 无法替代内部锁、查询或转发，故最高 L3。

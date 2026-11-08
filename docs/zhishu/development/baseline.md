@@ -1,14 +1,14 @@
 # Zhishu CCS 当前代码基线与限制
 
-> Git、版本与远程核对：2026-11-06；本轮联网获取并核验上游 v4.0.26，未重新核验生产发布状态。其余模块说明沿用各次任务的核对范围，具体实现以当前代码为准。
+> Git、版本与远程核对：2026-11-09；本轮联网获取并核验上游 v4.0.28，未重新核验生产发布状态。其余模块说明沿用各次任务的核对范围，具体实现以当前代码为准。
 
 ## 版本、上游与远程
 
 | 项目 | 当前本地事实 | 依据 |
 | --- | --- | --- |
-| 产品版本 | `0.0.7` | `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json` |
-| 产品分支 / 同步起点 | `ccs-dev`；本轮由 `8e4ffbf48782606b22e578998637b0357581a4c4` 在 `sync/upstream-4.0.26` 合并后快进；此前线性重建历史保留 | `git log`、[提交整理记录](../history/commit-reorganization.md) |
-| 已合入上游 | `v4.0.26` / `f621d4216189ef06bcc6acd3588c84937b9794e1` | 官方 tag 联网核验；合并保留祖先关系，见 [同步报告](../upstream-sync/2026-11-06.md) |
+| 产品版本 | `0.0.9` | `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json` |
+| 产品分支 / 同步起点 | `ccs-dev`；本轮由 `a04f940632901c6e59ba22becadb0482df92de71` 在 `sync/upstream-4.0.28` 合并后快进；此前线性重建历史保留 | `git log`、[提交整理记录](../history/commit-reorganization.md) |
+| 已合入上游 | `v4.0.28` / 提交 `8656ebd91f3eba631837126e29df71e8353b7e43`（tag 对象 `9bd119930cc4fc56b46415e88215d20eeab96726`） | 官方 tag 联网核验；合并保留祖先关系，见 [同步报告](../upstream-sync/2026-11-09.md) |
 | 官方 remote | `upstream` → `git@github.com:farion1231/cc-switch.git` | `git remote -v` |
 | 自有 GitHub | `origin` → `git@github.com:zws-code/zhishu-ccs.git` | 同上；发布 tag 使用此 remote |
 | 自有 GitLab | `gitlab` → `http://172.16.32.4:8929/hunanzs/zhishu-ccs.git` | 同上 |
@@ -24,7 +24,9 @@
 
 2026-11-06 同步 v4.0.26 起点为 `8e4ffbf4`，相对 `origin/ccs-dev` 缓存领先 55、落后 26；未 fetch 自有远程或处理该分歧。只核验并合入官方稳定 tag，不移动已有产品发布 tag。
 
-历史 [4.0.22 同步报告](../upstream-sync/2026-10-31.md)、[ADR-0007](../adr/ADR-0007-merge-4.0.22.md) 及版本发布证据中的远程旧名保留原事实，不表示当前配置。当前 v4.0.26 合并依据 [ADR-0012](../adr/ADR-0012-merge-4.0.26.md)。
+2026-11-09 同步 v4.0.28 起点为 `a04f9406`（0.0.9），相对 `origin/ccs-dev` 缓存领先 97、落后 26；同样未 fetch 自有远程或处理该分歧。数据库 schema 保持 24；上游新增的会话正文索引是独立 `session-index.db`，默认关闭。
+
+历史 [4.0.22 同步报告](../upstream-sync/2026-10-31.md)、[ADR-0007](../adr/ADR-0007-merge-4.0.22.md) 及版本发布证据中的远程旧名保留原事实，不表示当前配置。当前 v4.0.28 合并依据 [ADR-0013](../adr/ADR-0013-merge-4.0.28.md)。
 
 ## 身份、目录与凭据
 
