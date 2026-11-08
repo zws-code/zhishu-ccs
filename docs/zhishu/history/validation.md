@@ -2,6 +2,24 @@
 
 > 本页保留各次任务的执行结果和未验证项；测试数量、代码路径、分支状态及临时资料均属于当时快照。本次文档整理没有重跑这些历史测试。当前行为以 [代码基线](../development/baseline.md)、功能说明和源码为准。
 
+## 合并上游 v4.0.28（2026-11-09）
+
+从产品 `a04f9406` / 0.0.9 在 `sync/upstream-4.0.28` 合并官方 v4.0.28（提交 `8656ebd9`，tag 对象 `9bd11993`，`git ls-remote` 核验），保留祖先、智枢身份、OAuth2 与平台两阶段同步、WorkBuddy、配置历史和共存隔离。15 个冲突处理、Codex 路由新形态与最高 L3 依据见 [ADR-0013](../adr/ADR-0013-merge-4.0.28.md) 和 [同步报告](../upstream-sync/2026-11-09.md)。
+
+| 本轮实际执行 | 结果 |
+| --- | --- |
+| `pnpm install --frozen-lockfile`、TypeScript、Prettier | 通过；依赖与锁文件无变化 |
+| `pnpm test:unit` | 312 文件、3944 项通过 |
+| `pnpm build:renderer` | 通过，大 chunk 提示仍存在 |
+| `cargo check --locked --offline`、fmt、Clippy `-D warnings` | 通过；`--all-targets` 另见 2 处智枢自有测试代码既有 lint，基线同样存在，非本轮引入 |
+| 临时 `CC_SWITCH_TEST_HOME` 下 locked/offline `cargo test -- --skip describe_reqwest_error_keeps_cause_and_drops_url` | 18 目标、4982 通过、14 忽略、0 失败 |
+| Node 发布模拟 / Python COS 模拟 | 57 通过；23 项：21 通过、2 跳过 |
+| 静态核对 | 三个 workflow YAML 解析通过、61 段 bash run 块 `bash -n` 通过；五语 JSON 无重复键；智枢 0.0.9 身份一致；自有平台源码与 schema 24 零差异；`git diff --cached --check` 通过 |
+
+首轮全量 Rust 测试暴露 6 个失败，其中 5 个是上游新测试断言 `custom` 表或上游目录文件名，按智枢身份适配（路由表恒为 `zhishu`、派生目录 `zhishu-ccs-model-catalog.json`）后通过；`proxy::error::tests::describe_reqwest_error_keeps_cause_and_drops_url` 在合并前基线的临时 worktree 同样失败，属本机本地透明代理拦截回环连接的环境问题，与代码无关，复跑时跳过。未生成或手改金标快照（`deeplink-codex.txt` 与 `codex_red_lines.rs` 的修改是冲突解决的一部分，由测试本身验证）。
+
+本轮不启动真实应用、CLI、系统 keyring 或浏览器 OAuth2，不执行跨平台编译、安装升级、公证、线上发布和共存实机验收；有 ChatGPT 登录时 Codex 第三方路由改写为内置 openai 形态的行为未经真实 Codex 0.167 端到端验证。用户未跟踪目录不提交、不清理；不修改 remote、不处理 `origin/ccs-dev` 既有分歧（起点领先 97、落后 26）、不推送或发布。
+
 ## 合并上游 v4.0.26（2026-11-06）
 
 从产品 `8e4ffbf4` / 0.0.7 在 `sync/upstream-4.0.26` 合并官方 `f621d421`，保留祖先、智枢产品身份、OAuth2 与平台两阶段同步、WorkBuddy、配置历史和共存隔离。15 个冲突处理与最高 L3 的依据见 [ADR-0012](../adr/ADR-0012-merge-4.0.26.md) 和 [同步报告](../upstream-sync/2026-11-06.md)。
