@@ -178,7 +178,7 @@
 - mutation 后按实际副作用失效缓存：本地供应商同步刷新对应应用列表、相关原生配置/代理状态和 `configChangeHistory`，不刷新 `platformUsage`；平台目录更新只更新对应账户的目录查询。沿用调用方现有范围，不用全局失效把本地同步变成隐式平台请求。
 - 上游 IPC 封装在 `src/lib/api/`，自有 IPC 位于 `src/zhishu/api/` 或对应功能子目录，再由 query/hook 调用；平台 HTTP 认证和供应商协调继续由 Rust 处理。
 - 普通错误按现有场景使用 `extractErrorMessage` 和国际化兜底；平台错误使用 `platformAuthError`，不展示任意 IPC 异常或服务端原始响应。
-- 通用通知使用 `src/lib/toast.ts` 的去重封装；用户文案使用 i18n，修改共享翻译键时检查 `zh`、`zh-TW`、`en`、`ja`、`tr`。
+- 通用通知使用 `src/lib/toast.ts` 的去重封装；用户文案使用 i18n，修改共享翻译键时检查 `zh`、`zh-TW`、`en`、`ja`、`tr`、`ko`、`ru`。
 - Rust 业务层沿用 `Result<T, AppError>`，通过 `?` 传播并附带路径/上下文；多数 command 映射为字符串错误，平台 command 保留 `PlatformAuthError`。
 - Rust 使用 `log`；前端已有 `reportFrontendError`、`logFrontendInfo` 和 Tauri 日志插件。平台 HTTP 诊断沿用 `platform_http_log::RequestLog`，先脱敏再截断，只记录可解析的安全摘要；不直接记录密码、token、完整认证头、原始响应或含 Key 的配置。
 - 新 command 流程：实现 `#[tauri::command]` → 在 `commands/mod.rs` 声明/导出 → 加入 `lib.rs` 的 `generate_handler!` → 添加前端 wrapper、类型及相关测试。
@@ -213,7 +213,7 @@
 
 ## 待人工确认项
 
-- 截至 2026-11-09，本地已合入上游 v4.0.28 / 提交 `8656ebd91f3eba631837126e29df71e8353b7e43`（tag 对象 `9bd11993`），见代码基线与当日同步报告；后续同步前重新核对。官方 remote 为 `upstream`，不能仅凭目录判断文件归属。注意上游自 4.0.28 起在有 ChatGPT 登录时把 Codex 第三方路由写成内置 openai 形态；本分支无登录等分支仍投影智枢 `zhishu` 表，任何路径不写 `custom` 表。
+- 截至 2026-11-11，本地已合入上游 v4.0.29 / 提交 `efbec38f0e1ecaee2a488d619190b7ec4075238b`（tag 对象 `8ad4317a`），见代码基线与当日同步报告；后续同步前重新核对。主数据库 schema 为 25；新增 Copilot CLI 未加入平台同步白名单。官方 remote 为 `upstream`，不能仅凭目录判断文件归属。注意上游自 4.0.28 起在有 ChatGPT 登录时把 Codex 第三方路由写成内置 openai 形态；本分支无登录等分支仍投影智枢 `zhishu` 表，任何路径不写 `custom` 表。
 - 当前登录失效返回登录页，恢复暂时失败进入重试页；未实现未经验证的离线入口。若改变产品策略须另行确认与评审。
 - 客户端协议以 `docs/zhishu/api/client-api.md` 和 ADR-0004 为准；真实多设备共享 Key、系统凭据库和 CLI 端到端验收仍待执行。
 - TODO：补充 WorkBuddy 目标版本与真实 `models.json` 的运行验收；平台同步已实现，不能再列为尚未接入。

@@ -1,14 +1,14 @@
 # Zhishu CCS 当前代码基线与限制
 
-> Git、版本与远程核对：2026-11-09；本轮联网获取并核验上游 v4.0.28，未重新核验生产发布状态。其余模块说明沿用各次任务的核对范围，具体实现以当前代码为准。
+> Git、版本与远程核对：2026-11-11；本轮联网获取并核验上游 v4.0.29，未重新核验生产发布状态。其余模块说明沿用各次任务的核对范围，具体实现以当前代码为准。
 
 ## 版本、上游与远程
 
 | 项目 | 当前本地事实 | 依据 |
 | --- | --- | --- |
-| 产品版本 | `0.0.9` | `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json` |
-| 产品分支 / 同步起点 | `ccs-dev`；本轮由 `a04f940632901c6e59ba22becadb0482df92de71` 在 `sync/upstream-4.0.28` 合并后快进；此前线性重建历史保留 | `git log`、[提交整理记录](../history/commit-reorganization.md) |
-| 已合入上游 | `v4.0.28` / 提交 `8656ebd91f3eba631837126e29df71e8353b7e43`（tag 对象 `9bd119930cc4fc56b46415e88215d20eeab96726`） | 官方 tag 联网核验；合并保留祖先关系，见 [同步报告](../upstream-sync/2026-11-09.md) |
+| 产品版本 | `0.0.10` | `package.json`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json` |
+| 产品分支 / 同步起点 | `ccs-dev`；本轮由 `1c86ce632e3a5eafec5296322d3437b9007bfbe7` 在 `sync/upstream-4.0.29` 合并后快进；此前线性重建历史保留 | `git log`、[提交整理记录](../history/commit-reorganization.md) |
+| 已合入上游 | `v4.0.29` / 提交 `efbec38f0e1ecaee2a488d619190b7ec4075238b`（tag 对象 `8ad4317a8e949b95457e7441ff1bc8421e0b584a`） | 官方 tag 联网核验；合并保留祖先关系，见 [同步报告](../upstream-sync/2026-11-11.md) |
 | 官方 remote | `upstream` → `git@github.com:farion1231/cc-switch.git` | `git remote -v` |
 | 自有 GitHub | `origin` → `git@github.com:zws-code/zhishu-ccs.git` | 同上；发布 tag 使用此 remote |
 | 自有 GitLab | `gitlab` → `http://172.16.32.4:8929/hunanzs/zhishu-ccs.git` | 同上 |
@@ -26,7 +26,9 @@
 
 2026-11-09 同步 v4.0.28 起点为 `a04f9406`（0.0.9），相对 `origin/ccs-dev` 缓存领先 97、落后 26；同样未 fetch 自有远程或处理该分歧。数据库 schema 保持 24；上游新增的会话正文索引是独立 `session-index.db`，默认关闭。
 
-历史 [4.0.22 同步报告](../upstream-sync/2026-10-31.md)、[ADR-0007](../adr/ADR-0007-merge-4.0.22.md) 及版本发布证据中的远程旧名保留原事实，不表示当前配置。当前 v4.0.28 合并依据 [ADR-0013](../adr/ADR-0013-merge-4.0.28.md)。
+2026-11-11 同步 v4.0.29 起点为 `1c86ce63`（0.0.10），相对 `origin/ccs-dev` 缓存领先 164、落后 26；未 fetch 自有远程或处理该分歧。主数据库 schema 升至 25，仅新增 Copilot MCP/Skills 独立开关。
+
+历史 [4.0.22 同步报告](../upstream-sync/2026-10-31.md)、[ADR-0007](../adr/ADR-0007-merge-4.0.22.md) 及版本发布证据中的远程旧名保留原事实，不表示当前配置。当前 v4.0.29 合并依据 [ADR-0014](../adr/ADR-0014-merge-4.0.29.md)。
 
 ## 身份、目录与凭据
 
@@ -34,7 +36,7 @@
 | --- | --- | --- |
 | 应用身份 | productName `Zhishu CC Switch`、identifier `com.zhishu.ccswitch.desktop`、binary `zhishu-ccs`、深链 `zhishu-ccswitch` | `src-tauri/tauri.conf.json` |
 | 应用数据库 | 默认 `~/.zhishu-ccs/cc-switch.db`；目录覆盖仍由既有函数解析 | `src-tauri/src/config.rs`、`app_store.rs` |
-| 数据库结构 | schema `24`；保留智枢 v23 缺失 OMP 字段的幂等协调 | `src-tauri/src/database/mod.rs`、`schema.rs` |
+| 数据库结构 | schema `25`；新增 Copilot MCP/Skills 开关，保留智枢 v23 缺失 OMP 字段的幂等协调 | `src-tauri/src/database/mod.rs`、`schema.rs` |
 | OAuth2 授权码 / PKCE verifier / access token | Rust 内存 | `src-tauri/src/zhishu/services/platform_auth.rs` |
 | refresh token | 独立系统 keyring service；会话元数据不含 token，密码登录及历史存储已删除 | `src-tauri/src/zhishu/storage/platform_session.rs` |
 | 平台目录与模型 Key | 账号独立的 `platform-catalogs/<账号摘要>.json` v2；Unix 0600 私密原子写入，仍为明文 | `src-tauri/src/zhishu/services/platform_models/base_data.rs` |
@@ -47,6 +49,7 @@
 
 ## 当前能力与已知边界
 
+- 上游 v4.0.29 新增 Copilot CLI 原生卡片、MCP、Skills、提示词和会话/用量；Copilot 未加入智枢平台同步白名单或简易模式接入页。新增韩语/俄语，七语字典包含智枢扩展；语言实机验收待执行。
 - 平台 HTTP 只允许 `/api/zhishu/v1/client` 的八个方法/路径组合；Key 唯一来源为 `POST /access`。客户端不创建或撤销共享模型 Key。
 - 登录或恢复成功后只尝试一次目录快照同步，不改写供应商列表；接入由用户确认的「接入到工具」向导（模式应用可逐应用选择直连/路由/聚合）或手动本地同步执行，手动本地同步只读取快照。前后端平台白名单为 13 个应用，包含 `workbuddy` 和 `dsh`，不包含 `agy`。定义见 `src/zhishu/models/platformConfig.ts` 与 Rust Adapter 的 `AGENTS`。
 - 平台登录允许 HTTP(S)，移除 URL 用户信息、查询和片段；HTTP 不是加密传输。生产构建地址检查与登录输入校验分别执行，HTTPS 证书校验及拒绝重定向仍保留。

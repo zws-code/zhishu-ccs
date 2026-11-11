@@ -2,6 +2,25 @@
 
 > 本页保留各次任务的执行结果和未验证项；测试数量、代码路径、分支状态及临时资料均属于当时快照。本次文档整理没有重跑这些历史测试。当前行为以 [代码基线](../development/baseline.md)、功能说明和源码为准。
 
+## 合并上游 v4.0.29（2026-11-11）
+
+从产品 `1c86ce63` / 0.0.10 在独立同步分支合入官方 v4.0.29 / `efbec38f`，保留简易模式、平台、WorkBuddy、配置历史与共存身份。L3 决策见 [ADR-0014](../adr/ADR-0014-merge-4.0.29.md)，15 个冲突、schema 25 及回退限制见 [同步报告](../upstream-sync/2026-11-11.md)。
+
+| 本轮实际执行 | 结果 |
+| --- | --- |
+| frozen install、TypeScript、Prettier | 通过，依赖/锁无变化 |
+| `pnpm test:unit --maxWorkers=4 --minWorkers=1 --silent` | 319 文件、4082 项通过，含七语/平台/简易模式 |
+| `pnpm build:renderer` | 通过，既有大 chunk 提示仍存在 |
+| Rust fmt、locked/offline check、Clippy `-D warnings` | 通过 |
+| 临时 `CC_SWITCH_TEST_HOME`、回环 no_proxy/NO_PROXY 下串行全量测试 | 最终 5063 通过（4841 库 + 222 集成）、0 失败、15 忽略；19 个测试目标，不跳过用例 |
+| 关键回归 | schema 升级/旧分支协调/失败回滚通过；金标 44、ProviderService 55、MCP 42、Copilot commands 3 通过 |
+| 发布模拟 | Node 57 通过；Python 23 项中 21 通过、2 跳过 |
+| 静态核对 | 七语无重复 JSON 键，0.0.10/身份/锁一致、平台自有源码零差异；文档链接、diff、冲突和无删除检查通过；原未跟踪文件清单/哈希保留 |
+
+首轮 Rust 失败 1 项：上游新 WSL 测试写死 `cc-switch-model-catalog.json`，生产实际保留智枢文件名；按 `CATALOG_FILENAME` 适配该 Unix 测试及 Windows 期望/夹具后全量通过。忽略项包含真实凭据/环境、真实 Copilot 会话和性能基准，不代表已执行；未运行 doctest。首次沙箱 offline install 的重装询问已中止，正常缓存环境 frozen install 成功。
+
+未启动真实桌面应用或 CLI，未操作真实 keyring/OAuth2、安装升级、Windows/WSL、跨平台编译、公证或线上发布；七语尚待人工语言验收。Copilot 未加入平台白名单，不推断已接入平台。真实运行升级数据库至 25 后，回退旧版需恢复升级前备份，不能仅回退 Git。用户 `.zcode/` 保留；不推送、不处理既有远端分歧。
+
 ## 合并上游 v4.0.28（2026-11-09）
 
 从产品 `a04f9406` / 0.0.9 在 `sync/upstream-4.0.28` 合并官方 v4.0.28（提交 `8656ebd9`，tag 对象 `9bd11993`，`git ls-remote` 核验），保留祖先、智枢身份、OAuth2 与平台两阶段同步、WorkBuddy、配置历史和共存隔离。15 个冲突处理、Codex 路由新形态与最高 L3 依据见 [ADR-0013](../adr/ADR-0013-merge-4.0.28.md) 和 [同步报告](../upstream-sync/2026-11-09.md)。

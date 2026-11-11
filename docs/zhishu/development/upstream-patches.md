@@ -2,6 +2,22 @@
 
 > 这是按基线/事件累积的补丁台账。222 项清单针对 2026-10-29 的 4.0.21 快照，后续变更按事件追加；旧路径、版本和分支描述仅适用于该段，不是当前 4.0.22 的完整重新统计。当前现状见 [代码基线](baseline.md)。
 
+## 2026-11-11：合并上游 v4.0.29
+
+依据 [ADR-0014](../adr/ADR-0014-merge-4.0.29.md)，从产品 0.0.10 合入官方 v4.0.29，保留双方祖先。复用上游 Copilot 原生配置、Provider、MCP/Skills、会话、DAO、IPC 和代理；不新增平台业务，不建立平行实现。新应用只接入上游能力，不扩展平台白名单。
+
+| ID / 既有补丁 | 文件 | 处理与不能仅包装的原因 | 等级 | 验证 |
+| --- | --- | --- | --- | --- |
+| SYNC-20261111-01 / 产品身份补丁 | package、Cargo 清单与锁、Tauri 配置 | 固定工具入口保留智枢 0.0.10、scheme、identifier、更新源与命令；锁文件最终无差异；上游无依赖变更 | L1 | frozen install、locked/offline check/Clippy、清单核对 |
+| SYNC-20261111-02 / WorkBuddy 补丁 | app_config.rs、settings.rs、Provider/proxy 分发、前端 appConfig/ProviderList | 固定枚举和内部 match 同时保留 WorkBuddy 与 Copilot，外层 Adapter 无法扩展内部穷尽分支；平台 13 应用白名单不变 | L2/L3 | 类型、Provider/目录、平台白名单回归 |
+| SYNC-20261111-03 / 迁移兼容补丁 | database/schema.rs | 接入 schema 25 的 enabled_copilot 默认关闭迁移，保留智枢 v22/v23 协调、事务及双方测试；迁移在 DAO 启动内部，不能靠 UI 包装 | L3 | 旧版本升级/幂等/失败回滚、Copilot MCP/Skills 标志隔离 |
+| SYNC-20261111-04 / 配置历史、共存补丁 | services/provider/live.rs、services/skill.rs | 在既有审计包装内接入 Copilot，Skills 继续对所有受管应用验证目标归属；内部写入/删除调用不能由外层替代 | L3 | 写入引擎、配置历史、Skills/共存全量回归 |
+| SYNC-20261111-05 / 平台展示补丁 | ProviderCard.tsx、自动合并 App.tsx | 平台额度保持优先，原平台用量入口屏蔽保留；接入上游 Copilot CLI 额度/操作，同时保留简易模式外壳；渲染分支依赖组件内部状态 | L2 | App/卡片/平台/简易模式前端回归 |
+| SYNC-20261111-06 / Codex 目录身份 | live/project/codex.rs（测试） | 上游新增 Unix/Windows WSL 测试写死官方目录名，改用既有智枢 CATALOG_FILENAME；生产路径保留上游修复与智枢文件名 | L0 测试 | Codex 指针及金标、Rust 全量 |
+| SYNC-20261111-07 / 五语扩展 | 七语 JSON、AGENTS.md | ko/ru 各补 314 条智枢翻译和既有身份/路径，ja/zh-TW/tr 各补 8 条登录标签；tr OMP/DSH 保留已有键；维护入口更新基线和七语要求，均为固定加载入口 | L1 | 七语键/插值/非空测试、JSON/格式检查 |
+
+其余自动合并吸收上游 Copilot、Codex/代理、Claude/agy 额度与会话用量修复（L3），平台自有源码无差异，OAuth2 和两阶段同步契约保持。15 个冲突、测试首轮失败及修复、schema 25 数据回退要求见 [同步报告](../upstream-sync/2026-11-11.md)。
+
 ## 2026-11-09：新增简易模式外壳
 
 用户要求的简易模式：右下角「高级/简易」切换（localStorage 设备偏好），简易模式侧栏由「应用」开关页和既有全局项组成，各应用的供应商页从「应用」页进入。应用页页头隐藏、供应商列表只呈现当前登录账号的平台托管行。「应用」开关页复用「接入到工具」向导的接入逻辑与「一键删除平台供应商」，零新 IPC、无后端改动；新业务文件全部位于自有或新增路径（`src/lib/shellMode.ts`、`src/zhishu/models/platformManaged.ts`、`platformProvision.ts`、`PlatformAppsPage.tsx`、`src/components/shell/ShellModeToggle.tsx` 及测试，L0）。
