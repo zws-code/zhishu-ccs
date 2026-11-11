@@ -1,10 +1,55 @@
 # 智枢客户端：GitHub Actions + 腾讯云 COS/CDN 发布
 
-客户端正式发布只使用本流程：GitHub Actions 构建和签名 → COS 保存版本文件并切换更新清单 → GitHub Release 附上同一批安装包。客户端使用 COS HTTPS 更新源，有自有域名后再接 CDN；GitHub Releases 提供额外的安装包下载入口。此文档是唯一发布操作入口。
+客户端正式发布只使用本流程：GitHub Actions 构建和签名 → COS 保存版本文件并切换更新清单 → GitHub Release 附上同一批安装包。客户端使用 COS HTTPS 更新源，后续配置专用下载域名再接 CDN；GitHub Releases 提供额外的安装包下载入口。此文档是唯一发布操作入口。
 
 仓库：<https://github.com/zws-code/zhishu-ccs>。旧本地打包后 SSH 上传的二开脚本和配置示例已删除；本仓库在 COS 发布成功后自动创建智枢 GitHub Release，不运行上游 R2 镜像。上游相关实现保留，仅允许在上游仓库执行。
 
 0.0.1 为首次正式发布，不兼容旧测试包的更新入口；旧测试用户直接安装正式包。后续正式版本沿用既有应用身份及更新公钥；Windows 安装格式切换按 ADR-0003 验证。
+
+## 正式平台域名与旧地址切换（2026-11-11）
+
+正式平台 API 与网页统一使用 `https://api.hnzhishu.cn`，配置值不带 `/api`、`/v1` 或其他路径后缀。该域名用于平台登录、订阅及模型连接；客户端更新与安装包仍使用既有 COS HTTPS 地址，不能因平台域名切换而替换更新源或签名密钥。本节只规定切换目标，不表示生产配置或真实登录已验收。
+
+### 客户端构建配置
+
+GitHub Actions 从 Repository Variables 注入下列值，本机配置不会同步到云端：
+
+| Repository Variable | 正式值 |
+| --- | --- |
+| `ZHISHU_PLATFORM_API_URL` | `https://api.hnzhishu.cn` |
+| `ZHISHU_PLATFORM_WEB_URL` | `https://api.hnzhishu.cn` |
+| `ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP` | `false` |
+
+本机构建修改 `release.config.local.json` 中的 `platformApiUrl`、`platformWebUrl` 为上述 HTTPS 地址，`platformAllowInsecureHttp` 为布尔值 `false`，保留原更新地址、公钥及其他配置，然后执行：
+
+```sh
+pnpm release:prepare
+pnpm test:release-config
+```
+
+`release:prepare` 沿用现有校验与生成逻辑，生成 `src/.env.production.local` 和本机 Tauri 更新配置，不编译、不发布。环境变量优先于本机 JSON；如设置过 `VITE_PLATFORM_API_URL`、`VITE_PLATFORM_WEB_URL` 或 `ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP`，也须核对它们的值。上述本机配置与生成文件均已被 Git 忽略，不提交；开发用 `src/.env.local` 可以继续使用 localhost。
+
+### 服务端先行配置
+
+1. 平台管理后台的 `api_base_url` 设为 `https://api.hnzhishu.cn`。该值也是 `/access` 响应中模型 `connection.base_url` 的来源，仅修改客户端登录地址不会更新它。
+2. 服务端 `SERVER_FRONTEND_URL`（对应 `server.frontend_url`）设为同一 HTTPS 地址，通过现有部署流程重建网关容器使其生效；客户端配置中的 OAuth 授权/成功、注册、找回密码与订阅链接由此生成。旧 Compose 未透传该变量时，按相邻网关仓库的[维护说明](../../../../zhishu-proxy/deploy/rocky10/maintenance/README.md#旧版-compose-的前端地址透传)操作。
+3. 平台后台另有数据库设置 `frontend_url`，邮件链接优先读取它；如仍保存旧 IP，也须改为新域名。它与容器环境变量是两个独立配置，不能只修改其中一个就认为全部生效。
+4. 读取 `https://api.hnzhishu.cn/api/zhishu/v1/client/config`，确认 `api_base_url`、`oauth_authorize_url`、`oauth_success_url`、`register_url`、`password_reset_url` 和 `subscriptions_url` 均使用正式 HTTPS 域名；检查 `/download` 与 `/client-release.json` 可用，再进行客户端构建和发布。
+
+### 已安装客户端与旧 IP 数据
+
+旧 IP 会保存在会话中；升级安装包只改变新登录的默认地址，不改写已有会话。Rust 平台请求拒绝重定向，不能仅通过旧 IP 的 301/302 跳转完成迁移。
+
+平台目录、查询缓存和托管供应商身份均包含平台地址。同一用户从旧 IP 改用新域名后按不同来源隔离，旧快照与旧供应商不会自动改名、合并或清理；本次不迁移 keyring、数据库或工具配置。
+
+旧用户按以下顺序切换：
+
+1. 在客户端普通退出旧平台会话；不要为了换域名使用「退出并清除此账号本机数据」。恢复失败页面可使用返回登录入口结束旧会话。
+2. 在登录页确认服务器地址为 `https://api.hnzhishu.cn`，通过浏览器重新授权，并确认账户身份。
+3. 登录后检查自动拉取的平台基础数据是否成功，失败时手动同步。登录本身不会改写工具供应商；通过「接入到工具」向导确认接入，或手动同步并选择新供应商。
+4. 检查当前供应商及路由/聚合成员是否仍引用旧 IP，并显式选择新来源的供应商。完成实际 CLI 请求及客户端重启恢复后，再决定是否在供应商列表手动删除旧项，沿用安全备用项限制。新域名账户的「一键删除平台供应商」不会接管旧 IP 的项。
+
+发布前还需验证 OAuth 授权、取消、重启恢复、订阅页面、模型连接以及目标平台实机升级；公开接口返回 200 或配置回归通过不能替代这些验收。出现问题时暂停发布或后续切换，保留旧配置和数据排查；已发布版本按本文既有规则处理，不覆盖同版本产物。
 
 ## 当前打包策略（自 0.0.2 生效）
 
@@ -226,9 +271,9 @@ COS 桶
 
 | 名称 | 内容 |
 | --- | --- |
-| `ZHISHU_PLATFORM_API_URL` | 正式平台 API origin，不含 `/api/v1` 或其他路径 |
-| `ZHISHU_PLATFORM_WEB_URL` | 正式平台网页 origin |
-| `ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP` | `true` 或 `false`；平台仍是 HTTP 时显式设为 `true` |
+| `ZHISHU_PLATFORM_API_URL` | `https://api.hnzhishu.cn`，不含 API 路径后缀 |
+| `ZHISHU_PLATFORM_WEB_URL` | `https://api.hnzhishu.cn` |
+| `ZHISHU_PLATFORM_ALLOW_INSECURE_HTTP` | 正式域名使用 `false`；旧 HTTP 环境仅在明确需要时显式设为 `true` |
 | `ZHISHU_UPDATE_URL` | `https://下载域名/ccs/stable/latest.json` |
 | `ZHISHU_UPDATE_PUBLIC_KEY` | 更新公钥 `.pub` 文件的完整 base64 内容 |
 | `COS_BUCKET` | 完整桶名，例如 `zhishu-downloads-1234567890` |

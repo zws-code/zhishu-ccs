@@ -2,6 +2,23 @@
 
 > 本页保留各次任务的执行结果和未验证项；测试数量、代码路径、分支状态及临时资料均属于当时快照。本次文档整理没有重跑这些历史测试。当前行为以 [代码基线](../development/baseline.md)、功能说明和源码为准。
 
+## 正式平台域名配置（2026-11-11）
+
+本机 `release.config.local.json` 的平台 API、网页地址改为 `https://api.hnzhishu.cn`，`platformAllowInsecureHttp=false`，通过现有 `release:prepare` 生成生产环境文件。仅修改三个平台字段，开发环境文件和已有 Tauri 更新配置逐字节保持一致。复用既有发布配置校验与生成脚本，L0；未修改上游源码，无新增补丁登记。操作流程见[正式平台域名与旧地址切换](../releases/README.md#正式平台域名与旧地址切换2026-11-11)。
+
+| 本轮实际执行 | 结果 |
+| --- | --- |
+| 有效配置断言、`pnpm release:prepare` 与生成文件核对 | 通过；两个平台地址为正式 HTTPS 域名，HTTP 开关关闭，更新保持启用 |
+| `pnpm test:release` | 57 通过，0 失败、0 跳过 |
+| `pnpm typecheck` | 通过 |
+| `pnpm build:renderer` | 通过；浏览器数据过期、Tailwind 类名歧义与大 chunk 提示仍存在 |
+| 构建产物核对 | 登录主入口与设置页包含新域名，生成的 JavaScript 不含旧 `http://43.136.64.205` |
+| 文档本地链接、配置忽略规则、`git diff --check` | 通过；本机正式配置和生成文件均未加入 Git |
+
+只读公网复查时，`/api/zhishu/v1/client/config`、`/download`、`/client-release.json` 均为 HTTPS 200，下载清单返回 0.0.10。最后一次配置响应中的 `api_base_url` 已为新域名；OAuth 授权/成功、注册、找回密码与订阅链接仍使用旧 HTTP IP，服务端切换尚未完成。以上为本轮观察，不保证后续线上状态。
+
+未修改 GitHub Variables、服务端配置、真实会话、keyring、供应商或工具配置，未提交、推送或发布。未运行 Rust 检查、全量前端单元测试及 Python COS 模拟（本轮未改业务或上传代码）；未验证真实 OAuth、CLI 请求、重启恢复和跨平台安装升级。旧会话及按平台地址隔离的数据需按切换说明显式处理，不能以构建通过作为迁移验收。
+
 ## 合并上游 v4.0.29（2026-11-11）
 
 从产品 `1c86ce63` / 0.0.10 在独立同步分支合入官方 v4.0.29 / `efbec38f`，保留简易模式、平台、WorkBuddy、配置历史与共存身份。L3 决策见 [ADR-0014](../adr/ADR-0014-merge-4.0.29.md)，15 个冲突、schema 25 及回退限制见 [同步报告](../upstream-sync/2026-11-11.md)。
