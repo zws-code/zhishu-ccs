@@ -10,7 +10,7 @@
 | 开发基线 | [当前基线与限制](development/baseline.md) | 产品版本、上游基线、真实目录、存储和已知差异 |
 | 上游补丁 | [补丁登记](development/upstream-patches.md) | 上游文件修改原因、关联决策与历史复核 |
 | 开发环境 | [开发启动](development/development.md) | 启动入口与数据路径 |
-| 功能 | [平台登录与会话](features/platform-login.md)、[平台基础数据与供应商](features/platform-managed-models.md) | 当前用户流程、凭据边界与本地同步 |
+| 功能 | [平台登录与会话](features/platform-login.md)、[平台基础数据与供应商](features/platform-managed-models.md)、[简易模式与应用开关](features/simple-mode.md) | 当前用户流程、凭据边界与本地同步 |
 | 接口 | [客户端专用 API 契约](api/client-api.md) | HTTP 路由、DTO、字段映射和失败语义 |
 | 浏览器授权 | [OAuth2 授权登录接入说明](api/oauth-login.md) | 授权码 + PKCE 契约、错误码与已知问题 |
 | 发布 | [打包、发布与更新](releases/README.md) | 唯一发布操作入口；含各版本证据索引 |

@@ -125,6 +125,32 @@ export function AppPageHeader({
 }
 
 /**
+ * 简易模式应用页的极简页头：不显示标题和任何操作，只保留整条拖动区，
+ * 并在自绘窗口按钮模式下把窗口按钮接在最右端（与 AppPageHeader 同一套约定）。
+ * 高度与 AppPageHeader 一致，ModalDragStrip 的量测逻辑照常成立。
+ */
+export function SimpleAppHeader() {
+  const windowControls = useContext(WindowControlsContext);
+  // 与 AppPageHeader 相同：自绘窗口按钮时没有系统标题栏，页头必须提供拖动入口。
+  const dragRegionAttr = windowControls
+    ? { "data-tauri-drag-region": true }
+    : DRAG_REGION_ATTR;
+  return (
+    <header
+      className="flex h-[52px] shrink-0 items-center justify-end pe-4"
+      {...dragRegionAttr}
+      style={DRAG_REGION_STYLE as React.CSSProperties}
+    >
+      {windowControls && (
+        <div className="flex shrink-0 items-center gap-1" style={NO_DRAG}>
+          {windowControls}
+        </div>
+      )}
+    </header>
+  );
+}
+
+/**
  * 页头下沿离窗口顶部多远。页头上方可能有环境变量警告条，得量实际位置，
  * 遮罩上复刻的窗口按钮才能和页头里的对齐。
  */

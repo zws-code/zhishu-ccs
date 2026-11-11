@@ -2,6 +2,20 @@
 
 > 这是按基线/事件累积的补丁台账。222 项清单针对 2026-10-29 的 4.0.21 快照，后续变更按事件追加；旧路径、版本和分支描述仅适用于该段，不是当前 4.0.22 的完整重新统计。当前现状见 [代码基线](baseline.md)。
 
+## 2026-11-09：新增简易模式外壳
+
+用户要求的简易模式：右下角「高级/简易」切换（localStorage 设备偏好），简易模式侧栏由「应用」开关页和既有全局项组成，各应用的供应商页从「应用」页进入。应用页页头隐藏、供应商列表只呈现当前登录账号的平台托管行。「应用」开关页复用「接入到工具」向导的接入逻辑与「一键删除平台供应商」，零新 IPC、无后端改动；新业务文件全部位于自有或新增路径（`src/lib/shellMode.ts`、`src/zhishu/models/platformManaged.ts`、`platformProvision.ts`、`PlatformAppsPage.tsx`、`src/components/shell/ShellModeToggle.tsx` 及测试，L0）。
+
+| ID | 文件 | 处理与不能仅包装的原因 | 等级 | 验证 |
+| --- | --- | --- | --- | --- |
+| SIMPLE-20261109-01 | `src/App.tsx` | 外壳按模式分支：侧栏变体、应用页页头替换为拖动条、供应商列表按账号过滤、`platformApps` 全局页分支、右下角切换按钮与视图归一；布局分支依赖固定渲染入口内部的状态与回调，外层包装无法替换 | L1 | typecheck、format、前端单测、`pnpm dev` 手动场景 |
+| SIMPLE-20261109-02 | `src/lib/navigation.ts` | `GlobalPage` 增加 `platformApps` 并新增跨模式视图归一 `normalizeViewForMode`；导航模型与持久化是固定入口 | L1 | navigation 单测 |
+| SIMPLE-20261109-03 | `src/components/shell/Sidebar.tsx` | 在侧栏内部按模式选择目录，外层包装无法替换既有目录；`simple` 变体复用 `NavItem`、设置目录和账户菜单，「平台基础数据」紧跟「应用」，不提供独立的「供应商」按钮；高级目录保留上游既有条目 | L1 | 前端单测、`pnpm dev` 手动场景 |
+| SIMPLE-20261109-04 | `src/components/shell/AppPageHeader.tsx` | 新增 `SimpleAppHeader` 导出（拖动区 + 自绘窗口按钮的极简页头）；既有组件与其余导出不变 | L1 | Windows/Linux 自绘窗口实机待验收 |
+| SIMPLE-20261109-05 | 五语 JSON | 共享语言包新增 `simpleMode.*` 文案，含独立的「已接入」标签和「未启用平台模型」说明；复用现有语言加载入口 | L1 | 五语解析、组件测试 |
+
+向导接入逻辑抽取为共用模块（`PlatformOnboarding.tsx` 改为调用 `src/zhishu/models/platformProvision.ts`，行为不变，回归测试未改断言）属自有模块重组，L0。功能行为与已执行/未执行验证见[简易模式](../features/simple-mode.md)。
+
 ## 2026-11-09：合并上游 v4.0.28
 
 依据 [ADR-0013](../adr/ADR-0013-merge-4.0.28.md)，从当前产品 0.0.9 三方合入官方 v4.0.28，保留双方祖先。复用上游 Codex 路由写入、会话迁移、代理、会话索引、settings 与 IPC；没有新增平台业务或平行核心。15 个冲突文件中 5 个为身份/清单类（L1），语义类集中在 Codex 路由形态与历史迁移（L3）。

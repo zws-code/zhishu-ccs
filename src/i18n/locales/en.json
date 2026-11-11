@@ -142,6 +142,19 @@
     "noGroupsForApp": "No group is available for this app",
     "stackDefaultHint": "Stack adds every platform provider for this app; the selected group is the default."
   },
+  "simpleMode": {
+    "navApps": "Apps",
+    "title": "Apps",
+    "description": "Pick a provider for each tool. \"Zhishu Platform\" models sync with your account automatically.",
+    "notConnected": "Not connected",
+    "connected": "Connected",
+    "inactiveHint": "Platform models not in use",
+    "emptyProvidersHint": "No platform providers for this app yet. Turn on the switch on the Apps page to connect.",
+    "switchOnLabel": "Connect {{name}} to platform providers",
+    "switchOffLabel": "Remove platform providers of {{name}}",
+    "toSimple": "Simple mode",
+    "toAdvanced": "Advanced mode"
+  },
   "app": {
     "title": "CC Switch",
     "description": "All-in-One Assistant for Claude Code, Codex & Gemini CLI"

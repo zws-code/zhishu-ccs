@@ -70,6 +70,7 @@ import {
   APP_STORAGE_KEY,
   appPageBelongsTo,
   isAppPage,
+  normalizeViewForMode,
   readStoredView,
   sharedFeatureAppOf,
   storeView,
@@ -77,13 +78,16 @@ import {
   type SettingsSection,
   type View,
 } from "@/lib/navigation";
+import { useShellMode } from "@/lib/shellMode";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { useUpdate } from "@/contexts/UpdateContext";
 import { NewLayoutDialog } from "@/components/shell/NewLayoutDialog";
 import {
   AppPageHeader,
+  SimpleAppHeader,
   WindowControlsContext,
 } from "@/components/shell/AppPageHeader";
+import { ShellModeToggle } from "@/components/shell/ShellModeToggle";
 import { WindowControls } from "@/components/shell/WindowControls";
 import { APP_DISPLAY_NAME, AppGlyph } from "@/components/shell/AppGlyph";
 import { ProfileSwitcher } from "@/components/profiles/ProfileSwitcher";
@@ -92,6 +96,9 @@ import { PlatformConnectButton } from "@/zhishu/models/components/PlatformConnec
 import { PlatformBulkSyncButtons } from "@/zhishu/models/components/PlatformBulkSyncButtons";
 import { PlatformProviderDeletionMenuItem } from "@/zhishu/models/components/PlatformProviderDeletionMenuItem";
 import { PlatformCatalogPage } from "@/zhishu/models/components/PlatformCatalogPage";
+import { PlatformAppsPage } from "@/zhishu/models/components/PlatformAppsPage";
+import { listAccountManagedProviders } from "@/zhishu/models/platformManaged";
+import { usePlatformAuth } from "@/zhishu/auth/PlatformAuthContext";
 import {
   hasOpencodeDefinition,
   isNativeOpencodeConfig,
@@ -232,7 +239,13 @@ function App() {
   const { hasUpdate } = useUpdate();
   const [activeApp, setActiveApp] = useState<AppId>(getInitialApp);
   const sharedFeatureApp = sharedFeatureAppOf(activeApp);
-  const [currentView, setCurrentView] = useState<View>(readStoredView);
+  // 外壳布局模式（右下角可切）：简易模式换简化侧栏、隐藏应用页页头、
+  // 供应商列表只呈现当前账号的平台托管行
+  const [shellMode, setShellMode] = useShellMode();
+  const simpleMode = shellMode === "simple";
+  const [currentView, setCurrentView] = useState<View>(() =>
+    normalizeViewForMode(readStoredView(), shellMode === "simple"),
+  );
   const [settingsSection, setSettingsSection] =
     useState<SettingsSection>("general");
   const [appConfigScrollTarget, setAppConfigScrollTarget] = useState<AppId>();
@@ -280,6 +293,11 @@ function App() {
     storeView(currentView);
   }, [currentView]);
 
+  // 切换外壳模式时归一视图：「应用」开关页只在简易模式有效，切回高级模式回供应商页
+  useEffect(() => {
+    setCurrentView((view) => normalizeViewForMode(view, simpleMode));
+  }, [simpleMode]);
+
   const { data: settingsData } = useSettingsQuery();
   // Windows 一律去掉系统标题栏，用页头里的应用内窗口按钮；Linux 由设置决定
   const useAppWindowControls =
@@ -291,6 +309,8 @@ function App() {
     }),
     [settingsData?.visibleApps],
   );
+  const platformAuth = usePlatformAuth();
+  const platformAccount = platformAuth?.account ?? null;
 
   const getFirstVisibleApp = (): AppId => {
     return (
@@ -1475,99 +1495,103 @@ function App() {
           ? t("appPage.memory")
           : undefined;
 
-  const renderAppPageHeader = () => (
-    <AppPageHeader
-      variant="app"
-      icon={<AppGlyph app={activeApp} size={20} badgeClassName="bg-app" />}
-      title={APP_DISPLAY_NAME[activeApp]}
-      truncateTitle={currentView === "providers" && Boolean(modeAppId)}
-      titleExtra={
-        currentView === "providers" && modeAppId ? (
-          <div
-            ref={setConnectionStatusSlot}
-            className="ms-2 flex min-w-0 max-w-[280px] items-center"
-          />
-        ) : undefined
-      }
-      subtitle={
-        activeApp === "openclaw" ||
-        activeApp === "hermes" ||
-        (currentView === "providers" && modeAppId)
-          ? undefined
-          : appPageName
-      }
-      actions={
-        <>
-          <AppConfigHistoryButton key={activeApp} app={activeApp} />
-          {currentView === "providers" &&
-            activeApp !== "mcode" &&
-            activeApp !== "dsh" &&
-            activeApp !== "kimi" &&
-            (settingsData?.showProfileSwitcher ?? false) && (
-              <ProfileSwitcher activeApp={activeApp} />
-            )}
-          {activeApp === "hermes" && (
-            <Button
-              variant="quiet"
-              size="regular"
-              onClick={() => void openHermesWebUI()}
-            >
-              {t("appPage.webUi")}
-              <ExternalLink className="h-3.5 w-3.5" />
-            </Button>
-          )}
-          {currentView === "providers" &&
-            (settingsData?.showProviderSearch ?? true) && (
-              <HoverTip
-                content={t("provider.searchButtonTip", {
-                  shortcut: isMac() ? "⌘F" : "Ctrl+F",
-                })}
+  // 简易模式隐藏应用页页头（含加供应商、搜索、同步等管理入口），只留拖动区
+  const renderAppPageHeader = () =>
+    simpleMode ? (
+      <SimpleAppHeader />
+    ) : (
+      <AppPageHeader
+        variant="app"
+        icon={<AppGlyph app={activeApp} size={20} badgeClassName="bg-app" />}
+        title={APP_DISPLAY_NAME[activeApp]}
+        truncateTitle={currentView === "providers" && Boolean(modeAppId)}
+        titleExtra={
+          currentView === "providers" && modeAppId ? (
+            <div
+              ref={setConnectionStatusSlot}
+              className="ms-2 flex min-w-0 max-w-[280px] items-center"
+            />
+          ) : undefined
+        }
+        subtitle={
+          activeApp === "openclaw" ||
+          activeApp === "hermes" ||
+          (currentView === "providers" && modeAppId)
+            ? undefined
+            : appPageName
+        }
+        actions={
+          <>
+            <AppConfigHistoryButton key={activeApp} app={activeApp} />
+            {currentView === "providers" &&
+              activeApp !== "mcode" &&
+              activeApp !== "dsh" &&
+              activeApp !== "kimi" &&
+              (settingsData?.showProfileSwitcher ?? false) && (
+                <ProfileSwitcher activeApp={activeApp} />
+              )}
+            {activeApp === "hermes" && (
+              <Button
+                variant="quiet"
+                size="regular"
+                onClick={() => void openHermesWebUI()}
               >
-                <Button
-                  variant="quiet"
-                  size="icon-compact"
-                  className="h-8 w-8"
-                  aria-label={t("provider.searchAriaLabel")}
-                  aria-pressed={providerSearchOpen}
-                  onClick={() => setProviderSearchOpen((open) => !open)}
-                >
-                  <Search className="h-4 w-4" />
-                </Button>
-              </HoverTip>
+                {t("appPage.webUi")}
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Button>
             )}
-          {currentView === "providers" && (
-            <>
-              <PlatformConnectButton
-                app={activeApp}
-                disabled={platformDeletion.pending}
-              />
-              <PlatformBulkSyncButtons
-                app={activeApp}
-                modeView={modeAppId ? (currentModeView ?? null) : null}
-                providers={Object.values(providers)}
-              />
-            </>
-          )}
-          {currentView === "providers" && (
-            <Button
-              variant="solid"
-              size="regular"
-              onClick={() => openAddProvider(currentModeView)}
-            >
-              <Plus className="h-4 w-4" />
-              {t("provider.addProvider")}
-            </Button>
-          )}
-          {currentView === "hermesMemory" && (
-            <Suspense fallback={null}>
-              <HermesMemorySaveButton />
-            </Suspense>
-          )}
-          {appMenu}
-        </>
-      }
-    />
-  );
+            {currentView === "providers" &&
+              (settingsData?.showProviderSearch ?? true) && (
+                <HoverTip
+                  content={t("provider.searchButtonTip", {
+                    shortcut: isMac() ? "⌘F" : "Ctrl+F",
+                  })}
+                >
+                  <Button
+                    variant="quiet"
+                    size="icon-compact"
+                    className="h-8 w-8"
+                    aria-label={t("provider.searchAriaLabel")}
+                    aria-pressed={providerSearchOpen}
+                    onClick={() => setProviderSearchOpen((open) => !open)}
+                  >
+                    <Search className="h-4 w-4" />
+                  </Button>
+                </HoverTip>
+              )}
+            {currentView === "providers" && (
+              <>
+                <PlatformConnectButton
+                  app={activeApp}
+                  disabled={platformDeletion.pending}
+                />
+                <PlatformBulkSyncButtons
+                  app={activeApp}
+                  modeView={modeAppId ? (currentModeView ?? null) : null}
+                  providers={Object.values(providers)}
+                />
+              </>
+            )}
+            {currentView === "providers" && (
+              <Button
+                variant="solid"
+                size="regular"
+                onClick={() => openAddProvider(currentModeView)}
+              >
+                <Plus className="h-4 w-4" />
+                {t("provider.addProvider")}
+              </Button>
+            )}
+            {currentView === "hermesMemory" && (
+              <Suspense fallback={null}>
+                <HermesMemorySaveButton />
+              </Suspense>
+            )}
+            {appMenu}
+          </>
+        }
+      />
+    );
 
   // OpenClaw / Hermes 没有模式 tab，那一行放它们自己的页面导航。
   // 换整块内容的是页面导航，用下划线页签；分段控件只留给模式和页内筛选。
@@ -1630,7 +1654,30 @@ function App() {
     onSearchOpenChange: setProviderSearchOpen,
   };
 
+  // 简易模式只呈现当前登录账号的平台托管供应商；自建和其他账号的行不显示、也不受影响
+  const displayProviders =
+    simpleMode && platformAccount
+      ? listAccountManagedProviders(providers, platformAccount)
+      : providers;
+
   const renderProviderList = () => {
+    if (simpleMode && Object.keys(displayProviders).length === 0) {
+      // 简易模式没有平台托管行：不画列表（避免「从配置导入」等管理入口），指向「应用」页
+      return (
+        <div
+          ref={providerScrollContainerRef}
+          id="main-content"
+          className="min-h-0 flex-1 overflow-y-auto scroll-stable overflow-x-hidden px-6 pb-12 pt-4"
+        >
+          <p className="max-w-md text-caption leading-relaxed text-fg-3">
+            {t(
+              "simpleMode.emptyProvidersHint",
+              "这个应用还没有平台供应商。到「应用」页打开开关即可接入。",
+            )}
+          </p>
+        </div>
+      );
+    }
     if (modeAppId) {
       const startupFailure = startupFailures.find(
         (failure) => failure.appType === modeAppId,
@@ -1640,7 +1687,7 @@ function App() {
           key={modeAppId}
           app={modeAppId}
           statusSlot={connectionStatusSlot}
-          providers={providers}
+          providers={displayProviders}
           currentProviderId={currentProviderId}
           isLoading={isLoading}
           scrollRef={providerScrollContainerRef}
@@ -1671,7 +1718,7 @@ function App() {
         <div className="space-y-4">
           <ProviderList
             {...listCallbacks}
-            providers={providers}
+            providers={displayProviders}
             currentProviderId={currentProviderId}
             appId={activeApp}
             isLoading={isLoading}
@@ -1785,6 +1832,8 @@ function App() {
 
   const renderGlobalPage = () => {
     switch (currentView) {
+      case "platformApps":
+        return <PlatformAppsPage onOpenApp={selectApp} />;
       case "platformCatalog":
         return <PlatformCatalogPage />;
       case "usage":
@@ -1894,6 +1943,7 @@ function App() {
     >
       <div className="flex h-screen overflow-hidden bg-app text-fg-1 selection:bg-action/25">
         <Sidebar
+          simple={simpleMode}
           activeApp={activeApp}
           view={currentView}
           visibleApps={visibleApps}
@@ -1950,6 +2000,10 @@ function App() {
           >
             <Suspense fallback={<PageLoading />}>{renderContent()}</Suspense>
           </div>
+          <ShellModeToggle
+            simple={simpleMode}
+            onToggle={() => setShellMode(simpleMode ? "advanced" : "simple")}
+          />
         </main>
       </div>
 

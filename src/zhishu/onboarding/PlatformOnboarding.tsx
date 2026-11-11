@@ -22,12 +22,7 @@ import { providersApi } from "@/lib/api/providers";
 import { proxyApi } from "@/lib/api/proxy";
 import { useSettingsQuery } from "@/lib/query/queries";
 import { toast } from "@/lib/toast";
-import { extractErrorMessage } from "@/utils/errorUtils";
 import { APP_DISPLAY_NAME, AppGlyph } from "@/components/shell/AppGlyph";
-import {
-  TOOL_APP_IDS,
-  type ToolName,
-} from "@/components/apps/useToolManagement";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -50,20 +45,25 @@ import {
   platformAuthError,
   type PlatformAccount,
 } from "@/zhishu/api/platformAuth";
-import { platformModelsApi } from "@/zhishu/api/platformModels";
 import { usePlatformAuth } from "@/zhishu/auth/PlatformAuthContext";
 import { usePlatformOperationScope } from "@/zhishu/auth/usePlatformOperationScope";
 import { refreshPlatformProviders } from "@/zhishu/integrations/ccswitch/platformProviders";
 import { PLATFORM_SYNC_APPS } from "@/zhishu/models/platformConfig";
 import { usePlatformCatalog } from "@/zhishu/models/query/platformCatalog";
 import {
+  fetchPlatformGroupData,
+  pickPlatformGroupId,
+  provisionPlatformApp,
+  usePlatformAppInstalls,
+  type PlatformProvisionOutcome,
+} from "@/zhishu/models/platformProvision";
+import {
   DEFAULT_VISIBLE_APPS,
-  isAdditiveAppId,
   isModeAppId,
   isStackAppId,
   orderAppIds,
 } from "@/config/appConfig";
-import type { Provider, Settings, VisibleApps } from "@/types";
+import type { Settings, VisibleApps } from "@/types";
 import type { AppMode } from "@/types/proxy";
 
 const DISMISSED_PREFIX = "zhishu-platform-onboarding-dismissed:";
@@ -89,20 +89,7 @@ function markDismissed(baseUrl: string, userId: number) {
   }
 }
 
-const TOOL_BY_APP = Object.fromEntries(
-  Object.entries(TOOL_APP_IDS).map(([tool, app]) => [app, tool]),
-) as Partial<Record<AppId, ToolName>>;
-
-interface OnboardingResult {
-  app: AppId;
-  ok: boolean;
-  /** 模式应用的实际接入方式；累加式应用为 additive。 */
-  action?: "direct" | "route" | "stack" | "additive";
-  providerName?: string;
-  /** 聚合/累加式应用实际加入的平台供应商数量。 */
-  count?: number;
-  message?: string;
-}
+type OnboardingResult = PlatformProvisionOutcome;
 
 interface PlatformOnboardingValue {
   open: () => void;
@@ -200,42 +187,8 @@ function PlatformOnboardingDialog({
       ),
     [settings?.appOrder, visibleApps],
   );
-  const toolApps = useMemo(
-    () => apps.filter((app) => TOOL_BY_APP[app]),
-    [apps],
-  );
 
-  const detection = useQuery({
-    queryKey: ["platform-onboarding-installs", apps.join(",")],
-    queryFn: async () => {
-      const tools = toolApps
-        .map((app) => TOOL_BY_APP[app])
-        .filter((tool): tool is ToolName => Boolean(tool));
-      const [reports, desktop, workbuddyInstalled] = await Promise.all([
-        tools.length
-          ? settingsApi.listToolInstallations(tools)
-          : Promise.resolve([]),
-        apps.includes("claude-desktop")
-          ? providersApi.getClaudeDesktopStatus().catch(() => null)
-          : Promise.resolve(null),
-        apps.includes("workbuddy")
-          ? providersApi.getWorkBuddyInstalled().catch(() => false)
-          : Promise.resolve(false),
-      ]);
-      const installed = new Set<AppId>();
-      for (const report of reports) {
-        if (!report.installs.length) continue;
-        const app = TOOL_APP_IDS[report.tool as ToolName];
-        if (app) installed.add(app);
-      }
-      if (desktop?.installed) installed.add("claude-desktop");
-      if (workbuddyInstalled) installed.add("workbuddy");
-      return installed;
-    },
-    enabled: apps.length > 0,
-    staleTime: 60_000,
-    retry: false,
-  });
+  const detection = usePlatformAppInstalls(apps);
 
   // 模式应用先读当前模式作为默认值；累加式应用没有直连/路由/聚合的概念。
   const modeApps = useMemo<AppId[]>(
@@ -289,31 +242,7 @@ function PlatformOnboardingDialog({
         account.user.id,
         app,
       ] as const,
-      queryFn: async () => {
-        const [options, all, currentId] = await Promise.all([
-          platformModelsApi.groupOptions(app),
-          providersApi.getAll(app).catch((): Record<string, Provider> => ({})),
-          providersApi.getCurrent(app).catch(() => ""),
-        ]);
-        const providerGroups: Record<string, number> = {};
-        for (const provider of Object.values(all)) {
-          const managed = provider.meta?.platformManaged;
-          if (
-            managed?.origin === account.baseUrl &&
-            managed.userId === account.user.id &&
-            managed.groupId !== undefined
-          ) {
-            providerGroups[provider.id] = managed.groupId;
-          }
-        }
-        const currentManaged = all[currentId]?.meta?.platformManaged;
-        const currentGroupId =
-          currentManaged?.origin === account.baseUrl &&
-          currentManaged.userId === account.user.id
-            ? (currentManaged.groupId ?? null)
-            : null;
-        return { options, providerGroups, currentGroupId };
-      },
+      queryFn: () => fetchPlatformGroupData(app, account),
       staleTime: 30_000,
       retry: false,
     })),
@@ -324,32 +253,14 @@ function PlatformOnboardingDialog({
   const [selectedGroups, setSelectedGroups] = useState<Map<AppId, number>>(
     new Map(),
   );
-  const groupFor = (app: AppId): number | undefined => {
-    const options = groupOptionsFor(app);
-    const chosen = selectedGroups.get(app);
-    if (chosen && options.some((option) => option.groupId === chosen)) {
-      return chosen;
-    }
-    const groupData = groupQueryFor(app)?.data;
-    // 模式应用优先沿用当前生效的直连/路由供应商所属分组；累加式应用用当前默认项。
-    const modeView =
-      modeApps.indexOf(app) >= 0
+  const groupFor = (app: AppId): number | undefined =>
+    pickPlatformGroupId(
+      selectedGroups.get(app),
+      groupQueryFor(app)?.data,
+      modeApps.includes(app)
         ? modeQueries[modeApps.indexOf(app)]?.data
-        : undefined;
-    const effectiveProviderId = modeView
-      ? modeView.mode === "direct"
-        ? modeView.directProviderId
-        : modeView.routeProviderId
-      : null;
-    const current =
-      (effectiveProviderId
-        ? groupData?.providerGroups?.[effectiveProviderId]
-        : undefined) ?? groupData?.currentGroupId;
-    if (current && options.some((option) => option.groupId === current)) {
-      return current;
-    }
-    return options[0]?.groupId;
-  };
+        : undefined,
+    );
   const setGroupFor = (app: AppId, groupId: number) => {
     setSelectedGroups((previous) => new Map(previous).set(app, groupId));
   };
@@ -398,169 +309,17 @@ function PlatformOnboardingDialog({
       );
       for (const app of targets) {
         if (!isCurrent()) return null;
-        try {
-          const summary = await platformModelsApi.sync(app);
-          const [all, currentId] = await Promise.all([
-            providersApi.getAll(app),
-            providersApi.getCurrent(app).catch(() => ""),
-          ]);
-          const managed = Object.values(all)
-            .filter(
-              (provider) =>
-                provider.meta?.platformManaged?.origin === account.baseUrl &&
-                provider.meta?.platformManaged?.userId === account.user.id,
-            )
-            .sort(
-              (left, right) =>
-                (groupOrder.get(left.meta?.platformManaged?.groupId ?? -1) ??
-                  Number.MAX_SAFE_INTEGER) -
-                (groupOrder.get(right.meta?.platformManaged?.groupId ?? -1) ??
-                  Number.MAX_SAFE_INTEGER),
-            );
-          if (managed.length === 0) {
-            outcomes.push({
-              app,
-              ok: false,
-              message:
-                summary.warnings[0] ?? t("platformOnboarding.noProvider"),
-            });
-            continue;
-          }
-          const syncWarning = summary.warnings[0];
-
-          if (isAdditiveAppId(app)) {
-            // 累加式应用没有模式：把该应用的全部平台供应商加入工具列表。
-            let added = 0;
-            const notices: string[] = [];
-            const errors: string[] = [];
-            for (const provider of managed) {
-              if (!isCurrent()) return null;
-              try {
-                if (app === "kimi") {
-                  await providersApi.addToLiveConfig(provider.id, app);
-                } else {
-                  const switched = await providersApi.switch(provider.id, app);
-                  if (switched.warnings[0]) notices.push(switched.warnings[0]);
-                }
-                added += 1;
-              } catch (cause) {
-                errors.push(
-                  extractErrorMessage(cause) || platformAuthError(cause),
-                );
-              }
-            }
-            const defaultModelHint = [
-              "opencode",
-              "openclaw",
-              "pi",
-              "mcode",
-            ].includes(app)
-              ? t("platformOnboarding.defaultModelHint")
-              : undefined;
-            outcomes.push({
-              app,
-              ok: added > 0,
-              action: "additive",
-              count: added,
-              message:
-                [...notices, ...errors, syncWarning, defaultModelHint]
-                  .filter(Boolean)
-                  .join("；") || undefined,
-            });
-            continue;
-          }
-
-          // 使用用户选择的分组；没有选或该分组已不可用时，沿用当前托管分组/目录首项。
-          const chosenGroupId = groupFor(app);
-          const preferred =
-            (chosenGroupId !== undefined
-              ? managed.find(
-                  (provider) =>
-                    provider.meta?.platformManaged?.groupId === chosenGroupId,
-                )
-              : undefined) ??
-            managed.find((provider) => provider.id === currentId) ??
-            managed[0];
-
-          const requested = modeFor(app);
-          const mode =
-            requested === "stack" && !isStackAppId(app) ? "route" : requested;
-
-          if (mode === "direct") {
-            // 已经在路由/聚合时先退回直连，再写直连关键字段。
-            await proxyApi.setProxyTakeoverForApp(app, false);
-            if (!isCurrent()) return null;
-            const switched = await providersApi.switch(preferred.id, app);
-            outcomes.push({
-              app,
-              ok: true,
-              action: "direct",
-              providerName: preferred.name,
-              message:
-                [switched.warnings[0], syncWarning]
-                  .filter(Boolean)
-                  .join("；") || undefined,
-            });
-            continue;
-          }
-
-          if (mode === "route") {
-            await proxyApi.setProxyTakeoverForApp(
-              app,
-              true,
-              false,
-              preferred.id,
-            );
-            outcomes.push({
-              app,
-              ok: true,
-              action: "route",
-              providerName: preferred.name,
-              message: syncWarning,
-            });
-            continue;
-          }
-
-          // 聚合：进入聚合、把默认那家设为平台供应商，再把其余平台分组加入名单。
-          await proxyApi.setProxyTakeoverForApp(app, true, true, preferred.id);
-          if (!isCurrent()) return null;
-          let count = 0;
-          const stackNotices: string[] = [];
-          const stackErrors: string[] = [];
-          for (const provider of managed) {
-            if (!isCurrent()) return null;
-            try {
-              const notice = await proxyApi.setProxyStackMember(
-                app,
-                provider.id,
-                true,
-              );
-              if (notice) stackNotices.push(notice);
-              count += 1;
-            } catch (cause) {
-              stackErrors.push(
-                extractErrorMessage(cause) || platformAuthError(cause),
-              );
-            }
-          }
-          outcomes.push({
-            app,
-            ok: count > 0,
-            action: "stack",
-            providerName: preferred.name,
-            count,
-            message:
-              [...stackNotices, ...stackErrors, syncWarning]
-                .filter(Boolean)
-                .join("；") || undefined,
-          });
-        } catch (cause) {
-          outcomes.push({
-            app,
-            ok: false,
-            message: extractErrorMessage(cause) || platformAuthError(cause),
-          });
-        }
+        const outcome = await provisionPlatformApp(app, {
+          t,
+          account,
+          groupOrder,
+          groupId: groupFor(app),
+          mode: modeFor(app),
+          isCurrent,
+        });
+        // 中途账号切换或对话框关闭：放弃剩余应用，已完成的结果一并丢弃
+        if (!outcome) return null;
+        outcomes.push(outcome);
       }
       return outcomes;
     },

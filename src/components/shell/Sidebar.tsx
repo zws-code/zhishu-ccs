@@ -58,6 +58,8 @@ interface SidebarProps {
   onExitSettings: () => void;
   /** 打开了「启动时检查应用更新」并且查到了新版本 */
   appsUpdateAvailable?: boolean;
+  /** 简易模式目录：应用开关页置顶，不再单列各应用（应用入口在「应用」页里） */
+  simple?: boolean;
 }
 
 type DirectoryProps = SidebarProps & { collapsed: boolean };
@@ -72,7 +74,7 @@ export function Sidebar(props: SidebarProps) {
   const { t } = useTranslation();
   const navRef = useRef<HTMLElement>(null);
   const { collapsed, toggle } = useSidebarCollapsed(navRef);
-  const { view } = props;
+  const { view, simple } = props;
   const inSettings = view === "settings";
 
   return (
@@ -93,6 +95,8 @@ export function Sidebar(props: SidebarProps) {
       <SidebarTopBar collapsed={collapsed} onToggle={toggle} />
       {inSettings ? (
         <SettingsDirectory {...props} collapsed={collapsed} />
+      ) : simple ? (
+        <SimpleMainDirectory {...props} collapsed={collapsed} />
       ) : (
         <MainDirectory {...props} collapsed={collapsed} />
       )}
@@ -273,6 +277,114 @@ function MainDirectory({
           dot={appsUpdateAvailable}
           onClick={() => onSelectPage("apps")}
         />
+        <NavItem
+          collapsed={collapsed}
+          compact={!collapsed}
+          selected={false}
+          icon={Settings}
+          label={t("nav.settings")}
+          title={hasUpdate ? t("nav.settingsHasUpdate") : t("nav.settings")}
+          dot={hasUpdate}
+          dotTone="success"
+          onClick={() => onSelectPage("settings")}
+        />
+      </div>
+    </>
+  );
+}
+
+/**
+ * 简易模式主目录：应用开关页置顶，其后是全局页。
+ * 各应用的供应商页从「应用」页进入；样式复用同一套 NavItem。
+ */
+function SimpleMainDirectory({
+  collapsed,
+  view,
+  onSelectPage,
+}: DirectoryProps) {
+  const { t } = useTranslation();
+  const { hasUpdate } = useUpdate();
+  const isGlobalSelected = (page: GlobalPage) =>
+    view === page || (page === "skills" && view === "skillsDiscovery");
+
+  return (
+    <>
+      <div
+        role="group"
+        aria-label={t("nav.mainLabel")}
+        className={cn(
+          "flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden pb-2 pt-0.5",
+          collapsed && "no-scrollbar",
+        )}
+      >
+        <NavItem
+          collapsed={collapsed}
+          selected={view === "platformApps"}
+          icon={LayoutGrid}
+          label={t("simpleMode.navApps", "应用")}
+          onClick={() => onSelectPage("platformApps")}
+        />
+        <NavItem
+          collapsed={collapsed}
+          selected={isGlobalSelected("platformCatalog")}
+          icon={Database}
+          label={t("platformCatalog.title", "平台基础数据")}
+          onClick={() => onSelectPage("platformCatalog")}
+        />
+        <NavItem
+          collapsed={collapsed}
+          selected={isGlobalSelected("mcp")}
+          icon={Server}
+          label="MCP"
+          onClick={() => onSelectPage("mcp")}
+        />
+        <NavItem
+          collapsed={collapsed}
+          selected={isGlobalSelected("skills")}
+          icon={SkillsIcon}
+          label="Skills"
+          onClick={() => onSelectPage("skills")}
+        />
+        <NavItem
+          collapsed={collapsed}
+          selected={isGlobalSelected("prompts")}
+          icon={BookOpen}
+          label={t("nav.prompts")}
+          onClick={() => onSelectPage("prompts")}
+        />
+        <NavItem
+          collapsed={collapsed}
+          selected={isGlobalSelected("sessions")}
+          icon={History}
+          label={t("nav.sessions")}
+          onClick={() => onSelectPage("sessions")}
+        />
+        <NavItem
+          collapsed={collapsed}
+          selected={isGlobalSelected("auth")}
+          icon={KeyRound}
+          label={t("nav.auth")}
+          onClick={() => onSelectPage("auth")}
+        />
+        <NavItem
+          collapsed={collapsed}
+          selected={isGlobalSelected("usage")}
+          icon={ChartColumn}
+          label={t("nav.usage")}
+          onClick={() => onSelectPage("usage")}
+        />
+      </div>
+
+      <div
+        className={cn(
+          "my-1.5 h-px shrink-0 bg-border",
+          collapsed ? "mx-[18px]" : "mx-4",
+        )}
+      />
+
+      <div
+        className={cn("flex shrink-0 pb-2", collapsed ? "flex-col" : "px-2")}
+      >
         <NavItem
           collapsed={collapsed}
           compact={!collapsed}

@@ -15,6 +15,7 @@ export type AppPage =
   | "hermesMemory";
 
 export type GlobalPage =
+  | "platformApps"
   | "platformCatalog"
   | "usage"
   | "auth"
@@ -54,6 +55,7 @@ const APP_PAGES: AppPage[] = [
 ];
 
 const GLOBAL_PAGES: GlobalPage[] = [
+  "platformApps",
   "platformCatalog",
   "usage",
   "auth",
@@ -103,6 +105,15 @@ export function appPageBelongsTo(page: AppPage, app: AppId): boolean {
     case "hermesMemory":
       return app === "hermes";
   }
+}
+
+/**
+ * 跨外壳模式的视图归一：`platformApps`（应用开关页）只在简易模式有效，
+ * 切回高级模式时回到供应商页；其余视图两种模式通用。
+ */
+export function normalizeViewForMode(view: View, simpleMode: boolean): View {
+  if (!simpleMode && view === "platformApps") return "providers";
+  return view;
 }
 
 export function readStoredView(): View {
