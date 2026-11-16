@@ -39,6 +39,7 @@ import {
 } from "@/lib/api";
 import { checkAllEnvConflicts, checkEnvConflicts } from "@/lib/api/env";
 import { useProviderActions } from "@/hooks/useProviderActions";
+import { usePlatformProviderDeletion } from "@/zhishu/models/usePlatformProviderDeletion";
 import { openclawKeys, useOpenClawHealth } from "@/hooks/useOpenClaw";
 import { hermesKeys, useOpenHermesWebUI } from "@/hooks/useHermes";
 import { hermesApi } from "@/lib/api/hermes";
@@ -93,6 +94,10 @@ import { WindowControls } from "@/components/shell/WindowControls";
 import { APP_DISPLAY_NAME, AppGlyph } from "@/components/shell/AppGlyph";
 import { ProfileSwitcher } from "@/components/profiles/ProfileSwitcher";
 import { ProviderList } from "@/components/providers/ProviderList";
+import { PlatformConnectButton } from "@/zhishu/models/components/PlatformConnectButton";
+import { PlatformBulkSyncButtons } from "@/zhishu/models/components/PlatformBulkSyncButtons";
+import { PlatformProviderDeletionMenuItem } from "@/zhishu/models/components/PlatformProviderDeletionMenuItem";
+import { PlatformCatalogPage } from "@/zhishu/models/components/PlatformCatalogPage";
 import {
   hasOpencodeDefinition,
   isNativeOpencodeConfig,
@@ -403,6 +408,7 @@ function App() {
   });
   const { data: piCurrentState } = usePiCurrentState(activeApp === "pi");
   const providers = useMemo(() => data?.providers ?? {}, [data]);
+  const platformDeletion = usePlatformProviderDeletion(activeApp, providers);
   const currentProviderId = data?.currentProviderId ?? "";
   const isOpenClawView = activeApp === "openclaw" && isAppPage(currentView);
   const { data: openclawHealthWarnings = [] } =
@@ -1484,6 +1490,7 @@ function App() {
         <DropdownMenuItem onSelect={() => openPage("apps")}>
           {t("appPage.installAndUpgrade")}
         </DropdownMenuItem>
+        <PlatformProviderDeletionMenuItem deletion={platformDeletion} />
         <DropdownMenuSeparator />
         <DropdownMenuItem
           disabled={Object.values(visibleApps).filter(Boolean).length <= 1}
@@ -1565,6 +1572,19 @@ function App() {
                 </Button>
               </HoverTip>
             )}
+          {currentView === "providers" && (
+            <>
+              <PlatformConnectButton
+                app={activeApp}
+                disabled={platformDeletion.pending}
+              />
+              <PlatformBulkSyncButtons
+                app={activeApp}
+                modeView={modeAppId ? (currentModeView ?? null) : null}
+                providers={Object.values(providers)}
+              />
+            </>
+          )}
           {currentView === "providers" && (
             <Button
               variant="solid"
@@ -1793,6 +1813,8 @@ function App() {
 
   const renderGlobalPage = () => {
     switch (currentView) {
+      case "platformCatalog":
+        return <PlatformCatalogPage />;
       case "usage":
         return (
           <UsagePage

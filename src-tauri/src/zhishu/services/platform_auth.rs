@@ -1,9 +1,13 @@
-//! 平台 OAuth2 登录与账户恢复。
+//! 平台 OAuth2 登录、账户恢复以及带认证的分组与额度请求。
 //! access token 仅驻内存，refresh token 交给系统凭据库保存。
-use super::client_api::{self, ClientAccount, ClientConfig};
+use super::client_api::{
+    self, ClientAccess, ClientAccount, ClientConfig, ClientConnection, ClientUsage, GroupDetails,
+    PlatformUsageSummary,
+};
 use reqwest::{Client, Method, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 use tauri::{Manager, State};
 use tokio::sync::{oneshot, Mutex};
@@ -52,7 +56,52 @@ struct TokenPair {
     refresh_token: String,
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+pub(crate) struct AvailableGroup {
+    pub id: i64,
+    pub name: String,
+    #[serde(default)]
+    pub platform: String,
+    #[serde(default)]
+    pub status: String,
+    #[serde(default)]
+    pub subscription_type: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+pub(crate) struct GroupCredential {
+    pub key: String,
+    pub key_id: i64,
+    pub platform: String,
+    pub key_name: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+pub(crate) struct GroupCatalog {
+    pub group: AvailableGroup,
+    pub credential: GroupCredential,
+    pub models: Vec<Value>,
+    pub catalog_error: Option<String>,
+    #[serde(default)]
+    pub connection: Option<ClientConnection>,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+pub(crate) struct GroupDiscovery {
+    pub account: PlatformAccount,
+    pub groups: Vec<AvailableGroup>,
+    pub catalogs: Vec<GroupCatalog>,
+    pub failed_group_ids: HashSet<i64>,
+    #[serde(default)]
+    pub synced_at: i64,
+    #[serde(default)]
+    pub details: HashMap<i64, GroupDetails>,
+    pub subscription_group_ids: HashSet<i64>,
+    pub warnings: Vec<String>,
+}
+
 struct Session {
+    email: String,
     base_url: String,
     user_id: i64,
     tokens: TokenPair,
@@ -132,7 +181,8 @@ async fn request<T: DeserializeOwned>(
     // Closed allowlist: new code cannot accidentally resurrect panel/model endpoints.
     let allowed = matches!(
         (method.as_str(), path),
-        ("GET", "/config" | "/account") | ("POST", "/auth/refresh" | "/auth/logout")
+        ("GET", "/config" | "/account" | "/usage/summary")
+            | ("POST", "/auth/refresh" | "/auth/logout" | "/access")
     );
     if !allowed {
         return Err(error("CLIENT_API_ONLY", "仅允许客户端专用接口"));
@@ -231,6 +281,7 @@ async fn finish_login(
         )
     };
     let session = Session {
+        email: account.user.email.clone(),
         persistence,
         persistence_dirty: false,
         last_used_at: now(),
@@ -276,6 +327,9 @@ pub async fn platform_login_oauth(
     state: State<'_, PlatformAuthState>,
     base_url: String,
 ) -> Result<LoginResult, PlatformAuthError> {
+    let _operation = crate::zhishu::services::platform_models::APPLY_LOCK
+        .lock()
+        .await;
     let store_result = initialize_session_store(&state.0, &handle).await;
     let (cancel, receiver) = oneshot::channel();
     state.0.lock().await.oauth_cancel = Some(cancel);
@@ -307,6 +361,56 @@ pub async fn platform_get_account(
             window.is_visible().unwrap_or(false) && !window.is_minimized().unwrap_or(true)
         });
     get_account_with_activity(&state.0, active).await
+}
+
+/// 只读额度快照；不保存目录，不申请 Key，不请求模型接口。
+#[tauri::command]
+pub async fn platform_get_subscription_usage(
+    state: State<'_, PlatformAuthState>,
+) -> Result<PlatformUsageSummary, PlatformAuthError> {
+    subscription_usage(&state.0).await
+}
+
+async fn subscription_usage(
+    state: &Mutex<AuthState>,
+) -> Result<PlatformUsageSummary, PlatformAuthError> {
+    let mut auth = state.lock().await;
+    let session = auth
+        .session
+        .as_mut()
+        .filter(|s| !idle_expired(s.last_used_at, now()))
+        .ok_or_else(|| error("UNAUTHORIZED", "请先登录平台"))?;
+    let data: ClientUsage = match get_authenticated(&client()?, session, "/usage/summary").await {
+        Ok(data) => data,
+        Err(err) if matches!(err.code, "UNAUTHORIZED" | "FORBIDDEN") => {
+            invalidate_session(&mut auth).await;
+            return Err(err);
+        }
+        Err(err) => return Err(err),
+    };
+    let synced_at = client_api::snapshot_time(data.schema_version, &data.synced_at)?;
+    if data.account.id != session.user_id || data.account.status != "active" {
+        invalidate_session(&mut auth).await;
+        return Err(error("UNAUTHORIZED", "登录状态已改变，请重新登录"));
+    }
+    let mut group_ids = HashSet::new();
+    if data.groups.iter().any(|group| {
+        group.id <= 0
+            || !group_ids.insert(group.id)
+            || group
+                .subscriptions
+                .iter()
+                .any(|sub| sub.group_id != group.id)
+    }) {
+        return Err(client_api::invalid_response());
+    }
+    Ok(PlatformUsageSummary {
+        base_url: session.base_url.clone(),
+        user_id: session.user_id,
+        synced_at,
+        balance: data.account.balance_usd,
+        groups: data.groups,
+    })
 }
 
 pub(crate) async fn client_config(
@@ -433,6 +537,7 @@ async fn get_account_with_activity(
             if let Some((record, refresh_token)) = store.load().await? {
                 let base_url = normalize_base_url(&record.base_url)?;
                 state.session = Some(Session {
+                    email: String::new(),
                     base_url,
                     user_id: record.user_id,
                     last_used_at: record.last_used_at,
@@ -475,6 +580,7 @@ async fn get_account_with_activity(
         return Ok(None);
     }
     let user = user.into_user()?;
+    session.email = user.email.clone();
     Ok(Some(PlatformAccount {
         base_url: session.base_url.clone(),
         user,
@@ -530,8 +636,118 @@ async fn logout_results(
 
 impl PlatformAuthState {
     pub(crate) async fn logout(&self) -> Result<(), PlatformAuthError> {
+        let _operation = crate::zhishu::services::platform_models::APPLY_LOCK
+            .lock()
+            .await;
         // 退出只清理登录会话；保留本机目录、供应商和工具配置中的 API Key。
         logout(&self.0).await
+    }
+
+    /// 调用方必须持有 APPLY_LOCK；清理流程最后退出，不再次获取操作锁。
+    pub(crate) async fn logout_after_cleanup(
+        &self,
+    ) -> (Result<(), PlatformAuthError>, Result<(), PlatformAuthError>) {
+        logout_results(&self.0, true).await
+    }
+
+    pub(crate) async fn cleanup_email(
+        &self,
+        base_url: &str,
+        user_id: i64,
+    ) -> Result<String, PlatformAuthError> {
+        let state = self.0.lock().await;
+        Self::with_local_identity_locked(&state, |origin, current| {
+            if origin != base_url || current != user_id {
+                return Err(error("UNAUTHORIZED", "登录状态已改变，请重新操作"));
+            }
+            let email = &state.session.as_ref().expect("validated session").email;
+            if email.is_empty() {
+                return Err(error("UNAUTHORIZED", "请先完成账号验证"));
+            }
+            Ok(email.clone())
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_test(base_url: String, user_id: i64) -> Self {
+        Self(Mutex::new(AuthState {
+            session: Some(Session {
+                email: "test@example.com".into(),
+                base_url,
+                user_id,
+                tokens: TokenPair {
+                    access_token: "test-access-token".into(),
+                    refresh_token: String::new(),
+                },
+                persistence: None,
+                persistence_dirty: false,
+                last_used_at: now(),
+            }),
+            ..AuthState::default()
+        }))
+    }
+
+    /// 持有会话锁校验本机身份；不刷新令牌、不请求 /account，使已登录用户断网时仍能本地同步。
+    pub(crate) async fn with_local_identity<T>(
+        &self,
+        action: impl FnOnce(&str, i64) -> Result<T, PlatformAuthError>,
+    ) -> Result<T, PlatformAuthError> {
+        let state = self.0.lock().await;
+        Self::with_local_identity_locked(&state, action)
+    }
+
+    /// 同步配置适配器使用的身份校验，只能在阻塞线程调用，避免阻塞异步运行时。
+    pub(crate) fn with_local_identity_blocking<T>(
+        &self,
+        action: impl FnOnce(&str, i64) -> Result<T, PlatformAuthError>,
+    ) -> Result<T, PlatformAuthError> {
+        let state = self.0.blocking_lock();
+        Self::with_local_identity_locked(&state, action)
+    }
+
+    fn with_local_identity_locked<T>(
+        state: &AuthState,
+        action: impl FnOnce(&str, i64) -> Result<T, PlatformAuthError>,
+    ) -> Result<T, PlatformAuthError> {
+        let session = state
+            .session
+            .as_ref()
+            .filter(|session| !idle_expired(session.last_used_at, now()))
+            .ok_or_else(|| error("UNAUTHORIZED", "请先登录平台"))?;
+        action(&session.base_url, session.user_id)
+    }
+
+    /// 唯一凭证入口。会话锁覆盖请求和身份验证，APPLY_LOCK 覆盖保存阶段。
+    pub(crate) async fn discover_group_catalogs(
+        &self,
+    ) -> Result<GroupDiscovery, PlatformAuthError> {
+        let mut auth = self.0.lock().await;
+        let session = auth
+            .session
+            .as_mut()
+            .filter(|s| !idle_expired(s.last_used_at, now()))
+            .ok_or_else(|| error("UNAUTHORIZED", "请先登录平台"))?;
+        let data: ClientAccess =
+            match request_authenticated(&client()?, session, Method::POST, "/access").await {
+                Ok(data) => data,
+                Err(err) if matches!(err.code, "UNAUTHORIZED" | "FORBIDDEN") => {
+                    invalidate_session(&mut auth).await;
+                    return Err(err);
+                }
+                Err(err) => return Err(err),
+            };
+        let result = data.into_discovery(
+            &session.base_url,
+            session.user_id,
+            &[
+                session.tokens.access_token.clone(),
+                session.tokens.refresh_token.clone(),
+            ],
+        );
+        if result.as_ref().is_err_and(|err| err.code == "UNAUTHORIZED") {
+            invalidate_session(&mut auth).await;
+        }
+        result
     }
 }
 
@@ -701,6 +917,82 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn local_identity_never_fetches_account_or_refreshes_tokens() {
+        // No server is listening. Local operations still work even if the next
+        // authenticated HTTP request would require a token refresh.
+        let state = model_session("http://127.0.0.1:0".into());
+        state
+            .0
+            .lock()
+            .await
+            .session
+            .as_mut()
+            .unwrap()
+            .tokens
+            .access_token
+            .clear();
+        let identity = state
+            .with_local_identity(|origin, user_id| Ok((origin.to_string(), user_id)))
+            .await
+            .unwrap();
+        assert_eq!(identity, ("http://127.0.0.1:0".into(), 1));
+        state.0.lock().await.session.as_mut().unwrap().last_used_at = now() - IDLE_SECONDS - 1;
+        assert!(
+            matches!(state.with_local_identity(|_, _| Ok(())).await, Err(err) if err.code == "UNAUTHORIZED")
+        );
+        assert!(
+            matches!(PlatformAuthState::default().with_local_identity(|_, _| Ok(())).await, Err(err) if err.code == "UNAUTHORIZED")
+        );
+    }
+
+    #[tokio::test]
+    async fn blocking_local_identity_preserves_validation_without_async_poll_budget() {
+        let state = model_session("http://127.0.0.1:0".into());
+        state
+            .0
+            .lock()
+            .await
+            .session
+            .as_mut()
+            .unwrap()
+            .tokens
+            .access_token
+            .clear();
+        tauri::async_runtime::spawn_blocking(move || {
+            let locks = crate::proxy::switch_lock::SwitchLockManager::new();
+            state.with_local_identity_blocking(|origin, user_id| {
+                assert_eq!(origin, "http://127.0.0.1:0");
+                assert_eq!(user_id, 1);
+                for _ in 0..256 {
+                    let _guard = futures::executor::block_on(locks.lock_for_app("workbuddy"));
+                }
+                Ok(())
+            }).unwrap();
+            state.0.blocking_lock().session.as_mut().unwrap().last_used_at = now() - IDLE_SECONDS - 1;
+            assert!(matches!(state.with_local_identity_blocking(|_, _| Ok(())), Err(err) if err.code == "UNAUTHORIZED"));
+            assert!(matches!(PlatformAuthState::default().with_local_identity_blocking(|_, _| Ok(())), Err(err) if err.code == "UNAUTHORIZED"));
+        }).await.unwrap();
+    }
+
+    fn model_session(base: String) -> PlatformAuthState {
+        PlatformAuthState(Mutex::new(AuthState {
+            session: Some(Session {
+                email: String::new(),
+                base_url: base,
+                user_id: 1,
+                persistence: None,
+                persistence_dirty: false,
+                last_used_at: now(),
+                tokens: TokenPair {
+                    access_token: "access-secret".into(),
+                    refresh_token: "refresh-secret".into(),
+                },
+            }),
+            ..AuthState::default()
+        }))
+    }
+
+    #[tokio::test]
     async fn login_uses_and_persists_only_the_normalized_platform_base_url() {
         let (base, server) = mock_server(vec![(
             "GET /sub/api/zhishu/v1/client/account |access-secret",
@@ -757,6 +1049,7 @@ mod tests {
         ]);
         let state = Mutex::new(AuthState {
             session: Some(Session {
+                email: String::new(),
                 base_url: base,
                 user_id: 1,
                 persistence: None,
@@ -793,6 +1086,7 @@ mod tests {
         ]);
         let state = Mutex::new(AuthState {
             session: Some(Session {
+                email: String::new(),
                 base_url: base,
                 user_id: 1,
                 persistence: None,
@@ -811,6 +1105,32 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn cleanup_logout_reports_local_and_remote_failures_separately() {
+        use std::sync::atomic::Ordering;
+        let (base, server) = mock_server(vec![(
+            "POST /api/zhishu/v1/client/auth/logout ",
+            503,
+            json!({"message":"private response"}),
+        )]);
+        let (_dir, store, vault) =
+            crate::zhishu::storage::platform_session::tests::saved_store(&base, now()).await;
+        let auth = PlatformAuthState::for_test(base, 1);
+        {
+            let mut state = auth.0.lock().await;
+            state.store = Some(store.clone());
+            state.session.as_mut().unwrap().tokens.refresh_token = "saved-refresh".into();
+        }
+        vault.unavailable.store(true, Ordering::SeqCst);
+        let (local, remote) = auth.logout_after_cleanup().await;
+        assert_eq!(local.err().unwrap().code, "SESSION_STORE");
+        assert!(!remote.err().unwrap().message.contains("private response"));
+        assert!(auth.0.lock().await.session.is_none());
+        vault.unavailable.store(false, Ordering::SeqCst);
+        assert!(store.load().await.unwrap().is_none());
+        server.join().unwrap();
+    }
+
+    #[tokio::test]
     async fn logout_clears_local_tokens_even_if_revocation_fails() {
         let (base, server) = mock_server(vec![(
             "POST /api/zhishu/v1/client/auth/logout ",
@@ -819,6 +1139,7 @@ mod tests {
         )]);
         let state = Mutex::new(AuthState {
             session: Some(Session {
+                email: String::new(),
                 base_url: base,
                 user_id: 1,
                 persistence: None,
@@ -1057,6 +1378,7 @@ mod tests {
             store: Some(store.clone()),
             restoration_checked: true,
             session: Some(Session {
+                email: String::new(),
                 base_url: base,
                 user_id: 1,
                 last_used_at: now(),
@@ -1154,6 +1476,177 @@ mod tests {
         assert_eq!(token, "other-refresh");
         server.join().unwrap();
     }
+    fn access_response() -> Value {
+        json!({"code":0,"data":{
+            "schema_version":1,"synced_at":"2026-10-31T08:00:00Z",
+            "account":profile()["data"],"groups":[{
+                "id":42,"name":"Exclusive without prefix","platform":"openai","status":"active",
+                "subscription_type":"standard","is_exclusive":true,
+                "credential":{"id":123,"name":"zhishu-client-42","key":"shared-model-secret","status":"active",
+                    "client_managed":true,"expires_at":null,"quota_usd":0,"used_usd":0},
+                "quota":{"available":true,"reasons":[]},"subscriptions":[],
+                "connection":{"base_url":"https://gateway.test","endpoints":{"responses":"/v1/responses"}},
+                "models":[{"id":"only-authorized","supports_streaming":false,"description":"echo shared-model-secret","unknown_token":"must-not-save"}],
+                "catalog_status":"ok"
+            }]
+        }})
+    }
+
+    #[tokio::test]
+    async fn access_is_the_only_key_source_and_keeps_server_authorized_groups() {
+        let (base, server) = mock_server(vec![(
+            "POST /api/zhishu/v1/client/access |access-secret",
+            200,
+            access_response(),
+        )]);
+        let discovery = model_session(base.clone())
+            .discover_group_catalogs()
+            .await
+            .unwrap();
+        assert_eq!(discovery.account.base_url, base);
+        assert_eq!(discovery.synced_at, 1793433600000);
+        assert_eq!(discovery.groups[0].name, "Exclusive without prefix");
+        let catalog = &discovery.catalogs[0];
+        assert_eq!(catalog.credential.key, "shared-model-secret");
+        assert_eq!(catalog.credential.key_name, "zhishu-client-42");
+        assert_eq!(
+            catalog.connection.as_ref().unwrap().base_url,
+            "https://gateway.test"
+        );
+        assert_eq!(catalog.models[0]["supports_streaming"], false);
+        assert!(catalog.models[0].get("supports_tools").is_none());
+        assert!(!serde_json::to_string(&catalog.models)
+            .unwrap()
+            .contains("must-not-save"));
+        assert!(!serde_json::to_string(&catalog.models)
+            .unwrap()
+            .contains("shared-model-secret"));
+        server.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn access_refreshes_once_without_falling_back_to_panel_endpoints() {
+        let (base, server) = mock_server(vec![
+            (
+                "POST /api/zhishu/v1/client/access |access-secret",
+                401,
+                json!({}),
+            ),
+            (
+                "POST /api/zhishu/v1/client/auth/refresh ",
+                200,
+                json!({"code":0,"data":{"access_token":"new-access","refresh_token":"new-refresh"}}),
+            ),
+            (
+                "POST /api/zhishu/v1/client/access |new-access",
+                200,
+                access_response(),
+            ),
+        ]);
+        assert_eq!(
+            model_session(base)
+                .discover_group_catalogs()
+                .await
+                .unwrap()
+                .catalogs
+                .len(),
+            1
+        );
+        server.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn access_errors_never_create_empty_snapshots_or_request_old_endpoints() {
+        for status in [403, 404, 429, 503] {
+            let (base, server) = mock_server(vec![(
+                "POST /api/zhishu/v1/client/access ",
+                status,
+                json!({"message":"shared-model-secret"}),
+            )]);
+            let result = model_session(base).discover_group_catalogs().await;
+            assert!(result.is_err());
+            assert!(!serde_json::to_string(&result.err().unwrap())
+                .unwrap()
+                .contains("shared-model-secret"));
+            server.join().unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn access_distinguishes_failed_catalog_empty_success_and_unavailable_quota() {
+        for failed in [false, true] {
+            let mut response = access_response();
+            response["data"]["groups"][0]["models"] = if failed { Value::Null } else { json!([]) };
+            response["data"]["groups"][0]["catalog_status"] =
+                json!(if failed { "failed" } else { "ok" });
+            response["data"]["groups"][0]["catalog_error"] = json!("MODEL_CATALOG_UNAVAILABLE");
+            response["data"]["groups"][0]["quota"] =
+                json!({"available":false,"reasons":["key_quota_exhausted"]});
+            let (base, server) =
+                mock_server(vec![("POST /api/zhishu/v1/client/access ", 200, response)]);
+            let data = model_session(base).discover_group_catalogs().await.unwrap();
+            assert_eq!(data.failed_group_ids.contains(&42), failed);
+            assert_eq!(data.catalogs[0].credential.key, "shared-model-secret");
+            assert!(!data.details[&42].quota.available);
+            server.join().unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn access_rejects_wrong_identity_schema_and_invalid_model_ids() {
+        for (path, value) in [
+            ("identity", json!(2)),
+            ("schema", json!(2)),
+            ("model", json!({"name":"no id"})),
+            ("duplicate", Value::Null),
+        ] {
+            let mut response = access_response();
+            match path {
+                "identity" => response["data"]["account"]["id"] = value,
+                "schema" => response["data"]["schema_version"] = value,
+                "duplicate" => {
+                    let group = response["data"]["groups"][0].clone();
+                    response["data"]["groups"]
+                        .as_array_mut()
+                        .unwrap()
+                        .push(group);
+                }
+                _ => response["data"]["groups"][0]["models"][0] = value,
+            }
+            let (base, server) =
+                mock_server(vec![("POST /api/zhishu/v1/client/access ", 200, response)]);
+            let state = model_session(base);
+            assert!(state.discover_group_catalogs().await.is_err());
+            if path == "identity" {
+                assert!(state.0.lock().await.session.is_none());
+            }
+            server.join().unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn usage_is_read_only_and_cannot_expose_keys_connection_or_models() {
+        let mut response = access_response();
+        response["data"]["groups"][0]["models"] = Value::Null;
+        let (base, server) = mock_server(vec![(
+            "GET /api/zhishu/v1/client/usage/summary |access-secret",
+            200,
+            response,
+        )]);
+        let result = subscription_usage(&model_session(base).0).await.unwrap();
+        let public = serde_json::to_value(result).unwrap();
+        assert_eq!(public["groups"][0]["quota"]["available"], true);
+        for secret in [
+            "shared-model-secret",
+            "connection",
+            "models",
+            "access-secret",
+        ] {
+            assert!(!public.to_string().contains(secret));
+        }
+        server.join().unwrap();
+    }
+
     #[tokio::test]
     async fn login_without_refresh_token_clears_previous_account_persistence() {
         let (base, server) =
@@ -1239,5 +1732,27 @@ mod tests {
         assert!(config.oauth_authorize_url.is_none());
         assert!(config.oauth_client_id.is_empty());
         assert!(config.oauth_scopes.is_empty());
+    }
+    #[tokio::test]
+    async fn successful_empty_access_and_usage_are_valid_snapshots() {
+        let mut response = access_response();
+        response["data"]["groups"] = json!([]);
+        let (base, server) = mock_server(vec![
+            ("POST /api/zhishu/v1/client/access ", 200, response.clone()),
+            ("GET /api/zhishu/v1/client/usage/summary ", 200, response),
+        ]);
+        let state = model_session(base);
+        assert!(state
+            .discover_group_catalogs()
+            .await
+            .unwrap()
+            .groups
+            .is_empty());
+        assert!(subscription_usage(&state.0)
+            .await
+            .unwrap()
+            .groups
+            .is_empty());
+        server.join().unwrap();
     }
 }

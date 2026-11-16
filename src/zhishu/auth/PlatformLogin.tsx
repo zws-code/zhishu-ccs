@@ -20,6 +20,10 @@ import { Label } from "@/components/ui/label";
 import { DRAG_REGION_ATTR, DRAG_REGION_STYLE, isMac } from "@/lib/platform";
 import { WindowControls } from "@/components/shell/WindowControls";
 import { useClientConfig } from "@/zhishu/auth/useClientConfig";
+import {
+  PlatformAccountCleanupButton,
+  PlatformAccountCleanupResult,
+} from "./PlatformAccountCleanup";
 import logoMark from "@/zhishu/assets/logo-mark.png";
 
 // Vite 根目录是 src/，可选的部署环境配置相应放在 src/.env.local。
@@ -91,16 +95,28 @@ export function PlatformAuthGate({ children }: { children: ReactNode }) {
           <Loader2 className="h-5 w-5 animate-spin" />
           <span className="text-body">
             {t(
-              auth.logoutAction === "logout"
-                ? "platformCleanup.signingOut"
-                : "platformAuth.loading",
+              auth.logoutAction === "cleanup"
+                ? "platformCleanup.working"
+                : auth.logoutAction === "logout"
+                  ? "platformCleanup.signingOut"
+                  : "platformAuth.loading",
             )}
           </span>
         </div>
       </div>
     );
   if (auth.recoveryPending) return <PlatformSessionRecovery />;
-  return <>{auth.account ? children : <PlatformLogin />}</>;
+  return (
+    <>
+      {auth.account ? children : <PlatformLogin />}
+      {auth.cleanupResult && (
+        <PlatformAccountCleanupResult
+          result={auth.cleanupResult}
+          onDismiss={auth.dismissCleanupResult}
+        />
+      )}
+    </>
+  );
 }
 
 /** 启动恢复失败页；重试保留现有会话资料，返回登录则先显式退出，避免绕过身份验证。 */
@@ -421,6 +437,10 @@ export function PlatformAccountMenu({ collapsed }: { collapsed: boolean }) {
         >
           <LogOut className="h-4 w-4" />
         </button>
+        <PlatformAccountCleanupButton
+          key={JSON.stringify([auth.account.baseUrl, user.id])}
+          disabled={busy}
+        />
       </div>
       <button
         type="button"

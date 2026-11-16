@@ -29,6 +29,15 @@ describe("platform authentication IPC", () => {
   });
 });
 
+it("scopes cleanup logout to the requested platform and user without sending an email", async () => {
+  await platformAuthApi.logoutAndClear("https://platform.test", 7);
+  expect(invoke).toHaveBeenCalledOnce();
+  expect(invoke).toHaveBeenCalledWith("platform_logout_and_clear_account", {
+    baseUrl: "https://platform.test",
+    userId: 7,
+  });
+});
+
 it("starts OAuth with only the selected platform address", async () => {
   await platformAuthApi.loginOAuth("https://platform.test");
   expect(invoke).toHaveBeenCalledWith("platform_login_oauth", {

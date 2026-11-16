@@ -23,6 +23,7 @@ import CopilotCliQuotaFooter from "@/components/CopilotCliQuotaFooter";
 import CopilotQuotaFooter from "@/components/CopilotQuotaFooter";
 import CodexOauthQuotaFooter from "@/components/CodexOauthQuotaFooter";
 import XaiOauthQuotaFooter from "@/components/XaiOauthQuotaFooter";
+import { PlatformUsageFooter } from "@/zhishu/models/components/PlatformUsageFooter";
 import AgyAccountQuotaFooter from "@/components/AgyAccountQuotaFooter";
 import { ClaudeBoundAccountLine } from "@/components/providers/forms/ClaudeOfficialSection";
 import ClaudeAccountQuotaFooter from "@/components/ClaudeAccountQuotaFooter";
@@ -54,6 +55,7 @@ import {
   supportsConnectivityCheck,
 } from "@/utils/providerCapabilities";
 import { useProviderHealth } from "@/lib/query/failover";
+import { usePlatformCatalog } from "@/zhishu/models/query/platformCatalog";
 import { useUsageQuery } from "@/lib/query/queries";
 import { resolveProviderIcon } from "@/utils/providerIcon";
 import { isWorkBuddyOfficial } from "@/components/providers/workbuddyOfficial";
@@ -302,6 +304,25 @@ export function ProviderCard({
     return true;
   }, [provider.notes, displayUrl, fallbackUrlText]);
 
+  const isPlatformManaged = Boolean(provider.meta?.platformManaged);
+  // 平台卡的模型数读本机平台目录快照：按 origin / userId / groupId 对上分组才显示，
+  // 目录没同步过、不是同一账户或分组同步失败时不猜数字
+  const { data: platformCatalog } = usePlatformCatalog(isPlatformManaged);
+  const platformModelCount = useMemo(() => {
+    const managed = provider.meta?.platformManaged;
+    if (!managed || managed.groupId == null || !platformCatalog) return null;
+    if (
+      platformCatalog.baseUrl !== managed.origin ||
+      platformCatalog.userId !== managed.userId
+    ) {
+      return null;
+    }
+    const group = platformCatalog.groups.find(
+      (item) => item.id === managed.groupId,
+    );
+    if (!group || group.failed) return null;
+    return group.models.length;
+  }, [provider.meta?.platformManaged, platformCatalog]);
   const isOfficial = isOfficialProvider(provider, appId);
   // Claude 官方卡绑了 Claude 官方账号：副标题写账号，额度按这个号查
   const claudeBoundAccountId =
@@ -311,8 +332,9 @@ export function ProviderCard({
       : null;
   // 绑了账号的官方卡（Codex / Claude）默认查额度，和 Kimi、agy 的账号卡一样
   const usageEnabled =
-    provider.meta?.usage_script?.enabled ??
-    (isBoundCodexOfficial || Boolean(claudeBoundAccountId));
+    !isPlatformManaged &&
+    (provider.meta?.usage_script?.enabled ??
+      (isBoundCodexOfficial || Boolean(claudeBoundAccountId)));
   const supportsOfficialSubscription =
     isOfficial &&
     ["claude", "codex", "gemini", "grokbuild", "agy"].includes(appId);
@@ -513,6 +535,31 @@ export function ProviderCard({
             >
               {provider.name}
             </h3>
+            {isPlatformManaged && (
+              <CardChipBadge
+                chip={{
+                  key: "platform",
+                  label: t("providerCard.chip.platform", "平台"),
+                  tone: "outline",
+                  title: t(
+                    "providerCard.chip.platformHint",
+                    "来自平台基础数据同步的供应商，API Key 由平台托管",
+                  ),
+                }}
+              />
+            )}
+            {platformModelCount !== null && (
+              <CardChipBadge
+                chip={{
+                  key: "platformModels",
+                  label: t("providerCard.chip.models", {
+                    count: platformModelCount,
+                    defaultValue: "{{count}} 个模型",
+                  }),
+                  tone: "outline",
+                }}
+              />
+            )}
             {presentation.chips.map((chip) => (
               <CardChipBadge key={chip.key} chip={chip} />
             ))}
@@ -674,7 +721,9 @@ export function ProviderCard({
           {/* 额度列 136 宽，带重置倒计时时 194 宽（见 QuotaLines） */}
           <div className="max-w-[208px] text-end">
             <div className="flex items-center justify-end gap-1">
-              {copilotCliQuotaEnabled ? (
+              {isPlatformManaged ? (
+                <PlatformUsageFooter provider={provider} />
+              ) : copilotCliQuotaEnabled ? (
                 <CopilotCliQuotaFooter
                   meta={provider.meta}
                   isCurrent={isCurrent}
@@ -802,6 +851,7 @@ export function ProviderCard({
             }
             isTesting={isTesting}
             onConfigureUsage={
+              isPlatformManaged ||
               (isOfficial &&
                 !supportsOfficialSubscription &&
                 !isCopilotCliOfficial) ||

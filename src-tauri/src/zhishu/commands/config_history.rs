@@ -43,13 +43,15 @@ pub async fn restore_config_change_history(
     Ok(summary)
 }
 
-/// 先获取工具切换锁并完成 pending 恢复，再还原该组文件。
+/// 按平台操作锁、工具切换锁的顺序获取锁，先完成 pending 恢复，再还原该组文件。
 /// 直连模式的供应商指针仅在仍指向本次历史切换目标时回退，保留用户后续切换的选择；
 /// 切换前没有供应商时清除选择，切换前的供应商已被删除时保留当前选择。
 fn restore_group(
     state: &crate::store::AppState,
     ids: &[String],
 ) -> Result<ConfigRestoreSummary, crate::error::AppError> {
+    let _apply =
+        futures::executor::block_on(crate::zhishu::services::platform_models::APPLY_LOCK.lock());
     let plan = config_history::restore_plan(ids)?;
     let _switch = futures::executor::block_on(state.proxy_service.lock_switch_for_app(&plan.app));
     crate::mode::operation::settle(&state.db, &plan.app)?;

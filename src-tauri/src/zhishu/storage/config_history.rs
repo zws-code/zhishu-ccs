@@ -625,6 +625,42 @@ pub fn clear() -> Result<usize, AppError> {
     Ok(removed)
 }
 
+/// 独立记录供应商同步的数据库与文件变化；兼容旧报告的备份路径，不伪造文件差异。
+pub(crate) fn record_provider_sync(app: &str, report: ProviderSyncReport) -> Result<(), AppError> {
+    record_provider_change(app, "platform_sync", report)
+}
+
+/// 平台供应商的同步或显式删除报告；均不可作为单文件还原快照。
+pub(crate) fn record_provider_change(
+    app: &str,
+    action: &str,
+    report: ProviderSyncReport,
+) -> Result<(), AppError> {
+    let record = ConfigChangeRecord {
+        id: event_id(),
+        app: app.into(),
+        path: report.backup_path.clone().unwrap_or_else(|| {
+            DeviceStore::for_device()
+                .file(&format!("{}-history.json", action.replace('_', "-")))
+                .to_string_lossy()
+                .into_owned()
+        }),
+        changed_at: Local::now().to_rfc3339(),
+        action: action.into(),
+        before: None,
+        after: None,
+        sensitive: false,
+        operation_id: None,
+        operation_action: None,
+        switch_pointer: None,
+        sync: Some(report),
+        summary: None,
+    };
+    HistoryStore::for_device().write(&record)?;
+    notify_updated(app);
+    Ok(())
+}
+
 /// A roster-style operation summary (e.g. aggregation membership) as a
 /// standalone record: it has no restorable before/after content, and it is
 /// excluded from the internal-write chain used to explain external edits.

@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -11,10 +12,19 @@ import {
   PlatformAuthGate,
   PlatformAccountMenu,
 } from "@/zhishu/auth/PlatformLogin";
-import { PlatformAuthProvider } from "@/zhishu/auth/PlatformAuthContext";
+import {
+  platformModelsApi,
+  type PlatformCatalog,
+} from "@/zhishu/api/platformModels";
+import { platformCatalogKeys } from "@/zhishu/models/query/platformCatalogKeys";
+import {
+  PlatformAuthProvider,
+  usePlatformAuth,
+} from "@/zhishu/auth/PlatformAuthContext";
 import {
   platformAuthApi,
   type PlatformAccount,
+  type PlatformCleanupReport,
 } from "@/zhishu/api/platformAuth";
 import { toast } from "sonner";
 import zh from "@/i18n/locales/zh.json";
@@ -27,7 +37,11 @@ vi.mock("@/zhishu/api/platformAuth", async (original) => ({
     cancelLogin: vi.fn(),
     loginOAuth: vi.fn(),
     logout: vi.fn(),
+    logoutAndClear: vi.fn(),
   },
+}));
+vi.mock("@/zhishu/api/platformModels", () => ({
+  platformModelsApi: { syncCatalog: vi.fn(), sync: vi.fn() },
 }));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -69,6 +83,13 @@ const account: PlatformAccount = {
     balance: 10,
   },
 };
+const catalog: PlatformCatalog = {
+  baseUrl: account.baseUrl,
+  userId: account.user.id,
+  syncedAt: 1,
+  groups: [],
+  warnings: [],
+};
 
 function oauthConfig() {
   return {
@@ -82,6 +103,19 @@ function oauthConfig() {
     oauth_scopes: ["client"],
   };
 }
+function CatalogStatus() {
+  const auth = usePlatformAuth()!;
+  return (
+    <>
+      <p data-testid="catalog-status">
+        {auth.catalogSyncError || (auth.catalogSyncing ? "syncing" : "idle")}
+      </p>
+      <button onClick={() => void auth.syncCatalog().catch(() => undefined)}>
+        重试同步目录
+      </button>
+    </>
+  );
+}
 function renderGate() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -91,6 +125,7 @@ function renderGate() {
       <PlatformAuthProvider>
         <PlatformAuthGate>
           <p>工具主页</p>
+          <CatalogStatus />
           <PlatformAccountMenu collapsed={false} />
         </PlatformAuthGate>
       </PlatformAuthProvider>
@@ -111,12 +146,19 @@ beforeEach(() => {
   vi.mocked(platformAuthApi.config)
     .mockReset()
     .mockResolvedValue(oauthConfig());
+  vi.mocked(platformModelsApi.syncCatalog)
+    .mockReset()
+    .mockResolvedValue(catalog);
+  vi.mocked(platformModelsApi.sync)
+    .mockReset()
+    .mockResolvedValue({ added: 0, removed: 0, skipped: 0, warnings: [] });
   vi.mocked(platformAuthApi.cancelLogin)
     .mockReset()
     .mockResolvedValue(undefined);
   vi.mocked(platformAuthApi.account).mockReset().mockResolvedValue(null);
   vi.mocked(platformAuthApi.loginOAuth).mockReset();
   vi.mocked(platformAuthApi.logout).mockReset().mockResolvedValue(undefined);
+  vi.mocked(platformAuthApi.logoutAndClear).mockReset();
 });
 
 describe("platform login", () => {
@@ -232,6 +274,7 @@ describe("platform login", () => {
       finish({ status: "authenticated", account });
     });
     expect(screen.queryByText("工具主页")).not.toBeInTheDocument();
+    expect(platformModelsApi.syncCatalog).not.toHaveBeenCalled();
   });
 
   it("disables stale authorization config while a server address changes", async () => {
@@ -401,5 +444,348 @@ describe("platform login", () => {
       finishLogout();
     });
     await screen.findByRole("button", { name: "登录智枢" });
+  });
+});
+
+describe("catalog sync after verified login", () => {
+  it("does not attempt provider sync when catalog sync fails", async () => {
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    vi.mocked(platformModelsApi.syncCatalog).mockRejectedValue({
+      code: "NETWORK",
+      message: "目录暂时不可用",
+    });
+    renderGate();
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("目录暂时不可用"),
+    );
+    expect(platformModelsApi.sync).not.toHaveBeenCalled();
+    expect(screen.getByText("工具主页")).toBeInTheDocument();
+    expect(platformAuthApi.logout).not.toHaveBeenCalled();
+  });
+
+  it("does not write provider lists on restoration", async () => {
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    renderGate();
+    await waitFor(() =>
+      expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce(),
+    );
+    expect(platformModelsApi.sync).not.toHaveBeenCalled();
+    expect(toast.warning).not.toHaveBeenCalled();
+    expect(screen.getByText("工具主页")).toBeInTheDocument();
+  });
+
+  it("syncs once on restoration and does not resync during account checks", async () => {
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    const client = renderGate();
+    await screen.findByText("工具主页");
+    await waitFor(() =>
+      expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce(),
+    );
+    await waitFor(() =>
+      expect(
+        client.getQueryData(
+          platformCatalogKeys.account(account.baseUrl, account.user.id),
+        ),
+      ).toEqual(catalog),
+    );
+    await act(async () => {
+      document.dispatchEvent(new Event("visibilitychange"));
+      window.dispatchEvent(new Event("online"));
+    });
+    expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce();
+    expect(platformModelsApi.sync).not.toHaveBeenCalled();
+  });
+  it("does not sync before browser authorization completes", async () => {
+    let finish!: (value: {
+      status: "authenticated";
+      account: PlatformAccount;
+    }) => void;
+    vi.mocked(platformAuthApi.loginOAuth).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    renderGate();
+    await submitOAuth();
+    expect(platformModelsApi.syncCatalog).not.toHaveBeenCalled();
+    expect(platformModelsApi.sync).not.toHaveBeenCalled();
+    await act(async () => finish({ status: "authenticated", account }));
+    await waitFor(() =>
+      expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce(),
+    );
+  });
+  it("allows retry after sync failure without losing the authenticated account", async () => {
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    vi.mocked(platformModelsApi.syncCatalog)
+      .mockRejectedValueOnce({ code: "NETWORK", message: "目录暂时不可用" })
+      .mockResolvedValue(catalog);
+    renderGate();
+    await waitFor(() =>
+      expect(screen.getByTestId("catalog-status")).toHaveTextContent(
+        "目录暂时不可用",
+      ),
+    );
+    expect(screen.getByText("工具主页")).toBeInTheDocument();
+    expect(platformModelsApi.sync).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("重试同步目录"));
+    await waitFor(() =>
+      expect(screen.getByTestId("catalog-status")).toHaveTextContent("idle"),
+    );
+    expect(platformModelsApi.syncCatalog).toHaveBeenCalledTimes(2);
+  });
+  it("ignores an old sync after logout and a new login to the same account", async () => {
+    let finish!: (value: PlatformCatalog) => void;
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    vi.mocked(platformAuthApi.loginOAuth).mockResolvedValue({
+      status: "authenticated",
+      account,
+    });
+    vi.mocked(platformModelsApi.syncCatalog)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      )
+      .mockResolvedValue({ ...catalog, syncedAt: 2 });
+    const client = renderGate();
+    await waitFor(() =>
+      expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "退出平台登录" }));
+    await submitOAuth();
+    await waitFor(() =>
+      expect(platformModelsApi.syncCatalog).toHaveBeenCalledTimes(2),
+    );
+    await act(async () => {
+      finish(catalog);
+    });
+    expect(
+      client.getQueryData(
+        platformCatalogKeys.account(account.baseUrl, account.user.id),
+      ),
+    ).toEqual({ ...catalog, syncedAt: 2 });
+  });
+  it("coalesces manual retry with an automatic sync already in progress", async () => {
+    let finish!: (value: PlatformCatalog) => void;
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    vi.mocked(platformModelsApi.syncCatalog).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    renderGate();
+    await waitFor(() =>
+      expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce(),
+    );
+    fireEvent.click(screen.getByText("重试同步目录"));
+    expect(platformModelsApi.syncCatalog).toHaveBeenCalledOnce();
+    await act(async () => finish(catalog));
+  });
+});
+
+const cleanupReport: PlatformCleanupReport = {
+  baseUrl: account.baseUrl,
+  userId: account.user.id,
+  email: account.user.email,
+  providers: {
+    removed: 2,
+    skipped: 0,
+    warnings: [],
+    nativeFilesChanged: 0,
+    apps: [],
+  },
+  providerError: null,
+  catalog: { completed: true, error: null },
+  session: { completed: true, error: null },
+  serverLogout: { completed: true, error: null },
+};
+
+async function openCleanup() {
+  fireEvent.click(
+    await screen.findByRole("button", { name: zh.platformCleanup.action }),
+  );
+  return screen.getByRole("alertdialog");
+}
+
+describe("account cleanup logout", () => {
+  it("requires explicit confirmation and cancel preserves login", async () => {
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    renderGate();
+    const dialog = await openCleanup();
+    expect(
+      within(dialog).getByText(zh.platformCleanup.scope),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(zh.platformCleanup.retained),
+    ).toBeInTheDocument();
+    expect(platformAuthApi.logoutAndClear).not.toHaveBeenCalled();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: zh.common.cancel }),
+    );
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByText("工具主页")).toBeInTheDocument();
+    expect(platformAuthApi.logout).not.toHaveBeenCalled();
+  });
+
+  it("shows a dismissible result dialog and returns to OAuth login", async () => {
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    vi.mocked(platformAuthApi.logoutAndClear).mockResolvedValue(cleanupReport);
+    const client = renderGate();
+    const dialog = await openCleanup();
+    client.setQueryData(["providers", "claude"], { private: "old-account" });
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: zh.platformCleanup.confirm }),
+    );
+    await screen.findByText(zh.platformCleanup.complete);
+    expect(platformAuthApi.logoutAndClear).toHaveBeenCalledOnce();
+    expect(platformAuthApi.logoutAndClear).toHaveBeenCalledWith(
+      account.baseUrl,
+      account.user.id,
+    );
+    expect(platformAuthApi.logout).not.toHaveBeenCalled();
+    expect(screen.queryByText("工具主页")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "登录智枢", hidden: true }),
+    ).toBeInTheDocument();
+    expect(client.getQueryData(["providers", "claude"])).toBeUndefined();
+    const resultDialog = screen.getByRole("dialog", {
+      name: zh.platformCleanup.result,
+    });
+    expect(
+      within(resultDialog).getByText(zh.platformCleanup.complete),
+    ).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole("button", { name: "登录智枢", hidden: true })
+        .closest("main"),
+    ).not.toContainElement(resultDialog);
+    const appDetails = within(resultDialog)
+      .getByText(zh.platformCatalog.deleteAllResult)
+      .closest("details");
+    expect(appDetails).not.toHaveAttribute("open");
+    fireEvent.click(
+      within(resultDialog).getByRole("button", { name: zh.common.close }),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(zh.platformCleanup.complete),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("密码")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(zh.platformAuth.address)).toHaveValue(
+      account.baseUrl,
+    );
+  });
+
+  it("reports partial failures and retained providers without claiming complete cleanup", async () => {
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    vi.mocked(platformAuthApi.logoutAndClear).mockResolvedValue({
+      ...cleanupReport,
+      providers: {
+        ...cleanupReport.providers!,
+        skipped: 1,
+        warnings: ["没有可用备用供应商"],
+      },
+      session: {
+        completed: false,
+        error: { code: "CREDENTIAL_STORE", message: "请解锁系统凭据库" },
+      },
+      serverLogout: {
+        completed: false,
+        error: { code: "NETWORK", message: "服务端退出暂时不可用" },
+      },
+    });
+    renderGate();
+    const dialog = await openCleanup();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: zh.platformCleanup.confirm }),
+    );
+    await screen.findByText(zh.platformCleanup.partial);
+    expect(screen.getByText("没有可用备用供应商")).toBeInTheDocument();
+    expect(screen.getByText("请解锁系统凭据库")).toBeInTheDocument();
+    expect(screen.getByText("服务端退出暂时不可用")).toBeInTheDocument();
+    expect(
+      screen.queryByText(zh.platformCleanup.complete),
+    ).not.toBeInTheDocument();
+  });
+
+  it("blocks login and polling during cleanup and discards late catalog responses", async () => {
+    let finishCleanup!: (result: PlatformCleanupReport) => void;
+    let finishCatalog!: (result: PlatformCatalog) => void;
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    vi.mocked(platformModelsApi.syncCatalog).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishCatalog = resolve;
+        }),
+    );
+    vi.mocked(platformAuthApi.logoutAndClear).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishCleanup = resolve;
+        }),
+    );
+    const client = renderGate();
+    const dialog = await openCleanup();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: zh.platformCleanup.confirm }),
+    );
+    await waitFor(() =>
+      expect(platformAuthApi.logoutAndClear).toHaveBeenCalledOnce(),
+    );
+    expect(screen.getByText(zh.platformCleanup.working)).toBeInTheDocument();
+    const calls = vi.mocked(platformAuthApi.account).mock.calls.length;
+    await act(async () => {
+      window.dispatchEvent(new Event("online"));
+      document.dispatchEvent(new Event("visibilitychange"));
+      finishCatalog(catalog);
+    });
+    expect(platformAuthApi.account).toHaveBeenCalledTimes(calls);
+    expect(screen.queryByLabelText("密码")).not.toBeInTheDocument();
+    expect(platformModelsApi.sync).not.toHaveBeenCalled();
+    expect(
+      client.getQueryData(
+        platformCatalogKeys.account(account.baseUrl, account.user.id),
+      ),
+    ).toBeUndefined();
+    await act(async () => finishCleanup(cleanupReport));
+    await screen.findByRole("button", { name: "登录智枢", hidden: true });
+  });
+
+  it("does not claim logout when the cleanup IPC rejects before identity validation", async () => {
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    vi.mocked(platformAuthApi.logoutAndClear).mockRejectedValue({
+      code: "UNAUTHORIZED",
+      message: "账号已经改变",
+    });
+    renderGate();
+    const dialog = await openCleanup();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: zh.platformCleanup.confirm }),
+    );
+    await screen.findByText("账号已经改变");
+    expect(
+      screen.queryByText(zh.platformCleanup.complete),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("密码")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: zh.platformAuth.retryRestore }),
+    ).toBeInTheDocument();
+  });
+
+  it("ordinary logout never calls account cleanup", async () => {
+    vi.mocked(platformAuthApi.account).mockResolvedValue(account);
+    renderGate();
+    fireEvent.click(
+      await screen.findByRole("button", { name: zh.platformAuth.logout }),
+    );
+    await screen.findByRole("button", { name: "登录智枢", hidden: true });
+    expect(platformAuthApi.logout).toHaveBeenCalledOnce();
+    expect(platformAuthApi.logoutAndClear).not.toHaveBeenCalled();
+    expect(
+      screen.queryByLabelText(zh.platformCleanup.result),
+    ).not.toBeInTheDocument();
   });
 });

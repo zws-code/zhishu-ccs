@@ -6490,6 +6490,25 @@ impl ProviderService {
         Self::keep_row_if_written(state, &app_type, &provider.id, existing.as_ref(), written)
     }
 
+    /// Update metadata without publishing native configuration or replacing the provider row.
+    pub(crate) fn update_metadata(
+        state: &AppState,
+        app_type: AppType,
+        id: &str,
+        update: impl FnOnce(&mut Value) -> Result<(), AppError>,
+    ) -> Result<bool, AppError> {
+        let _guard = if app_type.spec().route_mode {
+            crate::mode::controller::lock_settled_blocking(state, &app_type)?
+        } else {
+            Some(futures::executor::block_on(
+                state.proxy_service.lock_switch_for_app(app_type.as_str()),
+            ))
+        };
+        state
+            .db
+            .update_provider_metadata(app_type.as_str(), id, update)
+    }
+
     /// Update a provider
     pub fn update(
         state: &AppState,
