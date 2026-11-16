@@ -5426,6 +5426,28 @@
       "secondaryModelInUse": "Kimi Code's subagent model uses a model from this provider. Change it with /secondary-model in Kimi Code first."
     }
   },
+  "platformAuth": {
+    "title": "Sign in to 智枢router",
+    "subtitle": "Sign in with your platform account to manage AI coding tools.",
+    "address": "Platform API address",
+    "loading": "Checking your session…",
+    "back": "Back to sign in",
+    "logout": "Sign out of platform",
+    "account": "Platform account",
+    "balance": "Balance",
+    "refreshBalance": "Click to refresh balance",
+    "sessionHint": "Stay signed in across restarts. Sign in again after more than 7 days without use.",
+    "restoreFailed": "Unable to restore your session",
+    "restoreHint": "Check your connection or unlock your system credential store, then retry. Your saved session is kept.",
+    "retryRestore": "Retry restoring session",
+    "oauthLogin": "Sign in to Zhishu",
+    "oauthHint": "A Zhishu authorization page will open in your browser. Sign-in completes automatically after you approve.",
+    "oauthWaiting": "Waiting for browser authorization…",
+    "oauthCancel": "Cancel authorization",
+    "advanced": "Advanced settings",
+    "oauthUnavailable": "OAuth2 browser authorization is unavailable. Check the server address or contact your administrator.",
+    "retryConfig": "Check sign-in settings again"
+  },
   "omp": {
     "empty": {
       "title": "No API key providers yet",
@@ -5467,6 +5489,9 @@
       "providerMissing": "This Oh My Pi provider is no longer saved.",
       "legacyModelsJson": "Oh My Pi still has a legacy models.json, which omp migrates to models.yml on its next start. Run omp once, then add the provider again."
     }
+  },
+  "platformCleanup": {
+    "signingOut": "Signing out…"
   },
   "dsh": {
     "empty": {

@@ -5426,6 +5426,28 @@
       "secondaryModelInUse": "Kimi Code 的子代理模型正在使用该供应商的模型，请先在 Kimi Code 中用 /secondary-model 更换"
     }
   },
+  "platformAuth": {
+    "title": "登录智枢router",
+    "subtitle": "使用平台账户登录，管理你的 AI 编程工具。",
+    "address": "平台后端地址",
+    "loading": "正在检查登录状态…",
+    "back": "返回登录",
+    "logout": "退出平台登录",
+    "account": "平台账户",
+    "balance": "余额",
+    "refreshBalance": "点击刷新余额",
+    "sessionHint": "登录后自动保持登录；连续超过 7 天未使用需要重新登录。",
+    "restoreFailed": "暂时无法恢复登录",
+    "restoreHint": "请检查网络或解锁系统凭据库后重试，已保存的登录凭证会保留。",
+    "retryRestore": "重试恢复登录",
+    "oauthLogin": "登录智枢",
+    "oauthHint": "将在浏览器中打开智枢授权页面，完成授权后自动返回登录。",
+    "oauthWaiting": "等待浏览器授权…",
+    "oauthCancel": "取消授权",
+    "advanced": "高级设置",
+    "oauthUnavailable": "平台未启用 OAuth2 浏览器授权，请检查服务器地址或联系管理员。",
+    "retryConfig": "重新检查登录配置"
+  },
   "omp": {
     "empty": {
       "title": "还没有添加 API Key 供应商",
@@ -5467,6 +5489,9 @@
       "providerMissing": "此 Oh My Pi 供应商已不在保存的列表中。",
       "legacyModelsJson": "Oh My Pi 目录里还是旧的 models.json，omp 会在下次启动时把它迁移成 models.yml。请先运行一次 omp，再回来添加供应商。"
     }
+  },
+  "platformCleanup": {
+    "signingOut": "正在退出登录…"
   },
   "dsh": {
     "empty": {

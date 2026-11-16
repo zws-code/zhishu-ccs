@@ -5426,6 +5426,28 @@
       "secondaryModelInUse": "Das Subagent-Modell von Kimi Code verwendet ein Modell dieses Anbieters. Ändern Sie es zuerst in Kimi Code mit /secondary-model."
     }
   },
+  "platformAuth": {
+    "title": "Bei 智枢router anmelden",
+    "subtitle": "Melden Sie sich mit Ihrem Plattformkonto an, um KI-Coding-Tools zu verwalten.",
+    "address": "Plattform-API-Adresse",
+    "loading": "Sitzung wird geprüft…",
+    "back": "Zurück zur Anmeldung",
+    "logout": "Von der Plattform abmelden",
+    "account": "Plattformkonto",
+    "balance": "Guthaben",
+    "refreshBalance": "Klicken, um das Guthaben zu aktualisieren",
+    "sessionHint": "Bleiben Sie über Neustarts hinweg angemeldet. Nach mehr als 7 Tagen ohne Nutzung ist eine erneute Anmeldung nötig.",
+    "restoreFailed": "Sitzung konnte nicht wiederhergestellt werden",
+    "restoreHint": "Prüfen Sie Ihre Verbindung oder entsperren Sie den Anmeldedatenspeicher des Systems und versuchen Sie es erneut. Ihre gespeicherte Sitzung bleibt erhalten.",
+    "retryRestore": "Wiederherstellung der Sitzung erneut versuchen",
+    "oauthLogin": "Bei Zhishu anmelden",
+    "oauthHint": "In Ihrem Browser wird eine Zhishu-Autorisierungsseite geöffnet. Die Anmeldung wird nach Ihrer Zustimmung automatisch abgeschlossen.",
+    "oauthWaiting": "Warten auf Autorisierung im Browser…",
+    "oauthCancel": "Autorisierung abbrechen",
+    "advanced": "Erweiterte Einstellungen",
+    "oauthUnavailable": "OAuth2-Autorisierung im Browser ist nicht verfügbar. Prüfen Sie die Serveradresse oder wenden Sie sich an Ihren Administrator.",
+    "retryConfig": "Anmeldeeinstellungen erneut prüfen"
+  },
   "omp": {
     "empty": {
       "title": "Noch keine Anbieter mit API-Schlüssel",
@@ -5467,6 +5489,9 @@
       "providerMissing": "Dieser Oh-My-Pi-Anbieter ist nicht mehr gespeichert.",
       "legacyModelsJson": "Oh My Pi hat noch eine alte models.json, die omp beim nächsten Start nach models.yml migriert. Führen Sie omp einmal aus und fügen Sie den Anbieter dann erneut hinzu."
     }
+  },
+  "platformCleanup": {
+    "signingOut": "Abmeldung läuft…"
   },
   "dsh": {
     "empty": {

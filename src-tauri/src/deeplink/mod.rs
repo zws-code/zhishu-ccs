@@ -28,7 +28,7 @@ use std::sync::Mutex;
 // Re-export public API
 pub use icon_fetch::fetch_deeplink_icon;
 pub use mcp::import_mcp_from_deeplink;
-pub use parser::parse_deeplink_url;
+pub use parser::{is_oauth_wakeup, parse_deeplink_url};
 pub use prompt::import_prompt_from_deeplink;
 pub use provider::{import_provider_from_deeplink, parse_and_merge_config};
 pub use skill::import_skill_from_deeplink;

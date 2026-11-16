@@ -8,6 +8,17 @@ use crate::error::AppError;
 use std::collections::HashMap;
 use url::Url;
 
+/// 平台授权成功页会先打开 `zhishu-ccswitch://v1/oauth` 拉起客户端；授权码通过
+/// 本地回环地址投递，因此这条链接只作为唤醒信号，不应该按导入请求解析。
+pub fn is_oauth_wakeup(url_str: &str) -> bool {
+    let Ok(url) = Url::parse(url_str) else {
+        return false;
+    };
+    matches!(url.scheme(), "zhishu-ccswitch" | "ccswitch")
+        && url.host_str() == Some("v1")
+        && url.path().trim_end_matches('/') == "/oauth"
+}
+
 /// Parse a Zhishu or legacy CC Switch URL into a DeepLinkImportRequest
 ///
 /// Expected format:

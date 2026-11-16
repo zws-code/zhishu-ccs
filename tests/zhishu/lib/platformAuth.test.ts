@@ -1,0 +1,40 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { invoke } from "@tauri-apps/api/core";
+import { platformAuthApi } from "@/zhishu/api/platformAuth";
+
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
+
+beforeEach(() => vi.mocked(invoke).mockReset());
+
+describe("platform authentication IPC", () => {
+  it("marks visible account reads as activity without changing the account result", async () => {
+    vi.mocked(invoke).mockResolvedValue(null);
+    expect(await platformAuthApi.account()).toBeNull();
+    expect(invoke).toHaveBeenCalledWith("platform_get_account", {
+      active: true,
+    });
+  });
+  it("marks background reads inactive", async () => {
+    vi.mocked(invoke).mockResolvedValue(null);
+    await platformAuthApi.account(false);
+    expect(invoke).toHaveBeenCalledWith("platform_get_account", {
+      active: false,
+    });
+  });
+  it("passes config baseUrl using the registered IPC contract", async () => {
+    await platformAuthApi.config("https://platform.test");
+    expect(invoke).toHaveBeenCalledWith("platform_get_client_config", {
+      baseUrl: "https://platform.test",
+    });
+  });
+});
+
+it("starts OAuth with only the selected platform address", async () => {
+  await platformAuthApi.loginOAuth("https://platform.test");
+  expect(invoke).toHaveBeenCalledWith("platform_login_oauth", {
+    baseUrl: "https://platform.test",
+  });
+  expect(platformAuthApi).not.toHaveProperty("login");
+  expect(platformAuthApi).not.toHaveProperty("login2fa");
+  expect(platformAuthApi).not.toHaveProperty("savedPassword");
+});

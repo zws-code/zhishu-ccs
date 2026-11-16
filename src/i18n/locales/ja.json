@@ -5426,6 +5426,28 @@
       "secondaryModelInUse": "Kimi Code のサブエージェントモデルがこのプロバイダーのモデルを使用中です。先に Kimi Code の /secondary-model で変更してください。"
     }
   },
+  "platformAuth": {
+    "restoreFailed": "ログイン状態を復元できません",
+    "restoreHint": "ネットワークを確認するか、システムの資格情報ストアのロックを解除して再試行してください。保存済みのログイン情報は保持されます。",
+    "retryRestore": "ログイン状態の復元を再試行",
+    "oauthLogin": "Zhishu にログイン",
+    "oauthHint": "ブラウザで Zhishu の認可ページが開きます。承認すると自動的にログインします。",
+    "oauthWaiting": "ブラウザでの認可を待っています…",
+    "oauthCancel": "認可をキャンセル",
+    "sessionHint": "再起動後もログイン状態を保持します。7 日を超えて使用しない場合は再ログインが必要です。",
+    "advanced": "詳細設定",
+    "back": "ログインに戻る",
+    "oauthUnavailable": "OAuth2 ブラウザ認可を利用できません。サーバーのアドレスを確認するか、管理者にお問い合わせください。",
+    "retryConfig": "ログイン設定を再確認",
+    "title": "智枢router にログイン",
+    "subtitle": "プラットフォームのアカウントでログインして AI コーディングツールを管理します。",
+    "address": "プラットフォーム API アドレス",
+    "loading": "セッションを確認中…",
+    "logout": "プラットフォームからログアウト",
+    "account": "プラットフォームアカウント",
+    "balance": "残高",
+    "refreshBalance": "クリックして残高を更新"
+  },
   "omp": {
     "empty": {
       "title": "API キープロバイダーはまだありません",
@@ -5467,6 +5489,9 @@
       "providerMissing": "この Oh My Pi プロバイダは保存済みリストにありません。",
       "legacyModelsJson": "Oh My Pi にはまだ旧形式の models.json があり、omp は次回起動時にこれを models.yml へ移行します。omp を一度起動してから、もう一度プロバイダを追加してください。"
     }
+  },
+  "platformCleanup": {
+    "signingOut": "ログアウトしています…"
   },
   "dsh": {
     "empty": {

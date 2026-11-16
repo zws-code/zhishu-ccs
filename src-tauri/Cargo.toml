@@ -85,6 +85,7 @@ indexmap = { version = "2", features = ["serde"] }
 rust_decimal = "1.33"
 uuid = { version = "1.11", features = ["v4"] }
 sha2 = "0.10"
+keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust", "vendored"] }
 hmac = "0.12"
 subtle = "2.6"
 json5 = "0.4"

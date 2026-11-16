@@ -1,7 +1,7 @@
 //! Deep link module tests
 
 use super::mcp::parse_mcp_apps;
-use super::parser::parse_deeplink_url;
+use super::parser::{is_oauth_wakeup, parse_deeplink_url};
 use super::prompt::import_prompt_from_deeplink;
 use super::provider::parse_and_merge_config;
 use super::utils::{infer_homepage_from_endpoint, validate_url};
@@ -190,6 +190,29 @@ fn test_parse_zhishu_and_legacy_schemes_equivalently() {
         assert_eq!(
             serde_json::to_value(zhishu).unwrap(),
             serde_json::to_value(legacy).unwrap()
+        );
+    }
+}
+
+#[test]
+fn test_oauth_wakeup_link_is_recognized() {
+    for url in [
+        "zhishu-ccswitch://v1/oauth",
+        "zhishu-ccswitch://v1/oauth/",
+        "ccswitch://v1/oauth",
+        "zhishu-ccswitch://v1/oauth?state=abc",
+    ] {
+        assert!(is_oauth_wakeup(url), "{url} should be an OAuth wake-up");
+    }
+    for url in [
+        "zhishu-ccswitch://v1/import?resource=provider&app=claude&name=Test",
+        "zhishu-ccswitch://v2/oauth",
+        "https://example.com/v1/oauth",
+        "zhishu-ccswitch://v1/oauth/extra",
+    ] {
+        assert!(
+            !is_oauth_wakeup(url),
+            "{url} should not be an OAuth wake-up"
         );
     }
 }

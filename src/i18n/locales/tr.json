@@ -5402,6 +5402,31 @@
       "legacyModelsJson": "Oh My Pi'de eski biçimde bir models.json dosyası var. omp, sonraki açılışında bunu models.yml biçimine geçirir. omp'yi bir kez çalıştırın, ardından sağlayıcıyı yeniden ekleyin."
     }
   },
+  "platformAuth": {
+    "restoreFailed": "Oturumunuz geri yüklenemedi",
+    "restoreHint": "Bağlantınızı kontrol edin veya sistem kimlik bilgisi deposunun kilidini açıp yeniden deneyin. Kaydedilen oturumunuz korunur.",
+    "retryRestore": "Oturumu geri yüklemeyi dene",
+    "oauthLogin": "Zhishu'ya giriş yap",
+    "oauthHint": "Tarayıcıda Zhishu yetkilendirme sayfası açılır. Onayladığınızda giriş otomatik tamamlanır.",
+    "oauthWaiting": "Tarayıcı yetkilendirmesi bekleniyor…",
+    "oauthCancel": "Yetkilendirmeyi iptal et",
+    "sessionHint": "Yeniden başlatmalarda oturum açık kalır. 7 günden uzun süre kullanılmazsa yeniden giriş gerekir.",
+    "advanced": "Gelişmiş ayarlar",
+    "back": "Girişe dön",
+    "oauthUnavailable": "OAuth2 tarayıcı yetkilendirmesi kullanılamıyor. Sunucu adresini kontrol edin veya yöneticinize başvurun.",
+    "retryConfig": "Giriş ayarlarını yeniden kontrol et",
+    "title": "Zhishu router oturumu aç",
+    "subtitle": "AI kodlama araçlarını yönetmek için platform hesabınızla oturum açın.",
+    "address": "Platform API adresi",
+    "loading": "Oturumunuz denetleniyor…",
+    "logout": "Platformdan çıkış yap",
+    "account": "Platform hesabı",
+    "balance": "Bakiye",
+    "refreshBalance": "Bakiyeyi yenilemek için tıklayın"
+  },
+  "platformCleanup": {
+    "signingOut": "Oturum kapatılıyor…"
+  },
   "dsh": {
     "empty": {
       "title": "DeepSeek Harness sağlayıcısı ekle",
