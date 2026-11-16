@@ -100,6 +100,7 @@ import {
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { OpenTerminalDialog } from "@/components/providers/OpenTerminalDialog";
 import { discardUnsavedChanges, hasUnsavedChanges } from "@/lib/unsavedChanges";
+import { AppConfigHistoryButton } from "@/zhishu/config-history/AppConfigHistoryButton";
 import { RefreshAllQuotaButton } from "@/components/settings/auth/RefreshAllQuotaButton";
 import {
   checkToolUpdatesInBackground,
@@ -1526,6 +1527,7 @@ function App() {
       }
       actions={
         <>
+          <AppConfigHistoryButton key={activeApp} app={activeApp} />
           {currentView === "providers" &&
             activeApp !== "mcode" &&
             activeApp !== "dsh" &&

@@ -1,5 +1,6 @@
 mod zhishu;
-
+pub use zhishu::commands::*;
+use zhishu::storage::config_history;
 mod agy_config;
 #[cfg(all(test, unix))]
 mod agy_smoke_tests;
@@ -684,6 +685,7 @@ pub fn run() {
             // 也能向前端推送 `usage-log-recorded`。
             // 放在日志系统初始化之后，确保 init 的日志能正常输出。
             usage_events::init(app.handle().clone());
+            config_history::init(app.handle().clone());
 
             // 初始化数据库
             let app_config_dir = crate::config::get_app_config_dir();
@@ -1651,6 +1653,11 @@ pub fn run() {
             commands::set_common_config_snippet,
             commands::extract_common_config_snippet,
             commands::read_live_provider_settings,
+            zhishu::commands::list_config_change_history,
+            zhishu::commands::open_config_sync_backup,
+            zhishu::commands::get_config_change_history,
+            zhishu::commands::clear_config_change_history,
+            zhishu::commands::restore_config_change_history,
             commands::get_settings,
             commands::save_settings,
             commands::has_codex_unify_history_backup,

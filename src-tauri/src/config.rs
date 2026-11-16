@@ -649,6 +649,10 @@ fn join_link_target(parent: &Path, target: &Path) -> PathBuf {
 /// 失败时临时文件留在原处：写入引擎的 pending 指着它，下次恢复要靠它前滚（目标文件被
 /// 占用、只读这类失败，过后多半能补完）。只做一次性原子写的调用方自己删。
 pub(crate) fn commit_staged(tmp: &Path, path: &Path) -> Result<(), AppError> {
+    // 配置历史先按调用方传入的逻辑路径留痕（应用归属与还原入口都认它）；
+    // 再解析软链接：实际替换写穿到链接指向的文件，链接本身保留。经链接读到的
+    // 内容与目标一致，finish 的 after 快照按解析后的路径读取，字节相同。
+    let history = crate::config_history::capture_before(path);
     let resolved = resolve_symlink_target(path);
     let path = resolved.as_path();
     #[cfg(windows)]
@@ -746,6 +750,9 @@ pub(crate) fn commit_staged(tmp: &Path, path: &Path) -> Result<(), AppError> {
                 source,
             });
         }
+    }
+    if let Some(history) = history {
+        history.finish(fs::read(path).ok());
     }
     Ok(())
 }
@@ -1293,7 +1300,11 @@ pub fn copy_file(from: &Path, to: &Path) -> Result<(), AppError> {
 /// 删除文件
 pub fn delete_file(path: &Path) -> Result<(), AppError> {
     if path.exists() {
+        let history = crate::config_history::capture_before(path);
         fs::remove_file(path).map_err(|e| AppError::io(path, e))?;
+        if let Some(history) = history {
+            history.finish(None);
+        }
     }
     Ok(())
 }

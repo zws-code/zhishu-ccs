@@ -5845,6 +5845,21 @@ impl ProviderService {
         provider: Provider,
         add_to_live: bool,
     ) -> Result<bool, AppError> {
+        let app = app_type.as_str().to_string();
+        crate::config_history::with_operation_action(app, "add_provider", || {
+            Self::add_inner(state, app_type, provider, add_to_live)
+        })
+    }
+
+    /// Original body of `add`; the public entry stamps the user operation
+    /// label so history records read "add/remove provider" instead of the
+    /// mechanical switch/apply write action.
+    fn add_inner(
+        state: &AppState,
+        app_type: AppType,
+        provider: Provider,
+        add_to_live: bool,
+    ) -> Result<bool, AppError> {
         let _native_guard = lock_native_provider_operations(state, &app_type);
         if app_type == AppType::Kimi
             && crate::kimi_config::is_official_provider(&provider.settings_config)
@@ -6145,6 +6160,22 @@ impl ProviderService {
     /// 从编辑器新增供应商。Claude Code、Codex、Gemini CLI、Grok Build 按关键字段拆开保存
     /// （见各自的 `*_editor`），其余应用和 `add` 一样。
     pub fn add_from_editor(
+        state: &AppState,
+        app_type: AppType,
+        provider: Provider,
+        add_to_live: bool,
+        editor: Option<EditorSave>,
+    ) -> Result<bool, AppError> {
+        let app = app_type.as_str().to_string();
+        crate::config_history::with_operation_action(app, "add_provider", || {
+            Self::add_from_editor_inner(state, app_type, provider, add_to_live, editor)
+        })
+    }
+
+    /// Original body of `add_from_editor`; the public entry stamps the user operation
+    /// label so history records read "add/remove provider" instead of the
+    /// mechanical switch/apply write action.
+    fn add_from_editor_inner(
         state: &AppState,
         app_type: AppType,
         provider: Provider,
@@ -6800,6 +6831,16 @@ impl ProviderService {
     /// 直连指针或代理路由指着的供应商不能删（见 `mode::current::is_referenced`）。
     /// 对于累加模式应用（OpenCode, OpenClaw），可以随时删除任意供应商，同时从 live 配置中移除。
     pub fn delete(state: &AppState, app_type: AppType, id: &str) -> Result<(), AppError> {
+        let app = app_type.as_str().to_string();
+        crate::config_history::with_operation_action(app, "remove_provider", || {
+            Self::delete_inner(state, app_type, id)
+        })
+    }
+
+    /// Original body of `delete`; the public entry stamps the user operation
+    /// label so history records read "add/remove provider" instead of the
+    /// mechanical switch/apply write action.
+    fn delete_inner(state: &AppState, app_type: AppType, id: &str) -> Result<(), AppError> {
         let _native_guard = lock_native_provider_operations(state, &app_type);
         if app_type == AppType::Pi {
             return pi::delete(state, id);
@@ -6931,6 +6972,20 @@ impl ProviderService {
         app_type: AppType,
         id: &str,
     ) -> Result<(), AppError> {
+        let app = app_type.as_str().to_string();
+        crate::config_history::with_operation_action(app, "add_provider", || {
+            Self::add_to_live_config_inner(state, app_type, id)
+        })
+    }
+
+    /// Original body of `add_to_live_config`; the public entry stamps the user operation
+    /// label so history records read "add/remove provider" instead of the
+    /// mechanical switch/apply write action.
+    fn add_to_live_config_inner(
+        state: &AppState,
+        app_type: AppType,
+        id: &str,
+    ) -> Result<(), AppError> {
         let _native_guard = lock_native_provider_operations(state, &app_type);
         if app_type == AppType::Copilot {
             return Self::add_copilot_to_live(state, id);
@@ -6975,6 +7030,20 @@ impl ProviderService {
     /// This is used when user wants to "remove" a provider from active config
     /// but keep it available for future use.
     pub fn remove_from_live_config(
+        state: &AppState,
+        app_type: AppType,
+        id: &str,
+    ) -> Result<(), AppError> {
+        let app = app_type.as_str().to_string();
+        crate::config_history::with_operation_action(app, "remove_provider", || {
+            Self::remove_from_live_config_inner(state, app_type, id)
+        })
+    }
+
+    /// Original body of `remove_from_live_config`; the public entry stamps the user operation
+    /// label so history records read "add/remove provider" instead of the
+    /// mechanical switch/apply write action.
+    fn remove_from_live_config_inner(
         state: &AppState,
         app_type: AppType,
         id: &str,
@@ -7126,7 +7195,9 @@ impl ProviderService {
     ///   操作里提交；累加式应用按各自的规则写入。
     pub fn switch(state: &AppState, app_type: AppType, id: &str) -> Result<SwitchResult, AppError> {
         let app = app_type.as_str().to_string();
-        let result = Self::switch_inner(state, app_type, id);
+        let result = crate::config_history::with_audit_context(&app, "switch", || {
+            Self::switch_inner(state, app_type, id)
+        });
         match &result {
             Ok(result) if result.warnings.is_empty() => {
                 log::info!("[SWITCH] {app} 切到 {id} 完成");
@@ -7297,6 +7368,10 @@ impl ProviderService {
             )
             .ok()
             .flatten();
+            // Record the pointer movement so a group restore can move the app
+            // window's current selection back together with the files. Proxy
+            // route switches never reach this branch: the pointer stays.
+            crate::config_history::set_provider_pointer(app_type.as_str(), previous.as_deref(), id);
             log::info!(
                 "[SWITCH] {} 直连：{} → {id}，写客户端配置",
                 app_type.as_str(),
