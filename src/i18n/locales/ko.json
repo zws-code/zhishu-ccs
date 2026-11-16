@@ -5647,6 +5647,19 @@
     "noGroupsForApp": "이 앱에서 사용할 그룹이 없습니다",
     "stackDefaultHint": "스택은 이 앱의 모든 플랫폼 공급자를 추가합니다. 선택한 그룹을 기본값으로 사용합니다."
   },
+  "simpleMode": {
+    "navApps": "앱",
+    "title": "앱",
+    "description": "각 도구의 공급자를 선택하세요. «Zhishu 플랫폼» 모델은 계정과 자동으로 동기화됩니다.",
+    "notConnected": "연결되지 않음",
+    "connected": "연결됨",
+    "inactiveHint": "플랫폼 모델을 사용하지 않음",
+    "emptyProvidersHint": "아직 이 앱의 플랫폼 공급자가 없습니다. 앱 페이지에서 스위치를 켜서 연결하세요.",
+    "switchOnLabel": "{{name}}을 플랫폼 공급자에 연결",
+    "switchOffLabel": "{{name}}의 플랫폼 공급자 제거",
+    "toSimple": "간편 모드",
+    "toAdvanced": "고급 모드"
+  },
   "platformAuth": {
     "title": "Zhishu router 로그인",
     "subtitle": "플랫폼 계정으로 로그인하여 AI 코딩 도구를 관리하세요.",

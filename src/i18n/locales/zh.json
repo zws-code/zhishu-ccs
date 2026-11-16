@@ -142,6 +142,19 @@
     "noGroupsForApp": "当前账号没有可用于此应用的分组",
     "stackDefaultHint": "聚合会加入该应用的全部平台供应商，所选分组为默认分组"
   },
+  "simpleMode": {
+    "navApps": "应用",
+    "title": "应用",
+    "description": "为每个工具选择供应商。「智枢平台」的模型随账号自动同步。",
+    "notConnected": "未接入",
+    "connected": "已接入",
+    "inactiveHint": "未启用平台模型",
+    "emptyProvidersHint": "这个应用还没有平台供应商。到「应用」页打开开关即可接入。",
+    "switchOnLabel": "接入 {{name}} 的平台供应商",
+    "switchOffLabel": "移除 {{name}} 的平台供应商",
+    "toSimple": "简易模式",
+    "toAdvanced": "高级模式"
+  },
   "app": {
     "title": "CC Switch",
     "description": "Claude Code / Codex / Gemini CLI 全方位辅助工具"

@@ -142,6 +142,19 @@
     "noGroupsForApp": "このアプリで利用できるグループがありません",
     "stackDefaultHint": "集約ではこのアプリのすべてのプラットフォームプロバイダーが追加され、選択したグループが既定になります。"
   },
+  "simpleMode": {
+    "navApps": "アプリ",
+    "title": "アプリ",
+    "description": "ツールごとにプロバイダーを選択します。「智枢プラットフォーム」のモデルはアカウントに合わせて自動同期されます。",
+    "notConnected": "未接続",
+    "connected": "接続済み",
+    "inactiveHint": "プラットフォームモデルは未使用",
+    "emptyProvidersHint": "このアプリにはプラットフォームプロバイダーがまだありません。「アプリ」ページでスイッチをオンにすると接続できます。",
+    "switchOnLabel": "{{name}} のプラットフォームプロバイダーに接続",
+    "switchOffLabel": "{{name}} のプラットフォームプロバイダーを削除",
+    "toSimple": "簡易モード",
+    "toAdvanced": "詳細モード"
+  },
   "app": {
     "title": "CC Switch",
     "description": "Claude Code・Codex・Gemini CLI のためのオールインワンアシスタント"

@@ -142,6 +142,19 @@
     "noGroupsForApp": "目前帳號沒有可用於此應用程式的群組",
     "stackDefaultHint": "聚合會加入此應用程式的全部平台供應商，所選群組為預設群組"
   },
+  "simpleMode": {
+    "navApps": "應用",
+    "title": "應用",
+    "description": "為每個工具選擇供應商。「智樞平台」的模型隨帳號自動同步。",
+    "notConnected": "未接入",
+    "connected": "已接入",
+    "inactiveHint": "未啟用平台模型",
+    "emptyProvidersHint": "這個應用還沒有平台供應商。到「應用」頁開啟開關即可接入。",
+    "switchOnLabel": "接入 {{name}} 的平台供應商",
+    "switchOffLabel": "移除 {{name}} 的平台供應商",
+    "toSimple": "簡易模式",
+    "toAdvanced": "進階模式"
+  },
   "app": {
     "title": "CC Switch",
     "description": "Claude Code / Codex / Gemini CLI 全方位輔助工具"

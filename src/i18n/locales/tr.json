@@ -142,6 +142,19 @@
     "noGroupsForApp": "Bu uygulama için kullanılabilir grup yok",
     "stackDefaultHint": "Birleştirme bu uygulamanın tüm platform sağlayıcılarını ekler; seçilen grup varsayılandır."
   },
+  "simpleMode": {
+    "navApps": "Uygulamalar",
+    "title": "Uygulamalar",
+    "description": "Her araç için sağlayıcı seçin. \"Zhishu Platform\" modelleri hesabınızla otomatik olarak eşitlenir.",
+    "notConnected": "Bağlı değil",
+    "connected": "Bağlı",
+    "inactiveHint": "Platform modelleri kullanımda değil",
+    "emptyProvidersHint": "Bu uygulamada henüz platform sağlayıcısı yok. Bağlanmak için Uygulamalar sayfasındaki düğmeyi açın.",
+    "switchOnLabel": "{{name}} için platform sağlayıcılarını bağla",
+    "switchOffLabel": "{{name}} platform sağlayıcılarını kaldır",
+    "toSimple": "Basit mod",
+    "toAdvanced": "Gelişmiş mod"
+  },
   "app": {
     "title": "CC Switch",
     "description": "Claude Code, Codex ve Gemini CLI için Hepsi Bir Arada Asistan"
