@@ -32,7 +32,7 @@ CC Switch 的做法是让 Codex 始终连本机路由，仍以 Responses API 发
 
 这条链路主要分成四步：
 
-1. Codex 接管时，本地配置会被写成 `http://127.0.0.1:15721/v1`，并强制保持 `wire_api = "responses"`。
+1. Codex 接管时，本地配置会被写成 `http://127.0.0.1:25721/v1`，并强制保持 `wire_api = "responses"`。
 2. Provider 的 `meta.apiFormat = "openai_chat"` 会告诉路由：真实上游是 Chat Completions。
 3. 路由把 `/responses` 或 `/v1/responses` 改写到 `/chat/completions`，并把 Responses 请求体转换成 Chat 请求体。
 4. 上游返回后，路由再把 Chat 的 JSON 或 SSE 转回 Codex 能理解的 Responses JSON/SSE。
@@ -73,7 +73,7 @@ CC Switch 的做法是让 Codex 始终连本机路由，仍以 Responses API 发
 
 进入设置里的 `路由` 页面，展开 `本地路由`，完成两个开关：
 
-1. 打开 `路由总开关`，启动本地服务。默认地址是 `127.0.0.1:15721`。
+1. 打开 `路由总开关`，启动本地服务。默认地址是 `127.0.0.1:25721`。
 2. 在 `路由启用` 中打开 `Codex`。如果只想让 Codex 走路由，可以保持 Claude、Gemini 关闭。
 
 ![本地路由页面中启用 Codex 接管](../images/codex-deepseek-routing/03-local-route-codex-takeover.png)
@@ -103,7 +103,7 @@ CC Switch 的做法是让 Codex 始终连本机路由，仍以 Responses API 发
 
 **Codex 报 404 或找不到 `/responses`**
 
-通常是没有开启 Codex 接管，或者你手动把上游 Chat base URL 直接写给了 Codex。检查 `~/.codex/config.toml` 是否指向 `http://127.0.0.1:15721/v1`。
+通常是没有开启 Codex 接管，或者你手动把上游 Chat base URL 直接写给了 Codex。检查 `~/.codex/config.toml` 是否指向 `http://127.0.0.1:25721/v1`。
 
 **上游报 404**
 

@@ -14,7 +14,7 @@ CC Switch's approach is to keep Codex always talking to the local route and stil
 
 The chain has four main steps:
 
-1. When Codex is taken over, the local configuration is written as `http://127.0.0.1:15721/v1`, and `wire_api = "responses"` is forcibly kept in place.
+1. When Codex is taken over, the local configuration is written as `http://127.0.0.1:25721/v1`, and `wire_api = "responses"` is forcibly kept in place.
 2. The provider's `anthropic` upstream format tells the route that the real upstream speaks the Anthropic Messages protocol.
 3. The route rewrites `/responses` to `/v1/messages` and converts the Responses request body into an Anthropic request body.
 4. After the upstream responds, the route converts the Anthropic JSON or SSE back into the Responses JSON/SSE that Codex understands — reasoning content, tool calls, and images are all within the conversion scope.
@@ -60,12 +60,12 @@ After you save the provider, a `Needs Routing` marker appears on the card — pr
 
 Go to the `Routing` page in Settings, expand `Local Routing`, and complete two toggles:
 
-1. Turn on the `Routing Master Switch` to start the local service (the first time you enable it, an explanatory confirmation dialog appears). The default address is `127.0.0.1:15721`.
+1. Turn on the `Routing Master Switch` to start the local service (the first time you enable it, an explanatory confirmation dialog appears). The default address is `127.0.0.1:25721`.
 2. Turn on `Codex` under `Routing Enabled`. If you only want Codex to use routing, you can leave Claude and Gemini off.
 
 ![Enabling Codex takeover on the local routing page](../images/codex-claude-routing/04-local-route-codex-takeover.png)
 
-After takeover, CC Switch points Codex's live config at the local route (`base_url = http://127.0.0.1:15721/v1`), with only a placeholder in `auth.json`. The real Claude key stays in the CC Switch provider config and is injected by the local route on forward, using the auth field you selected.
+After takeover, CC Switch points Codex's live config at the local route (`base_url = http://127.0.0.1:25721/v1`), with only a placeholder in `auth.json`. The real Claude key stays in the CC Switch provider config and is injected by the local route on forward, using the auth field you selected.
 
 ## Step 3: Switch providers and restart Codex
 
@@ -95,7 +95,7 @@ Nine times out of ten the auth field doesn't match what the gateway wants: switc
 
 **Codex reports 404 or cannot find `/responses`**
 
-Usually Codex routing takeover isn't enabled, or you manually wrote the gateway's address directly into Codex — an Anthropic-protocol upstream has no `/responses` endpoint, so that always 404s. Check whether the current provider's `base_url` in `~/.codex/config.toml` points to `http://127.0.0.1:15721/v1`.
+Usually Codex routing takeover isn't enabled, or you manually wrote the gateway's address directly into Codex — an Anthropic-protocol upstream has no `/responses` endpoint, so that always 404s. Check whether the current provider's `base_url` in `~/.codex/config.toml` points to `http://127.0.0.1:25721/v1`.
 
 **The upstream returns 404 (routing already enabled)**
 
