@@ -29,3 +29,12 @@ copilot-api
 .history
 CODEBUDDY.md
 mainWindow.js
+
+# Generated Zhishu release configuration
+/release.config.local.json
+/src/.env.production.local
+/src-tauri/tauri.release.local.conf.json
+
+# Local client publishing settings (SSH paths and signing configuration)
+/release.publish.local.json
+/release.config.local.json.backup-*

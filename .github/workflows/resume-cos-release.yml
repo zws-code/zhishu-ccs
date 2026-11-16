@@ -1,0 +1,150 @@
+name: Resume verified COS release
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Original completed formal tag release run ID
+        required: true
+        type: string
+      accelerate:
+        description: Use enabled COS upload acceleration (additional traffic fees, max 3 GB per run)
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches: ["codex/cos-resume"]
+
+permissions:
+  contents: read
+
+env:
+  COS_BUCKET: ${{ vars.COS_BUCKET }}
+  COS_REGION: ${{ vars.COS_REGION }}
+  COS_UPLOAD_ACCELERATE: ${{ vars.COS_UPLOAD_ACCELERATE || 'false' }}
+  COS_PREFIX: ${{ vars.COS_PREFIX || 'ccs/stable' }}
+  COS_PUBLIC_BASE_URL: ${{ vars.COS_PUBLIC_BASE_URL }}
+  ZHISHU_UPDATE_PUBLIC_KEY: ${{ vars.ZHISHU_UPDATE_PUBLIC_KEY }}
+
+jobs:
+  resume-cos:
+    if: github.repository == 'zws-code/zhishu-ccs'
+    runs-on: ubuntu-22.04
+    environment: cos-production
+    concurrency:
+      group: cos-stable-publication
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      tag: ${{ steps.source.outputs.tag }}
+      run_id: ${{ steps.source.outputs.run_id }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: scripts
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+      - name: Verify original formal release and immutable tag
+        id: source
+        uses: actions/github-script@v8
+        env:
+          REQUESTED_RUN_ID: ${{ inputs.run_id }}
+          REQUESTED_ACCELERATE: ${{ inputs.accelerate }}
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const { resolveReleaseSource } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/scripts/zhishu/resume-release.mjs`).href);
+            const trailer = context.payload.head_commit?.message?.match(/^Resume-Release-Run: ([1-9][0-9]*)$/m)?.[1];
+            const source = await resolveReleaseSource(github, context.repo, process.env.REQUESTED_RUN_ID || trailer || '');
+            core.setOutput('tag', source.tag);
+            core.setOutput('run_id', source.runId);
+            core.setOutput('artifact', source.artifact);
+            const accelerated = context.eventName === 'workflow_dispatch'
+              ? process.env.REQUESTED_ACCELERATE === 'true'
+              : /^Resume-Release-Accelerate: true$/m.test(context.payload.head_commit?.message || '');
+            core.setOutput('accelerate', String(accelerated));
+            core.info(`Reusing verified ${source.tag} payload from run ${source.runId} at ${source.sha}`);
+      - name: Download original verified payload
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ steps.source.outputs.artifact }}
+          path: cos-payload
+          run-id: ${{ steps.source.outputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Recheck original updater signatures
+        env:
+          SOURCE_TAG: ${{ steps.source.outputs.tag }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import assert from 'node:assert/strict';
+          import { collectReceiptUpdaterPlatforms } from './scripts/zhishu/release-artifacts.mjs';
+          const receipt = JSON.parse(readFileSync('cos-payload/release.json'));
+          assert.equal(receipt.tag, process.env.SOURCE_TAG);
+          assert.equal(receipt.downloadBaseUrl, process.env.COS_PUBLIC_BASE_URL.replace(/\/+$/, ''));
+          const platforms = collectReceiptUpdaterPlatforms('cos-payload', receipt,
+            { updatePublicKey: process.env.ZHISHU_UPDATE_PUBLIC_KEY }, { downloadBaseUrl: receipt.downloadBaseUrl });
+          assert.deepEqual(JSON.parse(readFileSync('cos-payload/latest.json')).platforms, platforms);
+          console.log('Original payload signatures verified');
+          NODE
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Validate original payload checksums
+        run: python scripts/zhishu/publish-cos.py cos-payload --dry-run
+      - name: Install COS SDK
+        run: python -m pip install -r scripts/zhishu/cos-requirements.txt
+      - name: Check actual COS SDK upload contract
+        run: python -B -m unittest discover -s scripts/zhishu -p 'test_publish_cos.py' -k CosSdkContractTests
+      - name: Resume COS publication without rebuilding
+        env:
+          COS_UPLOAD_ACCELERATE: ${{ steps.source.outputs.accelerate }}
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+          COS_SESSION_TOKEN: ${{ secrets.COS_SESSION_TOKEN }}
+        run: python scripts/zhishu/publish-cos.py cos-payload
+
+  resume-github:
+    name: Publish GitHub Release after resumed COS
+    needs: resume-cos
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: cos-payload-${{ needs.resume-cos.outputs.tag }}
+          path: cos-payload
+          run-id: ${{ needs.resume-cos.outputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Publish original signed installers on GitHub
+        id: release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.resume-cos.outputs.tag }}
+          name: 智枢 CCS ${{ needs.resume-cos.outputs.tag }}
+          draft: false
+          prerelease: false
+          make_latest: "true"
+          overwrite_files: false
+          fail_on_unmatched_files: true
+          files: cos-payload/*
+          body: |
+            智枢 CCS ${{ needs.resume-cos.outputs.tag }}
+
+            此版本复用原正式构建的安装包、签名和清单，COS 发布完成后提供 GitHub 下载。
+
+            在下方 Assets 选择对应系统和架构的原始安装包。新版本 Windows 使用 `.exe`；历史版本可能包含 `.msi` 和 Linux 包。
+            `.tar.gz` 和 `.sig` 用于客户端更新与验签。客户端自动更新使用 COS 更新源。
+
+            [COS 下载清单](${{ env.COS_PUBLIC_BASE_URL }}/${{ needs.resume-cos.outputs.tag }}/client-release.json)
+
+            Tauri 更新签名独立于系统代码签名。macOS 是否经过 Apple 公证以原构建记录为准，ad-hoc 构建未经过公证。
+      - name: Show download link
+        env:
+          RELEASE_URL: ${{ steps.release.outputs.url }}
+        run: echo "[下载安装包 / GitHub Release]($RELEASE_URL)" >> "$GITHUB_STEP_SUMMARY"

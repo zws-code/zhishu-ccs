@@ -48,6 +48,10 @@ jobs:
             frontend:
               - "src/**"
               - "tests/**"
+              - "scripts/*release*.mjs"
+              - "scripts/*cos*"
+              - "scripts/generate-download-manifest.mjs"
+              - "deploy/client-download/**"
               - "index.html"
               - "package.json"
               - "pnpm-lock.yaml"
@@ -96,8 +100,14 @@ jobs:
       - name: Check formatting
         run: pnpm format:check
 
+      - name: Test Zhishu release scripts
+        run: pnpm test:release
+
+      - name: Test COS publisher
+        run: pnpm test:release-cos
+
       - name: Build frontend
-        run: pnpm build:renderer
+        run: pnpm build:renderer --mode development
 
   # 单元测试是前端最慢的一段：4 核上约 5 分钟，几乎全是每个文件起 jsdom、跑 setup 的 CPU。
   # 按文件分到四台机器上跑。

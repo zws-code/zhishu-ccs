@@ -42,11 +42,12 @@ concurrency:
 
 jobs:
   sync-to-r2:
+    if: github.repository == 'farion1231/cc-switch'
     name: Sync release to R2
     runs-on: ubuntu-22.04
     env:
-      R2_BUCKET: cc-switch-releases
-      R2_PUBLIC_BASE_URL: https://dl.ccswitch.io
+      R2_BUCKET: ${{ vars.ZHISHU_R2_BUCKET }}
+      R2_PUBLIC_BASE_URL: ${{ vars.ZHISHU_R2_PUBLIC_BASE_URL }}
       KEEP_VERSIONS: "5"
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -66,7 +67,7 @@ jobs:
             echo "::error::No release tag to sync."
             exit 1
           fi
-          if [ -n "$R2_ACCOUNT_ID" ] && [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ]; then
+          if [ -n "$R2_ACCOUNT_ID" ] && [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ] && [ -n "$R2_BUCKET" ] && [ -n "$R2_PUBLIC_BASE_URL" ]; then
             echo "configured=true" >> "$GITHUB_OUTPUT"
           elif [ "$GITHUB_REPOSITORY" = "farion1231/cc-switch" ]; then
             # A silently stale mirror strands updater users on old versions
@@ -159,7 +160,7 @@ jobs:
           # the bucket root with a short TTL instead.
           aws s3 cp r2-assets "s3://$R2_BUCKET/$TAG/" \
             --recursive \
-            --exclude "*.sig" --exclude "latest.json" \
+            --exclude "*.sig" --exclude "latest.json" --exclude "client-release.json" \
             --cache-control "public, max-age=31536000, immutable" \
             --endpoint-url "$R2_ENDPOINT"
 
@@ -196,6 +197,10 @@ jobs:
           # short. Uploaded after the assets they reference so an aborted run
           # never leaves them pointing at missing files.
           aws s3 cp manifest.json "s3://$R2_BUCKET/manifest.json" \
+            --content-type "application/json" \
+            --cache-control "public, max-age=300" \
+            --endpoint-url "$R2_ENDPOINT"
+          aws s3 cp manifest.json "s3://$R2_BUCKET/client-release.json" \
             --content-type "application/json" \
             --cache-control "public, max-age=300" \
             --endpoint-url "$R2_ENDPOINT"

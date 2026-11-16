@@ -1,0 +1,12 @@
+{
+  "version": "0.0.2",
+  "items": [
+    {
+      "type": "improve",
+      "zh": "修复已知的问题",
+      "zh-TW": "修复已知的问题",
+      "en": "Fix known problems",
+      "ja": "既知の問題を修正する"
+    }
+  ]
+}
