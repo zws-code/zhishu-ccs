@@ -385,8 +385,8 @@ mod tests {
                 "OPENAI_API_KEY": api_key
             },
             "config": format!(
-                "model_provider = \"custom\"\n\
-                 [model_providers.custom]\n\
+                "model_provider = \"zhishu\"\n\
+                 [model_providers.zhishu]\n\
                  name = \"custom\"\n\
                  base_url = \"{base_url}\"\n\
                  wire_api = \"chat\"\n"
@@ -439,8 +439,8 @@ mod tests {
                 .expect("keyless managed Copilot preview");
                 let text = view.settings["config"].as_str().expect("config text");
                 let parsed: toml::Value = toml::from_str(text).expect("preview TOML");
-                let route = &parsed["model_providers"]["custom"];
-                assert_eq!(parsed["model_provider"].as_str(), Some("custom"));
+                let route = &parsed["model_providers"]["zhishu"];
+                assert_eq!(parsed["model_provider"].as_str(), Some("zhishu"));
                 assert_eq!(route["wire_api"].as_str(), Some("responses"));
                 assert!(route.get("requires_openai_auth").is_none());
                 assert!(route.get("experimental_bearer_token").is_none());
@@ -1084,7 +1084,7 @@ mod tests {
             );
 
             // 旧版「统一会话历史」注入进 live、又被回填进行里的形态，保存时剥掉。
-            unbound.settings_config["config"] = Value::String("model_provider = \"custom\"\n\n[model_providers.custom]\nname = \"OpenAI\"\nrequires_openai_auth = true\nsupports_websockets = true\nwire_api = \"responses\"\n".to_string());
+            unbound.settings_config["config"] = Value::String("model_provider = \"zhishu\"\n\n[model_providers.zhishu]\nname = \"OpenAI\"\nrequires_openai_auth = true\nsupports_websockets = true\nwire_api = \"responses\"\n".to_string());
             ProviderService::update(state, AppType::Codex, Some(provider_id), unbound)
                 .expect("unbind managed account");
 
@@ -1346,6 +1346,55 @@ mod tests {
                 "DEBUG": "1"
             }})
         );
+    }
+
+    /// 手动供应商只发布显式字段，平台模型档位由上层组装。
+    #[tokio::test]
+    #[serial]
+    async fn switching_manual_claude_provider_keeps_missing_model_slots_absent() {
+        let _home = TempHome::new();
+        crate::settings::reload_settings().expect("reload settings");
+
+        let db = Arc::new(Database::memory().expect("init db"));
+        let state = AppState::new(db.clone());
+        let bare = Provider::with_id(
+            "gw".into(),
+            "Gateway".into(),
+            json!({ "env": {
+                "ANTHROPIC_BASE_URL": "https://gw.example",
+                "ANTHROPIC_AUTH_TOKEN": "sk-gw",
+                "ANTHROPIC_MODEL": "glm-5.2"
+            }}),
+            None,
+        );
+        db.save_provider("claude", &bare).expect("save provider");
+        ProviderService::switch(&state, AppType::Claude, "gw").expect("switch");
+
+        let live: Value = read_json_file(&get_claude_settings_path()).expect("read live");
+        let env = |key: &str| live["env"][key].as_str();
+        assert_eq!(env("ANTHROPIC_DEFAULT_HAIKU_MODEL"), None);
+        assert_eq!(env("ANTHROPIC_DEFAULT_SONNET_MODEL"), None);
+        assert_eq!(env("ANTHROPIC_DEFAULT_OPUS_MODEL"), None);
+
+        let preview = claude_editor::view(&state, &bare.settings_config).expect("editor preview");
+        for key in [
+            "ANTHROPIC_DEFAULT_HAIKU_MODEL",
+            "ANTHROPIC_DEFAULT_SONNET_MODEL",
+            "ANTHROPIC_DEFAULT_OPUS_MODEL",
+        ] {
+            assert!(preview.settings["env"].get(key).is_none(), "{key}");
+        }
+
+        // 持久化配置保持用户原样。
+        let row = db
+            .get_all_providers("claude")
+            .expect("providers")
+            .get("gw")
+            .expect("row")
+            .clone();
+        assert!(row.settings_config["env"]
+            .get("ANTHROPIC_DEFAULT_SONNET_MODEL")
+            .is_none());
     }
 
     /// 文件已经写成目标供应商、指针还没改时崩溃：下次启动按 pending 补完指针，
@@ -2065,7 +2114,7 @@ disable_response_storage = true
 model_reasoning_effort = "high"
 approval_policy = "on-request"
 experimental_bearer_token = "sk-live-secret"
-model_catalog_json = "cc-switch-model-catalog.json"
+model_catalog_json = "zhishu-ccs-model-catalog.json"
 web_search = "disabled"
 
 [agents]
@@ -2239,7 +2288,7 @@ command = "legacy-cmd"
         let env = &live["env"];
         // 行里只配了 `ANTHROPIC_API_KEY`（供上游跳用 x-api-key），本地占位符仍落在
         // `ANTHROPIC_AUTH_TOKEN`，且本地不出现 `ANTHROPIC_API_KEY`（#8104）。
-        assert_eq!(env["ANTHROPIC_AUTH_TOKEN"], "PROXY_MANAGED");
+        assert_eq!(env["ANTHROPIC_AUTH_TOKEN"], "ZHISHU_CCS_PROXY_MANAGED");
         assert_eq!(
             env.get("ANTHROPIC_API_KEY"),
             None,
@@ -2278,10 +2327,10 @@ command = "legacy-cmd"
             "Codex A".into(),
             json!({
                 "auth": { "OPENAI_API_KEY": "token-a" },
-                "config": r#"model_provider = "custom"
+                "config": r#"model_provider = "zhishu"
 model = "old-model"
 
-[model_providers.custom]
+[model_providers.zhishu]
 name = "Codex A"
 base_url = "https://api.a.example/v1"
 wire_api = "responses"
@@ -2321,10 +2370,10 @@ requires_openai_auth = true
 
         let mut updated = original.clone();
         updated.settings_config["config"] = json!(
-            r#"model_provider = "custom"
+            r#"model_provider = "zhishu"
 model = "gpt-5.4"
 
-[model_providers.custom]
+[model_providers.zhishu]
 name = "Codex A"
 base_url = "https://api.updated.example/v1"
 wire_api = "responses"

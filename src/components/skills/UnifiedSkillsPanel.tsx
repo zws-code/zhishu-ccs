@@ -78,7 +78,7 @@ import { describeRepoFailures } from "./repoFailures";
 import type { ZipSkippedSkill } from "@/lib/api/skills";
 import { APP_IDS_WITH } from "@/config/appSpecs";
 
-const BACKUP_DIR = "~/.cc-switch/skill-backups";
+const BACKUP_DIR = "~/.zhishu-ccs/skill-backups";
 
 // 表格最小宽度 = 勾选框 + 名称栏保底 + 每个应用一列（MatrixCell 的 w-9）+ 行尾「⋯」（w-10）+ 左右内边距
 const NAME_MIN_WIDTH = 240;

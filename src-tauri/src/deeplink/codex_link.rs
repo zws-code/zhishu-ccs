@@ -144,7 +144,7 @@ impl CodexLinkConfig {
             .map(str::to_string)
     }
 
-    /// 写成供应商行的 `config`：一律选路到 `[model_providers.custom]`。链接参数优先：
+    /// 写成供应商行的 `config`：一律选路到 `[model_providers.zhishu]`。链接参数优先：
     /// 地址、模型名、Key 用合并后的值（URL 参数已经盖过配置里的）。
     pub(super) fn render(
         &self,

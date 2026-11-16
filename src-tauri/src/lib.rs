@@ -1,3 +1,5 @@
+mod zhishu;
+
 mod agy_config;
 #[cfg(all(test, unix))]
 mod agy_smoke_tests;
@@ -304,7 +306,7 @@ fn runtime_log_level_allows(level: log::Level, max_level: log::LevelFilter) -> b
     max_level.to_level().is_some_and(|maximum| level <= maximum)
 }
 
-/// 统一处理 ccswitch:// 深链接 URL
+/// 统一处理 zhishu-ccswitch:// 及兼容的 ccswitch:// 深链接 URL
 ///
 /// - 解析 URL，把结果（或错误）暂存为待处理深链接，再发 `deeplink-pending` 通知前端来读
 ///   （前端可能还没挂载，见 `deeplink::PendingDeepLink`）
@@ -315,7 +317,7 @@ fn handle_deeplink_url(
     focus_main_window: bool,
     source: &str,
 ) -> bool {
-    if !url_str.starts_with("ccswitch://") {
+    if !url_str.starts_with("zhishu-ccswitch://") && !url_str.starts_with("ccswitch://") {
         return false;
     }
 
@@ -521,6 +523,8 @@ pub fn run() {
 
     #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
     {
+        // 锁由 tauri.conf.json 的 identifier 决定；知数版使用独立标识，
+        // 与原版共存，同时仍阻止知数版重复启动并发写入自己的数据库。
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             log::info!("=== Single Instance Callback Triggered ===");
             // Windows 上这个回调跑在主线程处理 WM_COPYDATA 的窗口过程里，第二个实例的
@@ -820,7 +824,7 @@ pub fn run() {
             // 设置 AppHandle 用于代理故障转移时的 UI 更新
             app_state.proxy_service.set_app_handle(app.handle().clone());
 
-            // 补完上次崩溃时写到一半的客户端文件（写前意图在 ~/.cc-switch/live-state.json），
+            // 补完上次崩溃时写到一半的客户端文件（写前意图在设备数据目录的 live-state.json），
             // 要在任何写客户端文件的启动步骤之前。
             crate::mode::operation::recover_on_startup(&app_state.db);
             // 上次退出或崩溃前没来得及删的 Claude 空值墓碑（切换时给开着的会话写的）接着删
@@ -942,7 +946,7 @@ pub fn run() {
                 Err(e) => log::warn!("✗ Failed to seed official providers: {e}"),
             }
 
-            {
+            if crate::zhishu::coexistence::private_codex_home() {
                 let db_for_codex_history_migration = app_state.db.clone();
                 tauri::async_runtime::spawn_blocking(move || {
                     match crate::codex_history_migration::maybe_migrate_codex_third_party_history_provider_bucket(
@@ -1225,12 +1229,12 @@ pub fn run() {
                 #[cfg(target_os = "linux")]
                 {
                     // Use Tauri's path API to get correct path (includes app identifier)
-                    // tauri-plugin-deep-link writes to: ~/.local/share/com.ccswitch.desktop/applications/cc-switch-handler.desktop
+                    // tauri-plugin-deep-link writes below the app identifier's data directory.
                     // Only register if .desktop file doesn't exist to avoid overwriting user customizations
                     let should_register = app
                         .path()
                         .data_dir()
-                        .map(|d| !d.join("applications/cc-switch-handler.desktop").exists())
+                        .map(|d| !d.join("applications/zhishu-ccs-handler.desktop").exists())
                         .unwrap_or(true);
 
                     if should_register {
@@ -1273,7 +1277,7 @@ pub fn run() {
                         log::debug!("  URL[{i}]: {}", url_for_log(url_str));
 
                         if handle_deeplink_url(&app_handle, url_str, true, "on_open_url") {
-                            break; // Process only first ccswitch:// URL
+                            break; // Process only the first supported deep link URL
                         }
                     }
                 }
@@ -2134,6 +2138,7 @@ pub fn run() {
             // 转成 on_open_url 回调，这里再处理一遍会让同一条链接触发两次导入。
             if let RunEvent::Reopen { .. } = event {
                 if let Some(window) = app_handle.get_webview_window("main") {
+                    tray::apply_tray_policy(app_handle, true);
                     #[cfg(target_os = "windows")]
                     {
                         let _ = window.set_skip_taskbar(false);
@@ -2141,7 +2146,6 @@ pub fn run() {
                     let _ = window.unminimize();
                     let _ = window.show();
                     let _ = window.set_focus();
-                    tray::apply_tray_policy(app_handle, true);
                 } else if crate::lightweight::is_lightweight_mode() {
                     if let Err(e) = crate::lightweight::exit_lightweight_mode(app_handle) {
                         log::error!("退出轻量模式重建窗口失败: {e}");

@@ -50,7 +50,7 @@ use std::sync::Arc;
 use tauri::Manager;
 use tokio::sync::RwLock;
 
-const PROXY_AUTH_PLACEHOLDER: &str = "PROXY_MANAGED";
+const PROXY_AUTH_PLACEHOLDER: &str = crate::zhishu::identity::PROXY_TOKEN;
 
 /// Whether the upstream belongs to the OpenCode gateway (`opencode.ai`).
 ///
@@ -188,7 +188,7 @@ fn validate_codex_official_authorization(
         )),
         // 带占位 Key 的请求有两种来源：没重载配置的 Codex 进程；或切换前用第三方供应商建的
         // 旧会话（Codex 按会话记下的 provider 走休眠的 custom 表，重启也还是它）。
-        Some(value) if value.contains(PROXY_AUTH_PLACEHOLDER) => Err(ProxyError::AuthError(
+        Some(value) if value.contains(PROXY_AUTH_PLACEHOLDER) || value.contains(crate::zhishu::identity::LEGACY_PROXY_TOKEN) => Err(ProxyError::AuthError(
             "已切换到 OpenAI 官方供应商，但这个请求仍按第三方供应商的配置发出。如果这是切换前用第三方供应商创建的旧会话，它会一直沿用原供应商，重启也无效，请新建会话继续；否则请重启 Codex 以加载官方登录配置".to_string(),
         )),
         Some(_) => {
@@ -4622,7 +4622,7 @@ fn reject_proxy_placeholder_for_managed_account_upstream(
     }
 
     Err(ProxyError::AuthError(
-        "Managed account proxy auth was not resolved; PROXY_MANAGED must not be sent upstream"
+        "Managed account proxy auth was not resolved; ZHISHU_CCS_PROXY_MANAGED / PROXY_MANAGED must not be sent upstream"
             .to_string(),
     ))
 }
@@ -4646,7 +4646,10 @@ fn headers_contain_proxy_placeholder(headers: &http::HeaderMap) -> bool {
     headers.values().any(|value| {
         value
             .to_str()
-            .map(|value| value.contains(PROXY_AUTH_PLACEHOLDER))
+            .map(|value| {
+                value.contains(PROXY_AUTH_PLACEHOLDER)
+                    || value.contains(crate::zhishu::identity::LEGACY_PROXY_TOKEN)
+            })
             .unwrap_or(false)
     })
 }
@@ -5649,7 +5652,7 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(
             "authorization",
-            HeaderValue::from_static("Bearer PROXY_MANAGED"),
+            HeaderValue::from_static("Bearer ZHISHU_CCS_PROXY_MANAGED"),
         );
 
         let err = reject_proxy_placeholder_for_managed_account_upstream(
@@ -5660,7 +5663,7 @@ mod tests {
 
         assert!(matches!(
             err,
-            ProxyError::AuthError(message) if message.contains("PROXY_MANAGED")
+            ProxyError::AuthError(message) if message.contains("ZHISHU_CCS_PROXY_MANAGED")
         ));
 
         let xai_err = reject_proxy_placeholder_for_managed_account_upstream(
@@ -5670,7 +5673,7 @@ mod tests {
         .expect_err("xAI placeholder should be rejected before upstream");
         assert!(matches!(
             xai_err,
-            ProxyError::AuthError(message) if message.contains("PROXY_MANAGED")
+            ProxyError::AuthError(message) if message.contains("ZHISHU_CCS_PROXY_MANAGED")
         ));
     }
 
@@ -5679,7 +5682,7 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(
             "authorization",
-            HeaderValue::from_static("Bearer PROXY_MANAGED"),
+            HeaderValue::from_static("Bearer ZHISHU_CCS_PROXY_MANAGED"),
         );
 
         let err = reject_proxy_placeholder_for_managed_account_upstream(
@@ -5690,7 +5693,7 @@ mod tests {
 
         assert!(matches!(
             err,
-            ProxyError::AuthError(message) if message.contains("PROXY_MANAGED")
+            ProxyError::AuthError(message) if message.contains("ZHISHU_CCS_PROXY_MANAGED")
         ));
     }
 
@@ -5699,7 +5702,7 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(
             "authorization",
-            HeaderValue::from_static("Bearer PROXY_MANAGED"),
+            HeaderValue::from_static("Bearer ZHISHU_CCS_PROXY_MANAGED"),
         );
 
         reject_proxy_placeholder_for_managed_account_upstream(
@@ -6136,7 +6139,7 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(
             http::header::AUTHORIZATION,
-            HeaderValue::from_static("Bearer PROXY_MANAGED"),
+            HeaderValue::from_static("Bearer ZHISHU_CCS_PROXY_MANAGED"),
         );
         let mut provider = test_provider_with_type(None);
         provider.id = "codex-official".to_string();
@@ -7765,7 +7768,7 @@ mod tests {
             provider.settings_config = json!({
                 "auth": { "OPENAI_API_KEY": "sk-third-party" },
                 "config": format!(
-                    "model_provider = \"custom\"\nmodel = \"row-model\"\n\n[model_providers.custom]\nname = \"custom\"\nbase_url = \"{}/v1\"\nwire_api = \"responses\"\n",
+                    "model_provider = \"zhishu\"\nmodel = \"row-model\"\n\n[model_providers.zhishu]\nname = \"custom\"\nbase_url = \"{}/v1\"\nwire_api = \"responses\"\n",
                     upstream.base_url
                 ),
                 "modelCatalog": { "models": [{ "model": "listed" }] },

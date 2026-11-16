@@ -347,6 +347,7 @@ pub async fn install_update_and_restart(app: AppHandle) -> Result<bool, String> 
     let Some(_installing) = crate::app_update::begin_install() else {
         return Err("正在安装更新，请稍候".to_string());
     };
+    // TODO(zhishu): Replace upstream updater endpoints with a Zhishu-hosted signed manifest.
     let checked = match crate::app_update::build_updater(&app)?.check().await {
         Ok(update) => update,
         Err(e) => {

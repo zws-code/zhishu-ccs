@@ -36,7 +36,10 @@ vi.mock("@/hooks/useSidebarStatus", () => ({
   }),
 }));
 
-const renderSidebar = (settings: Partial<Settings>) => {
+const renderSidebar = (
+  settings: Partial<Settings>,
+  props: Partial<Parameters<typeof Sidebar>[0]> = {},
+) => {
   const client = createTestQueryClient();
   // 不让设置查询回头去 mock 后端重取，盖掉这里给的值
   client.setQueryDefaults(["settings"], { staleTime: Infinity });
@@ -52,6 +55,7 @@ const renderSidebar = (settings: Partial<Settings>) => {
         onSelectPage={vi.fn()}
         onSelectSettingsSection={vi.fn()}
         onExitSettings={vi.fn()}
+        {...props}
       />
     </QueryClientProvider>,
   );

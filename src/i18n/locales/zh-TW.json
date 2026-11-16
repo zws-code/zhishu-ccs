@@ -420,7 +420,7 @@
     },
     "unifyCodexHistory": {
       "title": "統一 Codex 會話歷史",
-      "message": "開啟後，官方訂閱改用共享的 custom 供應商標識，官方與第三方的會話歸到同一組：新版 Codex 裡兩邊的會話都能繼續，CLI 的 resume 清單也會合併顯示。\n\n可選擇同時遷入現有官方會話；勾選後，之後每次啟動也會把仍留在官方組的會話遷進來（遷移前自動備份到 ~/.cc-switch/backups，關閉開關時可選擇還原）。不遷入的話，這些會話在新版 Codex 裡只能檢視。遷移完成後重新啟動 Codex 生效。\n\n注意：跨供應商繼續舊會話時，可能因對方後端無法解密 encrypted_content 推理內容而失敗。",
+      "message": "開啟後，官方訂閱改用共享的 custom 供應商標識，官方與第三方的會話歸到同一組：新版 Codex 裡兩邊的會話都能繼續，CLI 的 resume 清單也會合併顯示。\n\n可選擇同時遷入現有官方會話；勾選後，之後每次啟動也會把仍留在官方組的會話遷進來（遷移前自動備份到 ~/.zhishu-ccs/backups，關閉開關時可選擇還原）。不遷入的話，這些會話在新版 Codex 裡只能檢視。遷移完成後重新啟動 Codex 生效。\n\n注意：跨供應商繼續舊會話時，可能因對方後端無法解密 encrypted_content 推理內容而失敗。",
       "migrateExisting": "同時遷入現有官方會話歷史",
       "confirm": "我已了解，繼續開啟"
     },
@@ -999,7 +999,7 @@
     "configDirectoryDescription": "在 WSL 等環境使用 Claude Code 或 Codex 的時候，可手動指定為 WSL 裡的設定目錄，供應商資料與主環境保持一致。",
     "appConfigDir": "CC Switch 設定目錄",
     "appConfigDirDescription": "自訂 CC Switch 的設定儲存位置（指定至雲端同步資料夾即可雲端同步設定）",
-    "browsePlaceholderApp": "例如：C:\\Users\\Administrator\\.cc-switch",
+    "browsePlaceholderApp": "例如：C:\\Users\\Administrator\\.zhishu-ccs",
     "claudeConfigDir": "Claude Code 設定目錄",
     "claudeConfigDirDescription": "覆寫 Claude 設定目錄 (settings.json)。真正自訂目錄會在目錄內存放 Claude MCP 的 .claude.json；預設 ~/.claude 目錄仍使用 Claude 預設的 ~/.claude.json。",
     "codexConfigDir": "Codex 設定目錄",
@@ -1036,7 +1036,7 @@
     "upToDate": "已是最新",
     "aboutHint": "檢視版本資訊與更新狀態。",
     "portableMode": "目前為可攜版，更新需手動下載。",
-    "portableUpdateHint": "可攜版：點擊上方按鈕會下載新版壓縮檔，解壓後覆蓋原本的 cc-switch.exe 即可。設定和資料保存在使用者目錄下的 .cc-switch，不會因覆蓋而遺失。",
+    "portableUpdateHint": "可攜版：點擊上方按鈕會下載新版壓縮檔，解壓後覆蓋原本的 cc-switch.exe 即可。設定和資料保存在使用者目錄下的 .zhishu-ccs，不會因覆蓋而遺失。",
     "updateAvailable": "檢測到新版本：{{version}}",
     "updateBadge": "有更新可用",
     "updateFailed": "更新安裝失敗，已嘗試開啟下載頁面。",
@@ -2343,7 +2343,10 @@
     "modelExtraFieldKeyPlaceholder": "variants",
     "sdkOptions": "SDK 選項",
     "modelOptionKeyPlaceholder": "provider",
-    "modelOptionValuePlaceholder": "{\"order\": [\"baseten\"]}"
+    "modelOptionValuePlaceholder": "{\"order\": [\"baseten\"]}",
+    "modelLimits": "Token 限制",
+    "limitContext": "上下文",
+    "limitOutput": "輸出"
   },
   "providerPreset": {
     "label": "預設供應商",
@@ -3958,7 +3961,7 @@
         },
         "listenPort": {
           "label": "監聽連接埠",
-          "placeholder": "15721",
+          "placeholder": "25721",
           "description": "路由伺服器監聽的連接埠號（1024 ~ 65535）"
         },
         "maxRetries": {
@@ -4517,7 +4520,9 @@
     "openclawConfig": "設定",
     "memory": "記憶",
     "webUi": "Web UI",
-    "viewUsage": "查看此應用的用量"
+    "viewUsage": "查看此應用的用量",
+    "browseDirectory": "瀏覽目錄",
+    "openDirectoryFailed": "開啟目錄失敗"
   },
   "mode": {
     "tabsLabel": "連線模式",
@@ -5077,7 +5082,8 @@
       "noUpdatesInSelection": "選中的 Skill 沒有可用的更新",
       "selectionAlreadyOn": "選中的 {{count}} 個 Skill 已經在 {{app}} 啟用",
       "selectionAlreadyOff": "選中的 {{count}} 個 Skill 都沒有在 {{app}} 啟用",
-      "disabledSelection": "已在 {{app}} 停用 {{count}} 個 {{noun}}"
+      "disabledSelection": "已在 {{app}} 停用 {{count}} 個 {{noun}}",
+      "copiedDir": "已複製目錄名稱 {{dir}}"
     },
     "installTo": {
       "prefix": "安裝到：",
@@ -5152,7 +5158,8 @@
       "updatesBody": "這些倉庫裡的 Skill 沒有檢查，更新結果可能不完整。"
     },
     "updateAllCount": "全部更新（{{count}} 個）",
-    "updatingProgress": "正在更新 {{done}}/{{total}}…"
+    "updatingProgress": "正在更新 {{done}}/{{total}}…",
+    "copyDir": "複製目錄名稱"
   },
   "newLayoutNotice": {
     "title": "介面改版了",

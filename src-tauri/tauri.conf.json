@@ -60,7 +60,7 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["ccswitch"]
+        "schemes": ["zhishu-ccswitch"]
       }
     },
     "updater": {

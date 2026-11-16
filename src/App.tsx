@@ -510,56 +510,32 @@ function App() {
     });
   };
 
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    let active = true;
-
-    const setupListener = async () => {
-      try {
-        const off = await providersApi.onSwitched(
-          async (event: ProviderSwitchEvent) => {
-            // 按前缀失效：故障转移只改路由指针，「路由中」标记读的是
-            // ["providers", app, "mode"]，只 refetch 列表会让它停在旧那家
-            await queryClient.invalidateQueries({
-              queryKey: ["providers", event.appType],
-            });
-            if (event.appType === "pi") {
-              await invalidatePiProviderCaches(queryClient);
-            }
-            if (event.appType === "claude") {
-              // 托盘切卡、应用项目同样可能把默认登录收成新账号
-              await queryClient.invalidateQueries({
-                queryKey: ["managed-auth-status", "claude_official"],
-              });
-            }
-            // 切换会顺带刷新托管 ChatGPT 账号的令牌（托盘切换也一样）：
-            // 重查停在失败上的账号额度，免得主界面一直显示旧的「登录过期」
-            await queryClient.invalidateQueries({
-              predicate: (query) =>
-                query.queryKey[0] === "codex_oauth" &&
-                query.queryKey[1] === "quota" &&
-                (query.state.status === "error" ||
-                  (query.state.data as SubscriptionQuota | undefined)
-                    ?.success === false),
-            });
-          },
-        );
-        if (!active) {
-          off();
-          return;
-        }
-        unsubscribe = off;
-      } catch (error) {
-        console.error("[App] Failed to subscribe provider switch event", error);
-      }
-    };
-
-    void setupListener();
-    return () => {
-      active = false;
-      unsubscribe?.();
-    };
-  }, [queryClient]);
+  useTauriEvent<ProviderSwitchEvent>("provider-switched", async (event) => {
+    // 按前缀失效：故障转移只改路由指针，「路由中」标记读的是
+    // ["providers", app, "mode"]，只 refetch 列表会让它停在旧那家
+    await queryClient.invalidateQueries({
+      queryKey: ["providers", event.appType],
+    });
+    if (event.appType === "pi") {
+      await invalidatePiProviderCaches(queryClient);
+    }
+    if (event.appType === "claude") {
+      // 托盘切卡、应用项目同样可能把默认登录收成新账号
+      await queryClient.invalidateQueries({
+        queryKey: ["managed-auth-status", "claude_official"],
+      });
+    }
+    // 切换会顺带刷新托管 ChatGPT 账号的令牌（托盘切换也一样）：
+    // 重查停在失败上的账号额度，免得主界面一直显示旧的「登录过期」
+    await queryClient.invalidateQueries({
+      predicate: (query) =>
+        query.queryKey[0] === "codex_oauth" &&
+        query.queryKey[1] === "quota" &&
+        (query.state.status === "error" ||
+          (query.state.data as SubscriptionQuota | undefined)?.success ===
+            false),
+    });
+  });
 
   useTauriEvent("universal-provider-synced", async () => {
     await queryClient.invalidateQueries({ queryKey: ["providers"] });
@@ -1401,10 +1377,10 @@ function App() {
     const isPiGlobalDefault =
       activeApp === "pi" &&
       piCurrentState?.defaultProviderId === confirmAction.provider.id;
-
-    return isPiGlobalDefault
-      ? `${message}\n\n${t("confirm.piDefaultProviderWarning")}`
-      : message;
+    if (isPiGlobalDefault) {
+      return `${message}\n\n${t("confirm.piDefaultProviderWarning")}`;
+    }
+    return message;
   }, [activeApp, confirmAction, piCurrentState?.defaultProviderId, t]);
 
   const handleImportSuccess = async () => {
@@ -1487,6 +1463,20 @@ function App() {
             {t("appPage.viewUsage")}
           </DropdownMenuItem>
         )}
+        <DropdownMenuItem
+          onSelect={() => {
+            settingsApi.openConfigFolder(activeApp).catch((error: unknown) => {
+              toast.error(
+                t("appPage.openDirectoryFailed", {
+                  defaultValue: "打开目录失败",
+                }),
+                { description: extractErrorMessage(error) || undefined },
+              );
+            });
+          }}
+        >
+          {t("appPage.browseDirectory")}
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => openSettings("appConfig", activeApp)}>
           {t("appPage.configDirectory")}
         </DropdownMenuItem>

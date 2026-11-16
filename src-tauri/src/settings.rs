@@ -133,6 +133,11 @@ pub struct WebDavSyncStatus {
 }
 
 fn default_remote_root() -> String {
+    crate::zhishu::identity::SYNC_ROOT.to_string()
+}
+// A missing persisted field used the upstream default before namespace isolation.
+// Keep that destination visible and blocked until the user changes it explicitly.
+fn legacy_remote_root() -> String {
     "cc-switch-sync".to_string()
 }
 fn default_profile() -> String {
@@ -153,7 +158,7 @@ pub struct WebDavSyncSettings {
     pub username: String,
     #[serde(default)]
     pub password: String,
-    #[serde(default = "default_remote_root")]
+    #[serde(default = "legacy_remote_root")]
     pub remote_root: String,
     #[serde(default = "default_profile")]
     pub profile: String,
@@ -178,6 +183,7 @@ impl Default for WebDavSyncSettings {
 
 impl WebDavSyncSettings {
     pub fn validate(&self) -> Result<(), crate::error::AppError> {
+        crate::zhishu::identity::validate_sync_root(&self.remote_root)?;
         if self.base_url.trim().is_empty() {
             return Err(crate::error::AppError::localized(
                 "webdav.base_url.required",
@@ -232,7 +238,7 @@ pub struct S3SyncSettings {
     pub secret_access_key: String,
     #[serde(default)]
     pub endpoint: String,
-    #[serde(default = "default_remote_root")]
+    #[serde(default = "legacy_remote_root")]
     pub remote_root: String,
     #[serde(default = "default_profile")]
     pub profile: String,
@@ -259,6 +265,7 @@ impl Default for S3SyncSettings {
 
 impl S3SyncSettings {
     pub fn validate(&self) -> Result<(), crate::error::AppError> {
+        crate::zhishu::identity::validate_sync_root(&self.remote_root)?;
         if self.bucket.trim().is_empty() {
             return Err(crate::error::AppError::localized(
                 "s3.bucket.required",
@@ -470,7 +477,7 @@ pub(crate) const LANGUAGES: &[&str] = &["zh", "zh-TW", "en", "de", "ja", "ko", "
 
 /// 应用设置结构
 ///
-/// 存储设备级别设置，保存在本地 `~/.cc-switch/settings.json`，不随数据库同步。
+/// 存储设备级别设置，保存在本地 `~/.zhishu-ccs/settings.json`，不随数据库同步。
 /// 这确保了云同步场景下多设备可以独立运作。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -822,11 +829,7 @@ impl AppSettings {
 
     fn settings_path() -> Option<PathBuf> {
         // settings.json 保留用于旧版本迁移和无数据库场景
-        Some(
-            crate::config::get_home_dir()
-                .join(".cc-switch")
-                .join("settings.json"),
-        )
+        Some(crate::config::get_device_data_dir().join("settings.json"))
     }
 
     fn normalize_paths(&mut self) {
@@ -1507,6 +1510,9 @@ pub fn get_current_provider(app_type: &AppType) -> Option<String> {
 /// 这是设备级别的设置，不随数据库同步。
 /// 传入 `None` 会清除当前供应商设置。
 pub fn set_current_provider(app_type: &AppType, id: Option<&str>) -> Result<(), AppError> {
+    if matches!(app_type, AppType::Pi) {
+        return Ok(());
+    }
     let id_owned = id.map(|s| s.to_string());
     mutate_settings(|settings| match app_type {
         AppType::Claude => settings.current_provider_claude = id_owned.clone(),

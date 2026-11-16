@@ -420,7 +420,7 @@
     },
     "unifyCodexHistory": {
       "title": "Birleşik Codex oturum geçmişi",
-      "message": "Etkinleştirildiğinde resmî abonelik paylaşılan \"custom\" sağlayıcı kimliğiyle çalışır ve resmî ile üçüncü taraf oturumlar tek grupta toplanır: yeni Codex her ikisine de devam edebilir, CLI'nin devam listesi de bunları birlikte gösterir.\n\nMevcut resmî oturumlarınızı da taşıyabilirsiniz; taşırsanız CC Switch her açılışta geride kalan resmî oturumları da taşır (önce ~/.cc-switch/backups konumuna yedeklenir; bu ayarı kapatırken geri yükleyebilirsiniz). Taşımadığınız oturumlar yeni Codex'te salt okunur kalır. Taşıma bittikten sonra Codex'i yeniden başlatın.\n\nNot: Diğer arka uç encrypted_content içindeki akıl yürütme verilerinin şifresini çözemediği için eski bir oturuma farklı bir sağlayıcıyla devam etmek başarısız olabilir.",
+      "message": "Etkinleştirildiğinde resmî abonelik paylaşılan \"custom\" sağlayıcı kimliğiyle çalışır ve resmî ile üçüncü taraf oturumlar tek grupta toplanır: yeni Codex her ikisine de devam edebilir, CLI'nin devam listesi de bunları birlikte gösterir.\n\nMevcut resmî oturumlarınızı da taşıyabilirsiniz; taşırsanız Zhishu CC Switch her açılışta geride kalan resmî oturumları da taşır (önce ~/.zhishu-ccs/backups konumuna yedeklenir; bu ayarı kapatırken geri yükleyebilirsiniz). Taşımadığınız oturumlar yeni Codex'te salt okunur kalır. Taşıma bittikten sonra Codex'i yeniden başlatın.\n\nNot: Diğer arka uç encrypted_content içindeki akıl yürütme verilerinin şifresini çözemediği için eski bir oturuma farklı bir sağlayıcıyla devam etmek başarısız olabilir.",
       "migrateExisting": "Ayrıca mevcut resmi oturum geçmişini taşıyın",
       "confirm": "Anladım, etkinleştir"
     },
@@ -999,7 +999,7 @@
     "configDirectoryDescription": "WSL gibi ortamlarda Claude Code veya Codex kullanırken, sağlayıcı verilerini ana ortamla tutarlı tutmak için yapılandırma dizinini WSL'deki dizine manuel olarak belirtebilirsiniz.",
     "appConfigDir": "CC Switch Yapılandırma Dizini",
     "appConfigDirDescription": "CC Switch yapılandırması için depolama konumunu özelleştirin (yapılandırma eşitlemeunu etkinleştirmek için bulut eşitleme klasörünü işaretleyin)",
-    "browsePlaceholderApp": "örneğin, C:\\Users\\Administrator\\.cc-switch",
+    "browsePlaceholderApp": "örneğin, C:\\Users\\Administrator\\.zhishu-ccs",
     "claudeConfigDir": "Claude Code Yapılandırma Dizini",
     "claudeConfigDirDescription": "Claude yapılandırma dizinini (settings.json) geçersiz kılın. Özel dizinler .claude.json'u (MCP) dizinin içinde saklar; varsayılan ~/.claude dizini Claude Code'nin bölünmüş ~/.claude.json yolunu korur.",
     "codexConfigDir": "Codex Yapılandırma Dizini",
@@ -2277,7 +2277,10 @@
     "modelExtraFieldKeyPlaceholder": "variants",
     "sdkOptions": "SDK Seçenekleri",
     "modelOptionKeyPlaceholder": "provider",
-    "modelOptionValuePlaceholder": "{\"order\": [\"baseten\"]}"
+    "modelOptionValuePlaceholder": "{\"order\": [\"baseten\"]}",
+    "modelLimits": "Token Limitleri",
+    "limitContext": "Bağlam",
+    "limitOutput": "Çıktı"
   },
   "providerPreset": {
     "label": "Sağlayıcı Ön Ayarı",
@@ -3892,7 +3895,7 @@
         },
         "listenPort": {
           "label": "Bağlantı Noktasını Dinle",
-          "placeholder": "15721",
+          "placeholder": "25721",
           "description": "Yönlendirme sunucusunun dinlediği port numarası (1024 ~ 65535)"
         },
         "maxRetries": {
@@ -4451,7 +4454,9 @@
     "openclawConfig": "Yapılandırma",
     "memory": "Bellek",
     "webUi": "Web kullanıcı arayüzü",
-    "viewUsage": "Bu uygulamanın kullanımını görüntüle"
+    "viewUsage": "Bu uygulamanın kullanımını görüntüle",
+    "browseDirectory": "Dizine gözat",
+    "openDirectoryFailed": "Dizin açılamadı"
   },
   "mode": {
     "tabsLabel": "Bağlantı modu",
@@ -5011,7 +5016,8 @@
       "noUpdatesInSelection": "Seçilen Becerilerin hiçbirinde güncelleme yok",
       "selectionAlreadyOn": "{{count}}'nin seçilen Becerileri zaten {{app}}'de etkindir",
       "selectionAlreadyOff": "Seçilen {{count}} Becerilerinden hiçbiri {{app}}'de etkin değil",
-      "disabledSelection": "{{app}}'de {{count}} {{noun}} kapatıldı"
+      "disabledSelection": "{{app}}'de {{count}} {{noun}} kapatıldı",
+      "copiedDir": "Kopyalanan klasör adı {{dir}}"
     },
     "installTo": {
       "prefix": "Şuraya yükleyin:",
@@ -5086,7 +5092,8 @@
       "updatesBody": "Bu depolardaki beceriler kontrol edilmediğinden sonuçlar eksik olabilir."
     },
     "updateAllCount": "Tümünü güncelle ({{count}})",
-    "updatingProgress": "{{done}}/{{total}} güncelleniyor…"
+    "updatingProgress": "{{done}}/{{total}} güncelleniyor…",
+    "copyDir": "Klasör adını kopyala"
   },
   "newLayoutNotice": {
     "title": "CC Switch yeni bir görünüme sahip",

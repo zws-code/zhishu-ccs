@@ -420,7 +420,7 @@
     },
     "unifyCodexHistory": {
       "title": "Codex セッション履歴を統一",
-      "message": "オンにすると、公式サブスクリプションが共有の custom プロバイダー ID で動作し、公式とサードパーティのセッションが同じグループにまとまります。新しい Codex でもどちらのセッションも再開でき、CLI の resume 一覧にもまとめて表示されます。\n\n既存の公式セッションを移行することもできます。移行を選ぶと、以後は起動のたびに公式グループに残ったセッションも移行します（移行前に ~/.cc-switch/backups へ自動バックアップし、オフにする際に復元を選べます）。移行しないセッションは新しい Codex では閲覧のみになります。移行後は Codex を再起動してください。\n\n注意：プロバイダーをまたいで古いセッションを再開すると、相手のバックエンドが encrypted_content の推論内容を復号できず失敗する場合があります。",
+      "message": "オンにすると、公式サブスクリプションが共有の custom プロバイダー ID で動作し、公式とサードパーティのセッションが同じグループにまとまります。新しい Codex でもどちらのセッションも再開でき、CLI の resume 一覧にもまとめて表示されます。\n\n既存の公式セッションを移行することもできます。移行を選ぶと、以後は起動のたびに公式グループに残ったセッションも移行します（移行前に ~/.zhishu-ccs/backups へ自動バックアップし、オフにする際に復元を選べます）。移行しないセッションは新しい Codex では閲覧のみになります。移行後は Codex を再起動してください。\n\n注意：プロバイダーをまたいで古いセッションを再開すると、相手のバックエンドが encrypted_content の推論内容を復号できず失敗する場合があります。",
       "migrateExisting": "既存の公式セッション履歴も移行する",
       "confirm": "理解しました、オンにする"
     },
@@ -999,7 +999,7 @@
     "configDirectoryDescription": "WSL などで Claude Code や Codex を使う場合、ここで設定ディレクトリを WSL 側に合わせるとデータを揃えられます。",
     "appConfigDir": "CC Switch 設定ディレクトリ",
     "appConfigDirDescription": "CC Switch の保存場所をカスタマイズします（クラウド同期フォルダを指定すると設定を同期できます）",
-    "browsePlaceholderApp": "例: C:\\\\Users\\\\Administrator\\\\.cc-switch",
+    "browsePlaceholderApp": "例: C:\\\\Users\\\\Administrator\\\\.zhishu-ccs",
     "claudeConfigDir": "Claude Code 設定ディレクトリ",
     "claudeConfigDirDescription": "Claude の設定ディレクトリ（settings.json）を上書きします。カスタムディレクトリでは .claude.json（MCP）をその中に保存し、既定の ~/.claude では Claude Code の既定どおり ~/.claude.json を使います。",
     "codexConfigDir": "Codex 設定ディレクトリ",
@@ -1036,7 +1036,7 @@
     "upToDate": "最新バージョンです",
     "aboutHint": "バージョン情報と更新状況を表示します。",
     "portableMode": "ポータブルモード: 更新は手動ダウンロードが必要です。",
-    "portableUpdateHint": "ポータブル版：上のボタンで新しい zip をダウンロードし、展開して既存の cc-switch.exe を上書きしてください。設定とデータはユーザーフォルダの .cc-switch に保存されており、上書きしても失われません。",
+    "portableUpdateHint": "ポータブル版：上のボタンで新しい zip をダウンロードし、展開して既存の cc-switch.exe を上書きしてください。設定とデータはユーザーフォルダの .zhishu-ccs に保存されており、上書きしても失われません。",
     "updateAvailable": "新しいバージョンがあります: {{version}}",
     "updateBadge": "更新あり",
     "updateFailed": "更新のインストールに失敗しました。ダウンロードページを開こうとしました。",
@@ -2343,7 +2343,10 @@
     "modelExtraFieldKeyPlaceholder": "variants",
     "sdkOptions": "SDK オプション",
     "modelOptionKeyPlaceholder": "provider",
-    "modelOptionValuePlaceholder": "{\"order\": [\"baseten\"]}"
+    "modelOptionValuePlaceholder": "{\"order\": [\"baseten\"]}",
+    "modelLimits": "トークン制限",
+    "limitContext": "コンテキスト",
+    "limitOutput": "出力"
   },
   "providerPreset": {
     "label": "プロバイダータイプ",
@@ -3958,7 +3961,7 @@
         },
         "listenPort": {
           "label": "リッスンポート",
-          "placeholder": "15721",
+          "placeholder": "25721",
           "description": "ルーティングサーバーがリッスンするポート番号（1024 ~ 65535）"
         },
         "maxRetries": {
@@ -4517,7 +4520,9 @@
     "openclawConfig": "設定",
     "memory": "メモリ",
     "webUi": "Web UI",
-    "viewUsage": "このアプリの使用量を見る"
+    "viewUsage": "このアプリの使用量を見る",
+    "browseDirectory": "ディレクトリを開く",
+    "openDirectoryFailed": "ディレクトリを開けませんでした"
   },
   "mode": {
     "tabsLabel": "接続モード",
@@ -5077,7 +5082,8 @@
       "noUpdatesInSelection": "選択した Skill に更新はありません",
       "selectionAlreadyOn": "選択した {{count}} 件の Skill は既に {{app}} で有効です",
       "selectionAlreadyOff": "選択した {{count}} 件の Skill はどれも {{app}} で有効ではありません",
-      "disabledSelection": "{{app}} で {{count}} 件の {{noun}} をオフにしました"
+      "disabledSelection": "{{app}} で {{count}} 件の {{noun}} をオフにしました",
+      "copiedDir": "フォルダー名 {{dir}} をコピーしました"
     },
     "installTo": {
       "prefix": "インストール先：",
@@ -5152,7 +5158,8 @@
       "updatesBody": "これらのリポジトリの Skill は確認されていないため、結果が不完全な可能性があります。"
     },
     "updateAllCount": "すべて更新（{{count}} 件）",
-    "updatingProgress": "更新中 {{done}}/{{total}}…"
+    "updatingProgress": "更新中 {{done}}/{{total}}…",
+    "copyDir": "フォルダー名をコピー"
   },
   "newLayoutNotice": {
     "title": "画面が新しくなりました",

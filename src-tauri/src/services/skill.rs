@@ -1,7 +1,7 @@
 //! Skills 服务层
 //!
 //! v3.10.0+ 统一管理架构：
-//! - SSOT（单一事实源）：`~/.cc-switch/skills/`
+//! - SSOT（单一事实源）：`~/.zhishu-ccs/skills/`
 //! - 安装时下载到 SSOT，按需同步到各应用目录
 //! - 数据库存储安装记录和启用状态
 
@@ -65,7 +65,7 @@ pub enum SyncMethod {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum SkillStorageLocation {
-    /// CC Switch 管理目录 (~/.cc-switch/skills/)
+    /// CC Switch 管理目录 (~/.zhishu-ccs/skills/)
     #[default]
     CcSwitch,
     /// Agent Skills 统一标准目录 (~/.agents/skills/)
@@ -656,7 +656,7 @@ impl SkillService {
 
     // ========== 路径管理 ==========
 
-    /// 获取 SSOT 目录（根据设置返回 ~/.cc-switch/skills/ 或 ~/.agents/skills/）
+    /// 获取 SSOT 目录（根据设置返回 ~/.zhishu-ccs/skills/ 或 ~/.agents/skills/）
     pub fn get_ssot_dir() -> Result<PathBuf> {
         let location = crate::settings::get_skill_storage_location();
         let dir = match location {
@@ -675,7 +675,7 @@ impl SkillService {
         Ok(Self::get_ssot_dir()?.join(directory))
     }
 
-    /// 获取 Skill 卸载备份目录（~/.cc-switch/skill-backups/）
+    /// 获取 Skill 卸载备份目录（~/.zhishu-ccs/skill-backups/）
     fn get_backup_dir() -> Result<PathBuf> {
         let dir = get_app_config_dir().join("skill-backups");
         fs::create_dir_all(&dir)?;
@@ -1730,6 +1730,33 @@ impl SkillService {
         let skill = current_skill;
 
         let dest = ssot_dir.join(&skill.directory);
+        // Verify old copies before replacing the source. This also records the
+        // pre-upgrade copies that predate deployment receipts, so legitimate
+        // copy-mode updates remain possible without accepting foreign edits.
+        for app in skill
+            .apps
+            .enabled_apps()
+            .into_iter()
+            .filter(Self::is_sync_managed_app)
+        {
+            if matches!(
+                app,
+                AppType::Mcode | AppType::Agy | AppType::Kimi | AppType::Dsh
+            ) {
+                continue;
+            }
+            let destination =
+                Self::get_distinct_app_skills_dir(&ssot_dir, &app)?.join(&skill.directory);
+            if let Some(PiSkillDeployment::Copy { expected_hash }) =
+                Self::inspect_pi_skill_destination(&dest, &destination, &skill.directory)?
+            {
+                crate::zhishu::coexistence::remember_skill_copy(
+                    &dest,
+                    &destination,
+                    expected_hash,
+                )?;
+            }
+        }
         let mut deployments = Vec::new();
         for app in [
             AppType::Pi,
@@ -2949,7 +2976,13 @@ impl SkillService {
                 Self::compute_pi_deployment_hash(destination),
                 Self::compute_pi_deployment_hash(source),
             ) {
-                if destination_hash == source_hash {
+                if destination_hash == source_hash
+                    || crate::zhishu::coexistence::owns_skill_copy(
+                        source,
+                        destination,
+                        &destination_hash,
+                    )
+                {
                     return Ok(Some(PiSkillDeployment::Copy {
                         expected_hash: destination_hash,
                     }));
@@ -2958,7 +2991,7 @@ impl SkillService {
         }
 
         Err(anyhow!(
-            "Pi 中已存在同名但内容不同的 Skill，拒绝覆盖或删除: {directory}"
+            "工具中已存在来自其他目录或内容不同的同名 Skill，拒绝覆盖或删除: {directory}"
         ))
     }
 
@@ -3053,18 +3086,7 @@ impl SkillService {
 
         let dest = app_dir.join(&directory);
 
-        if matches!(
-            app,
-            AppType::Pi
-                | AppType::Mcode
-                | AppType::Agy
-                | AppType::Kimi
-                | AppType::Dsh
-                | AppType::Omp
-                | AppType::Copilot
-                | AppType::WorkBuddy
-        ) && (dest.exists() || Self::is_symlink(&dest))
-        {
+        if dest.exists() || Self::is_symlink(&dest) {
             Self::ensure_pi_skill_destination_matches(&source, &dest, &directory)?;
         }
 
@@ -3082,6 +3104,7 @@ impl SkillService {
             SyncMethod::Auto => {
                 if dest.exists() && !Self::is_symlink(&dest) {
                     Self::replace_dest_with_copy(&source, &dest, &directory)?;
+                    Self::remember_skill_copy(&source, &dest)?;
                     log::debug!("Skill {directory} 已通过复制同步到 {app:?}");
                     return Ok(());
                 }
@@ -3106,6 +3129,7 @@ impl SkillService {
                 }
                 // Fallback 到 copy
                 Self::replace_dest_with_copy(&source, &dest, &directory)?;
+                Self::remember_skill_copy(&source, &dest)?;
                 log::debug!("Skill {directory} 已通过复制同步到 {app:?}");
             }
             SyncMethod::Symlink => {
@@ -3117,10 +3141,17 @@ impl SkillService {
             }
             SyncMethod::Copy => {
                 Self::replace_dest_with_copy(&source, &dest, &directory)?;
+                Self::remember_skill_copy(&source, &dest)?;
                 log::debug!("Skill {directory} 已通过复制同步到 {app:?}");
             }
         }
 
+        Ok(())
+    }
+
+    fn remember_skill_copy(source: &Path, destination: &Path) -> Result<()> {
+        let hash = Self::compute_pi_deployment_hash(destination)?;
+        crate::zhishu::coexistence::remember_skill_copy(source, destination, hash)?;
         Ok(())
     }
 
@@ -3263,17 +3294,7 @@ impl SkillService {
         }
 
         if skill_path.exists() || Self::is_symlink(&skill_path) {
-            if matches!(
-                app,
-                AppType::Pi
-                    | AppType::Mcode
-                    | AppType::Agy
-                    | AppType::Kimi
-                    | AppType::Dsh
-                    | AppType::Omp
-                    | AppType::Copilot
-                    | AppType::WorkBuddy
-            ) {
+            {
                 let source = ssot_dir.join(&directory);
                 Self::ensure_pi_skill_destination_matches(&source, &skill_path, &directory)?;
             }
@@ -3366,7 +3387,18 @@ impl SkillService {
 
                 if let Some(skill) = indexed_skills.get(&dir_name.to_lowercase()) {
                     if !skill.apps.is_enabled_for(app) {
-                        Self::remove_path(&path)?;
+                        let source = ssot_dir.join(&skill.directory);
+                        match Self::ensure_pi_skill_destination_matches(
+                            &source,
+                            &path,
+                            &skill.directory,
+                        ) {
+                            Ok(()) => Self::remove_path(&path)?,
+                            Err(error) => failed.push(SkillSyncFailure {
+                                directory: skill.directory.clone(),
+                                error: format!("{error:#}"),
+                            }),
+                        }
                     }
                     continue;
                 }
@@ -4487,7 +4519,7 @@ impl SkillService {
         skill: &InstalledSkill,
         excluded_paths: &[PathBuf],
     ) -> Result<Option<PathBuf>> {
-        // 返回值会被整目录复制进 ~/.cc-switch/skill-backups/ 并由 get_skill_backups
+        // 返回值会被整目录复制进 ~/.zhishu-ccs/skill-backups/ 并由 get_skill_backups
         // 在界面上列出——脏 directory 在这里等于任意文件读取 + 外泄通道。
         let directory = Self::require_valid_directory(&skill.directory)?;
 
@@ -5347,6 +5379,25 @@ pub fn migrate_skills_to_ssot(db: &Arc<Database>) -> Result<usize> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    #[serial_test::serial]
+    fn coexistence_shared_cli_skills_preserve_foreign_copies() {
+        let temp = tempfile::tempdir().unwrap();
+        let _home = TestHomeGuard::set(temp.path());
+        for app in [AppType::Claude, AppType::Codex, AppType::Gemini] {
+            let source = SkillService::get_ssot_dir().unwrap().join("shared-skill");
+            write_skill(&source, "ours");
+            let destination = SkillService::get_app_skills_dir(&app)
+                .unwrap()
+                .join("shared-skill");
+            write_skill(&destination, "foreign");
+            let before = fs::read(destination.join("SKILL.md")).unwrap();
+            assert!(SkillService::sync_to_app_dir("shared-skill", &app).is_err());
+            assert!(SkillService::remove_from_app("shared-skill", &app).is_err());
+            assert_eq!(fs::read(destination.join("SKILL.md")).unwrap(), before);
+        }
+    }
+
     use super::*;
     use tempfile::tempdir;
 
@@ -7510,7 +7561,7 @@ mod tests {
 
     /// 设置/恢复存储位置都会写 `settings.json`，所以必须借用一个已生效的
     /// `TestHomeGuard`：借用保证它在 HOME 隔离之后创建、在 HOME 恢复之前 drop，
-    /// 不会写到真实 `~/.cc-switch/settings.json`（Windows 上该文件被占用时原子替换
+    /// 不会写到真实 `~/.zhishu-ccs/settings.json`（Windows 上该文件被占用时原子替换
     /// 会报 os error 32 / 1176）。
     struct StorageLocationGuard<'a> {
         home: &'a TestHomeGuard,
@@ -7533,7 +7584,7 @@ mod tests {
     }
 
     fn assert_settings_write_isolated(home: &TestHomeGuard) {
-        let config_dir = crate::config::get_home_dir().join(".cc-switch");
+        let config_dir = crate::config::get_home_dir().join(".zhishu-ccs");
         assert!(
             config_dir.starts_with(&home.home),
             "settings.json would be written outside the test home: {}",
@@ -7775,7 +7826,7 @@ mod tests {
         let _guard = TestHomeGuard::set(temp.path());
 
         // 手工放置一个备份：meta.json 里的 directory 指向 SSOT 之外。
-        // SSOT 位于 {home}/.cc-switch/skills，"../../pwned-restore" 若生效会写到 {home}/pwned-restore。
+        // SSOT 位于 {home}/.zhishu-ccs/skills，"../../pwned-restore" 若生效会写到 {home}/pwned-restore。
         let backup_id = "20260727_120000_evil";
         let backup_dir = SkillService::get_backup_dir()
             .expect("backup dir")
@@ -7923,7 +7974,7 @@ mod tests {
             .expect("migrate away from alias");
         let new_source = temp
             .path()
-            .join(".cc-switch")
+            .join(".zhishu-ccs")
             .join("skills")
             .join("test-skill");
         let pi_skill = temp
@@ -7948,7 +7999,7 @@ mod tests {
         let _guard = TestHomeGuard::set(temp.path());
 
         // 模拟同步导入灌进来的脏数据：directory 含路径穿越（save_skill 不校验，
-        // 与 import_sql_string_for_sync 的效果一致）。SSOT = {home}/.cc-switch/skills，
+        // 与 import_sql_string_for_sync 的效果一致）。SSOT = {home}/.zhishu-ccs/skills，
         // "../../victim-uninstall" 解析为 {home}/victim-uninstall。
         let victim = temp.path().join("victim-uninstall");
         fs::create_dir_all(&victim).expect("create victim dir");
@@ -8044,7 +8095,7 @@ mod tests {
             .join("test-skill");
         fs::create_dir_all(pi_skill.parent().expect("Pi skills directory"))
             .expect("create Pi skills directory");
-        std::os::unix::fs::symlink(Path::new("../../.cc-switch/skills/test-skill"), &pi_skill)
+        std::os::unix::fs::symlink(Path::new("../../.zhishu-ccs/skills/test-skill"), &pi_skill)
             .expect("create relative Pi symlink");
 
         let result = SkillService::migrate_storage(&db, SkillStorageLocation::Unified)
@@ -8335,7 +8386,7 @@ mod tests {
                 ("weread-skills", "skills", "."),
             ] {
                 let home = tempdir().expect("home");
-                let config_dir = home.path().join(".cc-switch");
+                let config_dir = home.path().join(".zhishu-ccs");
                 fs::create_dir_all(&config_dir).expect("isolated config directory");
                 // Keep Windows' legacy-HOME fallback out of this destructive test.
                 fs::File::create(config_dir.join("cc-switch.db"))

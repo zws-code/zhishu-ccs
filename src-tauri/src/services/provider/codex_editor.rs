@@ -608,7 +608,7 @@ mod tests {
         });
         let edited = json!({
             "auth": { "OPENAI_API_KEY": "sk-new" },
-            "config": "approval_policy = \"never\"\nmodel_provider = \"custom\"\nmodel = \"gpt-b\"\n\n[model_providers.custom]\nname = \"Relay\"\nbase_url = \"https://new.example/v1\"\n"
+            "config": "approval_policy = \"never\"\nmodel_provider = \"zhishu\"\nmodel = \"gpt-b\"\n\n[model_providers.zhishu]\nname = \"Relay\"\nbase_url = \"https://new.example/v1\"\n"
         });
         let plan = plan_save(
             Some(&stored),
@@ -625,9 +625,9 @@ mod tests {
         let text = row["config"].as_str().unwrap();
         let parsed: toml::Table = toml::from_str(text).unwrap();
         assert_eq!(parsed["model"].as_str(), Some("gpt-b"));
-        assert_eq!(parsed["model_provider"].as_str(), Some("custom"));
+        assert_eq!(parsed["model_provider"].as_str(), Some("zhishu"));
         assert_eq!(
-            parsed["model_providers"]["custom"]["base_url"].as_str(),
+            parsed["model_providers"]["zhishu"]["base_url"].as_str(),
             Some("https://new.example/v1")
         );
         assert!(parsed["model_providers"].get("relay").is_none());
@@ -664,9 +664,9 @@ mod tests {
         .unwrap();
         let text = plan.row_settings["config"].as_str().unwrap();
         let parsed: toml::Table = toml::from_str(text).unwrap();
-        assert_eq!(parsed["model_provider"].as_str(), Some("custom"));
+        assert_eq!(parsed["model_provider"].as_str(), Some("zhishu"));
         assert_eq!(
-            parsed["model_providers"]["custom"]["base_url"].as_str(),
+            parsed["model_providers"]["zhishu"]["base_url"].as_str(),
             Some("https://relay.example.com/v1")
         );
         assert!(parsed.get("base_url").is_none(), "{text}");

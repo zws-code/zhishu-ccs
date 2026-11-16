@@ -420,7 +420,7 @@
     },
     "unifyCodexHistory": {
       "title": "Einheitlicher Codex-Sitzungsverlauf",
-      "message": "Wenn aktiviert, läuft das offizielle Abonnement unter der gemeinsamen Anbieter-ID „custom“. Offizielle und Drittanbieter-Sitzungen bilden damit eine Gruppe: Neuere Codex-Versionen können beide fortsetzen, und die Fortsetzungsliste der CLI zeigt sie gemeinsam an.\n\nSie können auch Ihre vorhandenen offiziellen Sitzungen migrieren; in diesem Fall verschiebt CC Switch bei jedem Start außerdem alle zurückgebliebenen offiziellen Sitzungen (zuvor wird in ~/.cc-switch/backups gesichert; beim Deaktivieren können Sie sie wiederherstellen). Nicht migrierte Sitzungen bleiben in neueren Codex-Versionen schreibgeschützt. Starten Sie Codex nach der Migration neu.\n\nHinweis: Das Fortsetzen einer alten Sitzung über Anbietergrenzen hinweg kann fehlschlagen, weil das andere Backend den verschlüsselten encrypted_content des Reasonings nicht entschlüsseln kann.",
+      "message": "Wenn aktiviert, läuft das offizielle Abonnement unter der gemeinsamen Anbieter-ID „custom“. Offizielle und Drittanbieter-Sitzungen bilden damit eine Gruppe: Neuere Codex-Versionen können beide fortsetzen, und die Fortsetzungsliste der CLI zeigt sie gemeinsam an.\n\nSie können auch Ihre vorhandenen offiziellen Sitzungen migrieren; in diesem Fall verschiebt Zhishu CC Switch bei jedem Start außerdem alle zurückgebliebenen offiziellen Sitzungen (zuvor wird in ~/.zhishu-ccs/backups gesichert; beim Deaktivieren können Sie sie wiederherstellen). Nicht migrierte Sitzungen bleiben in neueren Codex-Versionen schreibgeschützt. Starten Sie Codex nach der Migration neu.\n\nHinweis: Das Fortsetzen einer alten Sitzung über Anbietergrenzen hinweg kann fehlschlagen, weil das andere Backend den verschlüsselten encrypted_content des Reasonings nicht entschlüsseln kann.",
       "migrateExisting": "Auch vorhandenen offiziellen Sitzungsverlauf migrieren",
       "confirm": "Verstanden, aktivieren"
     },
@@ -999,7 +999,7 @@
     "configDirectoryDescription": "Wenn Sie Claude Code oder Codex in Umgebungen wie WSL verwenden, können Sie das Konfigurationsverzeichnis manuell auf das in WSL festlegen, damit die Anbieterdaten mit der Hauptumgebung übereinstimmen.",
     "appConfigDir": "CC-Switch-Konfigurationsverzeichnis",
     "appConfigDirDescription": "Speicherort der CC-Switch-Konfiguration anpassen (auf einen Cloud-Sync-Ordner verweisen, um die Konfiguration zu synchronisieren)",
-    "browsePlaceholderApp": "z. B. C:\\Users\\Administrator\\.cc-switch",
+    "browsePlaceholderApp": "z. B. C:\\Users\\Administrator\\.zhishu-ccs",
     "claudeConfigDir": "Claude-Code-Konfigurationsverzeichnis",
     "claudeConfigDirDescription": "Überschreibt das Claude-Konfigurationsverzeichnis (settings.json). Benutzerdefinierte Verzeichnisse speichern .claude.json (MCP) innerhalb des Verzeichnisses; das Standardverzeichnis ~/.claude behält den getrennten Pfad ~/.claude.json von Claude Code bei.",
     "codexConfigDir": "Codex-Konfigurationsverzeichnis",
@@ -1036,7 +1036,7 @@
     "upToDate": "Auf dem neuesten Stand",
     "aboutHint": "Versionsinformationen und Update-Status anzeigen.",
     "portableMode": "Portabler Modus: Updates müssen manuell heruntergeladen werden.",
-    "portableUpdateHint": "Portabler Modus: Die Schaltfläche oben lädt das neue ZIP herunter. Entpacken Sie es und ersetzen Sie Ihre vorhandene cc-switch.exe. Ihre Einstellungen und Daten liegen in .cc-switch in Ihrem Benutzerordner und sind nicht betroffen.",
+    "portableUpdateHint": "Portabler Modus: Die Schaltfläche oben lädt das neue ZIP herunter. Entpacken Sie es und ersetzen Sie Ihre vorhandene cc-switch.exe. Ihre Einstellungen und Daten liegen in .zhishu-ccs in Ihrem Benutzerordner und sind nicht betroffen.",
     "updateAvailable": "Neue Version verfügbar: {{version}}",
     "updateBadge": "Update verfügbar",
     "updateFailed": "Die Update-Installation ist fehlgeschlagen, es wurde versucht, die Download-Seite zu öffnen.",
@@ -2343,7 +2343,10 @@
     "modelExtraFieldKeyPlaceholder": "variants",
     "sdkOptions": "SDK-Optionen",
     "modelOptionKeyPlaceholder": "provider",
-    "modelOptionValuePlaceholder": "{\"order\": [\"baseten\"]}"
+    "modelOptionValuePlaceholder": "{\"order\": [\"baseten\"]}",
+    "modelLimits": "Token-Limits",
+    "limitContext": "Kontext",
+    "limitOutput": "Ausgabe"
   },
   "providerPreset": {
     "label": "Anbieter-Vorlage",
@@ -3958,7 +3961,7 @@
         },
         "listenPort": {
           "label": "Abhörport",
-          "placeholder": "15721",
+          "placeholder": "25721",
           "description": "Portnummer, auf der der Routing-Server lauscht (1024 ~ 65535)"
         },
         "maxRetries": {
@@ -4517,7 +4520,9 @@
     "openclawConfig": "Konfiguration",
     "memory": "Memory",
     "webUi": "Web UI",
-    "viewUsage": "Nutzung dieser App ansehen"
+    "viewUsage": "Nutzung dieser App ansehen",
+    "browseDirectory": "Verzeichnis durchsuchen",
+    "openDirectoryFailed": "Verzeichnis konnte nicht geöffnet werden"
   },
   "mode": {
     "tabsLabel": "Verbindungsmodus",
@@ -5077,7 +5082,8 @@
       "noUpdatesInSelection": "Für keinen der ausgewählten Skills gibt es Updates",
       "selectionAlreadyOn": "Die {{count}} ausgewählten Skills sind in {{app}} bereits aktiviert",
       "selectionAlreadyOff": "Keiner der {{count}} ausgewählten Skills ist in {{app}} aktiviert",
-      "disabledSelection": "{{count}} {{noun}} in {{app}} ausgeschaltet"
+      "disabledSelection": "{{count}} {{noun}} in {{app}} ausgeschaltet",
+      "copiedDir": "Ordnername {{dir}} kopiert"
     },
     "installTo": {
       "prefix": "Installieren für: ",
@@ -5152,7 +5158,8 @@
       "updatesBody": "Skills aus diesen Repositories wurden nicht geprüft, daher sind die Ergebnisse möglicherweise unvollständig."
     },
     "updateAllCount": "Alle aktualisieren ({{count}})",
-    "updatingProgress": "Aktualisierung {{done}}/{{total}} …"
+    "updatingProgress": "Aktualisierung {{done}}/{{total}} …",
+    "copyDir": "Ordnernamen kopieren"
   },
   "newLayoutNotice": {
     "title": "CC Switch hat ein neues Aussehen",

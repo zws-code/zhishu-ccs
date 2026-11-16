@@ -22,7 +22,7 @@ interface SkillsStorageSheetProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const DEFAULT_CC_SWITCH_DIR = "~/.cc-switch/skills";
+const DEFAULT_CC_SWITCH_DIR = "~/.zhishu-ccs/skills";
 const UNIFIED_DIR = "~/.agents/skills";
 
 /** 和后端 SyncMethod（auto / symlink / copy）一一对应。 */

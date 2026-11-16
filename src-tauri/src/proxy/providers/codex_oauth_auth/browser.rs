@@ -110,6 +110,7 @@ async fn callback(
                 [
                     (header::CACHE_CONTROL, "no-store"),
                     (header::REFERRER_POLICY, "no-referrer"),
+                    (header::CONNECTION, "close"),
                 ],
                 "Invalid login callback. Return to CC Switch and try again.",
             )
@@ -123,6 +124,7 @@ async fn callback(
             [
                 (header::CACHE_CONTROL, "no-store"),
                 (header::REFERRER_POLICY, "no-referrer"),
+                (header::CONNECTION, "close"),
             ],
             "This login callback has already been received.",
         );
@@ -133,6 +135,7 @@ async fn callback(
         [
             (header::CACHE_CONTROL, "no-store"),
             (header::REFERRER_POLICY, "no-referrer"),
+            (header::CONNECTION, "close"),
         ],
         if success {
             "Authorization received. Return to CC Switch to finish signing in."
@@ -146,7 +149,18 @@ async fn bind_callback_listener(port: u16) -> Result<tokio::net::TcpListener, Co
     // Bind before changing login state. Never stop another app's listener or
     // silently fall back to device authentication.
     tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port)).await
-        .map_err(|_| CodexOAuthError::IoError(format!("Cannot open the browser login callback on localhost:{port}. Finish any other Codex login and retry, or choose device-code login.")))
+        .map_err(|error| {
+            let message = if error.kind() == std::io::ErrorKind::AddrInUse {
+                crate::error::AppError::localized(
+                    "codex.oauth.callback_busy",
+                    format!("Codex 浏览器登录端口 {port} 正被其他应用使用。请完成另一处登录后重试，或选择设备码登录；不会关闭其他应用的监听器"),
+                    format!("Codex browser login port {port} is in use. Finish the other login or choose device-code login. The other application's listener was preserved."),
+                ).to_string()
+            } else {
+                format!("Cannot open the browser login callback on localhost:{port}: {error}. Choose device-code login.")
+            };
+            CodexOAuthError::IoError(message)
+        })
 }
 
 impl CodexOAuthManager {
