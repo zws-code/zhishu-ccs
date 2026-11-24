@@ -1,160 +1,4 @@
 {
-  "platformCatalog": {
-    "accountIsolation": "Catalogs are stored separately by platform address and user ID. Only the currently signed-in account is shown here.",
-    "deleteAllHint": "Delete the current account’s platform providers across all Agent apps, including hidden apps. Keep platform base data and server keys.",
-    "deleteAllResult": "Deletion results for all Agent apps",
-    "deleteResultApp": "Agent app",
-    "deleteResultStatus": "Deletion result",
-    "deleteAppFailed": "Deletion failed: {{message}}",
-    "deleteProviders": "Delete all platform providers",
-    "deletingProviders": "Deleting platform providers…",
-    "deleteAction": "Platform provider deletion",
-    "deleteCompleted": "Deleted {{removed}} platform providers; kept {{skipped}}",
-    "syncAction": "Platform provider sync",
-    "syncResult": "Provider sync result",
-    "syncResultDescription": "View this sync's results, native file changes, and backup location.",
-    "deleteResultDescription": "View this deletion's results, native file changes, and backup location.",
-    "syncStats": "Providers: {{added}} added, {{updated}} updated, {{removed}} removed, {{unchanged}} unchanged",
-    "nativeChanges": "Native Agent configuration files",
-    "noNativeChanges": "No native Agent configuration was changed. Only the provider list in CCS was synchronized.",
-    "syncBackup": "Backup before sync",
-    "openBackup": "Open backup folder",
-    "copyBackupPath": "Copy backup path",
-    "noSyncBackup": "No backup directory was created for this sync.",
-    "openBackupFailed": "Unable to open backup folder",
-    "backupPathCopied": "Backup path copied",
-    "nativeChangedCount": "{{count}} native configuration files changed",
-    "noNativeChangesShort": "No native configuration files changed",
-    "syncCompleted": "Providers: {{added}} added, {{updated}} updated, {{removed}} removed; {{fileState}}. See configuration history for details.",
-    "group": "Group",
-    "actions": "Actions",
-    "groupStatus": "Group status",
-    "userId": "User ID",
-    "keyId": "Key ID",
-    "keyName": "Key name",
-    "showKey": "Show API Key",
-    "hideKey": "Hide API Key",
-    "copyKey": "Copy API Key",
-    "keyCopied": "API Key copied",
-    "copyFailed": "Unable to copy API Key. Please retry.",
-    "noKey": "No API Key is available for this group. Sync platform data again.",
-    "expandCatalog": "Expand model catalog",
-    "collapseCatalog": "Collapse model catalog",
-    "toggleModel": "Model parameters for {{name}}",
-    "expand": "Expand",
-    "collapse": "Collapse",
-    "viewDetails": "View details",
-    "viewDetailsFor": "View details for {{name}}",
-    "detailsDescription": "Group information and model parameters",
-    "groupId": "Group ID",
-    "platform": "Platform type",
-    "billing": "Billing type",
-    "source": "Platform URL",
-    "status": "Sync status",
-    "subscription": "Subscription",
-    "standard": "Pay as you go",
-    "modelCatalog": "Model catalog",
-    "noModels": "No model data available",
-    "contextWindow": "Context window",
-    "maxOutput": "Maximum output tokens",
-    "endpoints": "API protocols",
-    "inputModalities": "Input modalities",
-    "tools": "Tool calling",
-    "streaming": "Streaming output",
-    "reasoningLevels": "Reasoning levels",
-    "defaultReasoning": "Default reasoning level",
-    "notReported": "Not provided",
-    "supported": "Supported",
-    "unsupported": "Not supported",
-    "title": "Platform data",
-    "description": "Fetch groups and model catalogs from the Zhishu platform as shared data for all apps. After an update, use Connect tools to apply it to installed apps in one step, or sync each app individually.",
-    "sync": "Sync platform data",
-    "syncing": "Syncing platform data…",
-    "success": "Platform data updated. Use Connect tools to apply it, or sync each app.",
-    "partial": "Some groups could not be synced. Available data was saved; you can retry.",
-    "account": "Current account",
-    "lastSync": "Last synced",
-    "never": "Never synced",
-    "counts": "{{groups}} groups · {{models}} models",
-    "loading": "Reading local platform data…",
-    "empty": "No platform data for this account yet. Use the button above to sync.",
-    "noGroups": "This account has no groups available to sync.",
-    "models": "models",
-    "failed": "Sync failed; retry available",
-    "ready": "Synced",
-    "localHint": "Generate provider configurations using platform data already saved on this device",
-    "changes": "Added {{added}}, removed {{removed}}, skipped {{skipped}}",
-    "providersSuccess": "Platform providers synced: added {{added}}, removed {{removed}}, skipped {{skipped}}",
-    "providersSyncing": "Syncing platform providers…",
-    "providersSync": "Sync platform providers",
-    "bulkAdd": "Add all",
-    "bulkRemove": "Remove all",
-    "bulkAddHint": "Add every platform provider that is not enabled yet to the added list",
-    "bulkRemoveHint": "Remove enabled platform providers from the configuration; they stay in the available list",
-    "bulkAddStackHint": "Add all platform providers to the stack member list",
-    "bulkRemoveStackHint": "Remove platform providers from the stack member list",
-    "bulkAddDone": "Added {{count}} platform providers",
-    "bulkRemoveDone": "Removed {{count}} platform providers",
-    "bulkPartial": "{{success}} succeeded, {{failed}} failed"
-  },
-  "platformOnboarding": {
-    "title": "Connect tools",
-    "description": "Choose the apps and access mode. Mode apps can use direct, route, or stack; additive apps add every platform provider. Existing providers stay in the list so you can switch back at any time.",
-    "button": "Connect tools",
-    "buttonHint": "Pick apps and access mode, then create and connect their platform providers in one step",
-    "detecting": "Detecting installed tools…",
-    "loadingCatalog": "Reading platform data…",
-    "detectFailed": "Could not detect installations. Select the apps to connect manually.",
-    "installed": "Installed",
-    "notInstalled": "Not installed",
-    "noApps": "No supported apps are visible. Show at least one supported tool on the Apps page first.",
-    "noCatalog": "This account has no groups to sync. Sync platform data first.",
-    "groupsAvailable": "{{count}} groups available",
-    "selectAll": "Select all",
-    "clearAll": "Clear",
-    "confirm": "Connect selected apps",
-    "later": "Later",
-    "provisioning": "Connecting…",
-    "warning": "Connecting rewrites the current provider configuration of the selected tools.",
-    "resultTitle": "Connection results",
-    "resultSummary": "Connected {{success}} app(s); {{failed}} failed",
-    "resultSuccess": "Connected: {{provider}}",
-    "resultFailed": "Failed: {{message}}",
-    "noProvider": "No platform model is available for this app",
-    "done": "Done",
-    "retry": "Retry failed",
-    "modeLabel": "Access mode for {{name}}",
-    "mode": {
-      "direct": "Direct",
-      "route": "Route",
-      "stack": "Stack"
-    },
-    "additiveMode": "Added to provider list",
-    "modeHint": "Mode apps can use direct or route; Claude, Codex, and Claude Desktop also support stack. Additive apps add every platform provider.",
-    "resultDirect": "Direct configuration written: {{provider}}",
-    "resultRoute": "Route switched: {{provider}}",
-    "resultStack": "Added to stack: {{provider}} ({{count}} platform providers)",
-    "resultAdditive": "Added to provider list: {{count}} platform providers",
-    "defaultModelHint": "The default model was not changed automatically; select this provider's model in the tool.",
-    "groupLabel": "Group for {{name}}",
-    "groupOption": "{{name}} ({{count}} models)",
-    "groupLoading": "Reading groups…",
-    "noGroupsForApp": "No group is available for this app",
-    "stackDefaultHint": "Stack adds every platform provider for this app; the selected group is the default."
-  },
-  "simpleMode": {
-    "navApps": "Apps",
-    "title": "Apps",
-    "description": "Pick a provider for each tool. \"Zhishu Platform\" models sync with your account automatically.",
-    "notConnected": "Not connected",
-    "connected": "Connected",
-    "inactiveHint": "Platform models not in use",
-    "emptyProvidersHint": "No platform providers for this app yet. Turn on the switch on the Apps page to connect.",
-    "switchOnLabel": "Connect {{name}} to platform providers",
-    "switchOffLabel": "Remove platform providers of {{name}}",
-    "toSimple": "Simple mode",
-    "toAdvanced": "Advanced mode"
-  },
   "app": {
     "title": "CC Switch",
     "description": "All-in-One Assistant for Claude Code, Codex & Gemini CLI"
@@ -181,7 +25,6 @@
     "success": "Success",
     "error": "Error",
     "unknown": "Unknown",
-    "enterValidValue": "Please enter a valid value",
     "clear": "Clear",
     "format": "Format",
     "formatSuccess": "Formatted successfully",
@@ -206,7 +49,8 @@
     "collapse": "Collapse",
     "more": "More",
     "retry": "Retry",
-    "required": "required"
+    "required": "required",
+    "enterValidValue": "Please enter a valid value"
   },
   "firstRunNotice": {
     "title": "Welcome to CC Switch",
@@ -217,7 +61,9 @@
   "apiKeyInput": {
     "placeholder": "Enter API Key",
     "show": "Show API Key",
-    "hide": "Hide API Key"
+    "hide": "Hide API Key",
+    "copied": "API Key copied",
+    "copyFailed": "Failed to copy API Key"
   },
   "jsonEditor": {
     "mustBeObject": "Configuration must be a JSON object, not an array or other type",
@@ -298,7 +144,6 @@
     "adoptCatalog": "Use CC Switch's model catalog",
     "adoptCatalogDone": "Now using CC Switch's model catalog. Restart Codex to apply",
     "adoptCatalogFailed": "Failed to switch to CC Switch's model catalog: {{error}}",
-    "noRoutingSupport": "No Routing Support",
     "blockedByProxyHint": "Can't switch to an official provider in Routing mode",
     "editProvider": "Edit Provider",
     "editProviderHint": "Configuration will be applied to the current provider immediately after update.",
@@ -360,6 +205,8 @@
       "extraArgsPlaceholder": "e.g. --debug --append-system-prompt \"Be brief\"",
       "extraArgsHint": "Added after the launch command, for this terminal only. Separate with spaces; quote values that contain spaces.",
       "agySwitchTitle": "This switches agy's sign-in",
+      "agyBindingMissing": "The Antigravity account bound to this card is missing on this computer. Add it in Auth Center or use agy's current sign-in for this launch.",
+      "agyUseCurrentLogin": "Use agy's current sign-in for this launch",
       "agySwitchBody": "Before opening, agy's sign-in switches to {{account}}, and agy sessions started afterwards use this account.",
       "agySwitchRunning": "agy is running: open agy sessions keep the previous account and may write it back. Quit them first if you can.",
       "isolationBodyCopilot": "copilot in this terminal starts with --model set to the first model of \"{{name}}\", for this session only. The endpoint and key come from Copilot's providers.json, so other terminals can pick it with /model too."
@@ -397,17 +244,19 @@
         "oauthHint": "Google official uses OAuth personal authentication, no need to fill in API Key. The browser will automatically open for login on first use.",
         "apiKeyPlaceholder": "Enter Gemini API Key"
       },
-      "claudeAccount": {
+      "managedAccount": {
         "label": "Sign-in method",
+        "missing": "Account not on this computer",
+        "reauthBadge": "Re-login required"
+      },
+      "claudeAccount": {
         "default": "Follow Claude Code login",
         "defaultDescription": "The account changes with the current Claude Code login",
-        "missing": "Account not on this computer",
         "manage": "Add or manage Claude accounts",
         "helpTerminal": "The Claude config folder is overridden in Settings, so switching to this card doesn't change Claude Code's sign-in. Use Open Terminal on the card to use the selected account.",
         "helpWsl": "The Claude config folder is in WSL, where Claude accounts aren't supported yet. Switching to this card doesn't change Claude Code's sign-in.",
         "help": "Switching to this card changes Claude Code's sign-in to the selected account right away, including sessions already running. To use several accounts at once, use Open Terminal on the card.",
         "claudeAccount": "Claude account",
-        "reauthBadge": "Re-login required",
         "terminalHint": "Use via Open Terminal",
         "wslHint": "Not supported in WSL",
         "plan": {
@@ -419,6 +268,13 @@
           "teamPremium": "Team Premium",
           "enterprise": "Enterprise"
         }
+      },
+      "grokAccount": {
+        "default": "Follow Grok CLI sign-in",
+        "defaultDescription": "Uses whichever account Grok CLI is signed in to",
+        "manage": "Add or manage xAI accounts",
+        "help": "When you switch to this card, Grok CLI's sign-in (~/.grok/auth.json) changes to the selected account. The account signed in before is saved to the auth center first and comes back when you switch to the \"Follow Grok CLI sign-in\" card.",
+        "xaiAccount": "xAI account"
       }
     },
     "duplicateLiveIdsLoadFailed": "Failed to read provider identifiers from config, please fix the config and try again",
@@ -434,7 +290,8 @@
     "formSubtitleStack": "{{app}} (Aggregation mode)",
     "editCurrentNoticeFile": "This is the provider in use. Saving writes it to",
     "editCurrentNoticeFileEnd": " right away; the next request uses it.",
-    "editCurrentNotice": "This is the provider in use. Saving takes effect right away; the next request uses the new settings."
+    "editCurrentNotice": "This is the provider in use. Saving takes effect right away; the next request uses the new settings.",
+    "noRoutingSupport": "No Routing Support"
   },
   "claudeCode": {
     "needsRouting": "Needs Routing",
@@ -442,7 +299,6 @@
   },
   "codex": {
     "needsRouting": "Needs Routing",
-    "noRoutingSupport": "No Routing Support",
     "officialRouting": "Official Account Routing",
     "nativeLogin": "Codex Sign-in",
     "followCodexLogin": "Follow Codex login",
@@ -452,7 +308,8 @@
     "chooseAccount": "Choose account",
     "accountStatusUnavailable": "Unable to load account details",
     "boundAccountUnavailable": "The linked account is unavailable",
-    "accountLoading": "Loading account…"
+    "accountLoading": "Loading account…",
+    "noRoutingSupport": "No Routing Support"
   },
   "claudeDesktop": {
     "modelConfigTitle": "Model Configuration",
@@ -478,7 +335,7 @@
     "supports1mShort": "1M",
     "directModelListTitle": "Model List",
     "directModelListCollapsedHint": "Native Claude model providers usually do not need this. Claude Desktop will fetch /v1/models automatically.",
-    "directModelListHint": "Configure the Sonnet, Opus, and Haiku models available to Claude Desktop. Leave this empty to let Claude Desktop fetch /v1/models automatically. Checking 1M declares 1M context support.",
+    "directModelListHint": "Configure the Sonnet, Opus, and Haiku models available to Claude Desktop. In direct mode, leave this empty to let Claude Desktop fetch /v1/models automatically; in route mode, an empty list only offers the default Claude model names, so fill it in to use the provider's models. Checking 1M declares 1M context support.",
     "directModelInvalid": "Direct models must use Claude Desktop-recognized Sonnet / Opus / Haiku model IDs",
     "addModel": "Add model",
     "addRoute": "Add model",
@@ -500,8 +357,6 @@
   },
   "notifications": {
     "providerAdded": "Provider added",
-    "providerSaved": "Provider configuration saved",
-    "providerDeleted": "Provider deleted successfully",
     "switchSuccess": "Switch successful!",
     "codexRestartRequired": "Switched successfully. Restart the client to apply changes.",
     "geminiRestartRequired": "Switched successfully. Restart Gemini CLI to apply changes.",
@@ -512,12 +367,9 @@
     "removeFromConfigFailed": "Could not remove provider",
     "switchFailedTitle": "Switch failed",
     "switchFailed": "Switch failed: {{error}}",
-    "autoImported": "Default provider created from existing configuration",
     "addFailed": "Failed to add provider: {{error}}",
     "saveFailed": "Save failed: {{error}}",
     "saveFailedGeneric": "Save failed, please try again",
-    "appliedToClaudePlugin": "Applied to Claude plugin",
-    "removedFromClaudePlugin": "Removed from Claude plugin",
     "syncClaudePluginFailed": "Sync Claude plugin failed",
     "skipClaudeOnboardingFailed": "Failed to skip Claude Code first-run confirmation",
     "clearClaudeOnboardingSkipFailed": "Failed to restore Claude Code first-run confirmation",
@@ -536,8 +388,6 @@
     "proxyReasonDesktopMapping": "uses model mapping (Claude Desktop only accepts Claude model names)",
     "proxyReasonManagedOAuth": "uses managed OAuth login (token injected by local routing)",
     "proxyReasonRoutingRequired": "requires local routing to process requests",
-    "openAIFormatHint": "This provider uses OpenAI-compatible format and requires the routing service to be enabled",
-    "copilotProxyHint": "GitHub Copilot as a Claude provider always requires local routing; routing automatically selects Chat Completions or Responses based on the current model.",
     "openLinkFailed": "Failed to open link",
     "openclawModelsRegistered": "Models have been registered to /model list",
     "openclawDefaultModelSet": "Set as default model",
@@ -546,6 +396,7 @@
     "openclawModelNotFound": "The selected model no longer exists. Refresh and try again.",
     "backfillWarning": "Switched successfully, but failed to save changes back to the previous provider",
     "codexAuthCleanupFailed": "Switched successfully, but auth.json could not be removed — the official login credentials are still on disk; delete auth.json from the Codex config directory to remove them",
+    "omoVariantCleanupFailed": "Switched successfully, but the other OMO variant's config file (OMO / OMO Slim) could not be removed, so OpenCode may load both; delete it from the OpenCode config directory",
     "windowControlFailed": "Window control failed: {{error}}",
     "officialBlockedByProxy": "Cannot switch to official provider while local routing is active. Using routing with official APIs may cause account bans.",
     "proxyOfficialWarning": "Current provider {{name}} is official. Consider switching to a third-party provider before using local routing.",
@@ -556,7 +407,14 @@
       "thirdPartyBucket": "third-party providers",
       "migrationFinished": "Migrated {{count}} old sessions. Restart Codex to continue them.",
       "migrationFailed": "Failed to migrate old sessions: {{error}}. CC Switch will retry on next launch."
-    }
+    },
+    "providerSaved": "Provider configuration saved",
+    "providerDeleted": "Provider deleted successfully",
+    "autoImported": "Default provider created from existing configuration",
+    "appliedToClaudePlugin": "Applied to Claude plugin",
+    "removedFromClaudePlugin": "Removed from Claude plugin",
+    "openAIFormatHint": "This provider uses OpenAI-compatible format and requires the routing service to be enabled",
+    "copilotProxyHint": "GitHub Copilot as a Claude provider always requires local routing; routing automatically selects Chat Completions or Responses based on the current model."
   },
   "confirm": {
     "deleteProvider": "Delete Provider",
@@ -644,14 +502,14 @@
       "proxy": {
         "title": "Local Routing",
         "description": "Control routing service toggle, view status and port info",
+        "enableStackMode": "Show the Aggregation mode switch on the main page",
+        "enableFailoverToggle": "Show Failover Toggle on Main Page",
+        "running": "Running",
+        "stopped": "Stopped",
         "enableFeature": "Show Routing Toggle on Main Page",
         "enableFeatureDescription": "When enabled, the routing and failover toggles will appear at the top of the main page",
-        "enableStackMode": "Show the Aggregation mode switch on the main page",
         "enableStackModeDescription": "When on, the main-page switch for Claude Code and Codex becomes the Aggregation mode: add several providers like in OpenCode, and all their models appear in the client's model list (Codex needs a restart first). No failover. This and the local routing switch are mutually exclusive; switching sends Claude Code and Codex back to direct first",
-        "enableFailoverToggle": "Show Failover Toggle on Main Page",
-        "enableFailoverToggleDescription": "When enabled, the failover toggle will appear independently at the top of the main page",
-        "running": "Running",
-        "stopped": "Stopped"
+        "enableFailoverToggleDescription": "When enabled, the failover toggle will appear independently at the top of the main page"
       },
       "failover": {
         "title": "Auto Failover",
@@ -682,7 +540,6 @@
         "description": "Automatically fix API request compatibility issues",
         "enabled": "Enable Rectifier",
         "requestGroup": "Request Rectification",
-        "responseGroup": "Response Rectification",
         "thinkingSignature": "Thinking Signature Rectification",
         "thinkingSignatureDescription": "When an Anthropic-type provider returns thinking signature incompatibility or illegal request errors, automatically removes incompatible thinking-related blocks and retries once with the same provider",
         "thinkingBudget": "Thinking Budget Rectification",
@@ -690,7 +547,8 @@
         "mediaFallback": "Unsupported Image Fallback",
         "mediaFallbackDescription": "When a provider does not support image input (it declares text-only capability, or the upstream returns an unsupported-image error), automatically replaces image blocks with an [Unsupported Image] marker so the conversation is not interrupted",
         "mediaHeuristic": "Text-Only Model Preflight",
-        "mediaHeuristicDescription": "Before sending, strips images for models in the built-in confirmed text-only registry. Turning this off only disables the proxy's registry-based preflight; declared text-only handling and upstream-error fallback remain, and Codex model-catalog capability declarations are unchanged"
+        "mediaHeuristicDescription": "Before sending, strips images for models in the built-in confirmed text-only registry. Turning this off only disables the proxy's registry-based preflight; declared text-only handling and upstream-error fallback remain, and Codex model-catalog capability declarations are unchanged",
+        "responseGroup": "Response Rectification"
       },
       "privacyFilter": {
         "title": "Privacy Filter",
@@ -770,6 +628,9 @@
       "safetyBackupId": "Safety Backup ID",
       "intervalLabel": "Auto-backup Interval",
       "retainLabel": "Backup Retention",
+      "maxTotalLabel": "Backup Size Limit",
+      "maxTotalUnlimited": "No limit",
+      "maxTotalHint": "Off by default. When set, the oldest backups are deleted once the backups folder grows past this size. The newest backup and any backup used by a restore are always kept, so the folder can stay above the limit when a single backup is larger. Applies at the next backup or the daily maintenance run.",
       "intervalDisabled": "Disabled",
       "intervalHours": "{{hours}} hours",
       "intervalDays": "{{days}} days",
@@ -992,10 +853,8 @@
       "enabledHint": "Turn on S3 sync for manual and automatic cloud operations.",
       "mutualExclusionTitle": "Switch Sync Type",
       "mutualExclusionMessage": "Enabling S3 sync will disable the current WebDAV sync. Continue?",
-      "mutualExclusionMessageReverse": "Enabling WebDAV sync will disable the current S3 sync. Continue?",
       "mutualExclusionFailed": "Failed to switch sync type: {{error}}",
       "testConnection": "Test Connection",
-      "connectionOk": "S3 connection successful",
       "test": "Test Connection",
       "testing": "Testing...",
       "testSuccess": "S3 connection successful",
@@ -1022,6 +881,15 @@
       "incompatibleVersion": "Remote data is incompatible (version {{version}}). This client supports protocol v2 / db-v6.",
       "unsaved": "Unsaved",
       "saved": "Saved",
+      "clear": "Clear config",
+      "clearing": "Clearing...",
+      "clearSuccess": "S3 config cleared on this device",
+      "clearFailed": "Failed to clear config: {{error}}",
+      "clearConfirm": {
+        "title": "Clear S3 config",
+        "message": "This removes the saved S3 region, bucket, access key, secret key, endpoint and remote folder from this device and stops auto sync. Data already uploaded to the bucket is not deleted.",
+        "confirm": "Clear"
+      },
       "unsavedChanges": "Please save config first",
       "saveBeforeSync": "Save configuration first to enable upload/download.",
       "fetchingRemote": "Fetching remote info...",
@@ -1047,7 +915,9 @@
         "createdAt": "Uploaded at",
         "warning": "This will overwrite existing sync data at the S3 path",
         "confirm": "Confirm Upload"
-      }
+      },
+      "mutualExclusionMessageReverse": "Enabling WebDAV sync will disable the current S3 sync. Continue?",
+      "connectionOk": "S3 connection successful"
     },
     "autoReload": "Data refreshed",
     "languageOptionChinese": "简体中文",
@@ -1111,19 +981,18 @@
     "appVisibility": {
       "title": "Homepage Display",
       "description": "Choose which apps to show on the homepage",
-      "claudeDesc": "Anthropic Claude Code CLI",
-      "codexDesc": "OpenAI Codex CLI",
-      "geminiDesc": "Google Gemini CLI",
-      "opencodeDesc": "OpenCode CLI",
       "showProfileSwitcher": "Show project switcher",
       "showProfileSwitcherDescription": "Show the project switcher in the main page header",
       "showProviderSearch": "Show provider search",
-      "showProviderSearchDescription": "Show a search button at the top of the provider page to find providers by name, notes, website, or API address. When hidden, ⌘F / Ctrl+F still opens search"
+      "showProviderSearchDescription": "Show a search button at the top of the provider page to find providers by name, notes, website, or API address. When hidden, ⌘F / Ctrl+F still opens search",
+      "claudeDesc": "Anthropic Claude Code CLI",
+      "codexDesc": "OpenAI Codex CLI",
+      "geminiDesc": "Google Gemini CLI",
+      "opencodeDesc": "OpenCode CLI"
     },
     "terminal": {
       "title": "Preferred Terminal",
       "description": "Choose which terminal app to use when clicking the terminal button",
-      "fallbackHint": "If the selected terminal is unavailable, the system default will be used",
       "options": {
         "macos": {
           "terminal": "Terminal.app",
@@ -1149,30 +1018,21 @@
           "kitty": "Kitty",
           "ghostty": "Ghostty"
         }
-      }
+      },
+      "fallbackHint": "If the selected terminal is unavailable, the system default will be used"
     },
-    "configDirectoryOverride": "Configuration Directory Override (Advanced)",
     "configDirectoryDescription": "When using Claude Code or Codex in environments like WSL, you can manually specify the configuration directory to the one in WSL to keep provider data consistent with the main environment.",
     "appConfigDir": "CC Switch Configuration Directory",
     "appConfigDirDescription": "Customize the storage location for CC Switch configuration (point to cloud sync folder to enable config sync)",
     "browsePlaceholderApp": "e.g., C:\\Users\\Administrator\\.zhishu-ccs",
-    "claudeConfigDir": "Claude Code Configuration Directory",
     "claudeConfigDirDescription": "Override Claude configuration directory (settings.json). Custom directories store .claude.json (MCP) inside the directory; the default ~/.claude directory keeps Claude Code's split ~/.claude.json path.",
-    "codexConfigDir": "Codex Configuration Directory",
     "codexConfigDirDescription": "Override Codex configuration directory.",
-    "geminiConfigDir": "Gemini Configuration Directory",
     "geminiConfigDirDescription": "Override Gemini configuration directory (.env).",
-    "grokConfigDir": "Grok Build Configuration Directory",
     "grokConfigDirDescription": "Override Grok Build configuration directory (config.toml).",
-    "opencodeConfigDir": "OpenCode Configuration Directory",
     "opencodeConfigDirDescription": "Override OpenCode configuration directory (opencode.json / opencode.jsonc).",
-    "openclawConfigDir": "OpenClaw Configuration Directory",
     "openclawConfigDirDescription": "Override OpenClaw configuration directory (openclaw.json).",
-    "hermesConfigDir": "Hermes Configuration Directory",
     "hermesConfigDirDescription": "Override Hermes configuration directory (config.yaml).",
-    "piConfigDir": "Pi Configuration Directory",
     "piConfigDirDescription": "Override the Pi configuration directory (models.json, instruction files, prompts, skills, and sessions).",
-    "ompConfigDir": "Oh My Pi Configuration Directory",
     "browsePlaceholderClaude": "e.g., /home/<your-username>/.claude",
     "browsePlaceholderCodex": "e.g., /home/<your-username>/.codex",
     "browsePlaceholderGemini": "e.g., /home/<your-username>/.gemini",
@@ -1267,6 +1127,7 @@
     "toolUpgradeUnanchoredHint": "Can't determine which install your command line uses; will run the default upgrade command (may install to the first npm on PATH).",
     "toolUpgradeUnmanagedTitle": "Skipped upgrading these tools",
     "toolUpgradeUnmanagedDetail": "{{tool}} ({{path}}) wasn't installed by npm or a recognized installer, so CC Switch can't tell how to upgrade it. Upgrade it the way you installed it (e.g. winget, Scoop, or re-running the official install script).",
+    "toolUpgradeDesktopManagedDetail": "This OpenCode CLI is bundled with OpenCode Desktop and is updated with the Desktop app.",
     "envBadge": {
       "wsl": "WSL",
       "windows": "Win",
@@ -1301,14 +1162,14 @@
       "testFailed": "Connection failed: {{error}}",
       "pricingDefaultsTitle": "Pricing Defaults",
       "pricingDefaultsDescription": "Choose whether each app matches pricing by the request model or the response model. Only applies to requests that go through local routing.",
-      "pricingAppLabel": "App",
       "pricingModelSourceLabel": "Pricing Model Source",
       "pricingModelSourceRequest": "Request model",
       "pricingModelSourceResponse": "Response model",
-      "pricingSave": "Save Pricing Defaults",
       "pricingSaved": "Pricing defaults saved",
       "pricingSaveFailed": "Failed to save pricing defaults: {{error}}",
-      "pricingLoadFailed": "Failed to load pricing defaults: {{error}}"
+      "pricingLoadFailed": "Failed to load pricing defaults: {{error}}",
+      "pricingAppLabel": "App",
+      "pricingSave": "Save Pricing Defaults"
     },
     "saveFailedGeneric": "Save failed, please try again",
     "sections": {
@@ -1329,6 +1190,55 @@
     "data": {
       "location": "Location"
     },
+    "ipDiagnostics": {
+      "title": "IP diagnostics",
+      "scope": "Inspect the selected outbound route. These samples do not verify DNS or browser isolation and do not predict account restrictions.",
+      "exitScope": "This shows the exit CC Switch uses to reach the check services over the selected route, which may differ from other apps: in Direct mode, clients such as Claude Code and Codex use their own proxy settings, and a proxy tool with domain-based rules may send AI services and these check services through different nodes.",
+      "route": "Network route",
+      "saved": "Saved global proxy",
+      "custom": "Temporary proxy",
+      "proxyUrl": "Temporary proxy URL",
+      "explicitRoute": "Requests use this proxy without changing the saved configuration. A failed proxy does not fall back to a direct connection.",
+      "systemRoute": "No explicit proxy: follow CC Switch’s system proxy behavior. This may use a system proxy or a direct connection.",
+      "settingsError": "Could not load the saved proxy. Retry or choose a temporary proxy.",
+      "privacy": "Only runs when you click Check. Sends requests to icanhazip.com and ipify.org, then submits the observed IP to ipwho.is for location and network details.",
+      "run": "Check IP",
+      "running": "Checking…",
+      "invalidProxy": "Invalid proxy URL. Use HTTP, HTTPS, SOCKS5 or SOCKS5H.",
+      "failed": "Could not run the checks. Please retry.",
+      "unknown": "Unknown",
+      "checkedAt": "Checked at",
+      "incomplete": "Exit sampling is incomplete. Failed checks are not evidence of a safe route.",
+      "consistent": "Both services observed the same exit IP. This only describes these requests.",
+      "different": "The services observed different IPs. Routing rules or a rotating proxy may explain this; check your proxy configuration.",
+      "locationError": "Location lookup failed",
+      "locationIp": "Location queried for",
+      "country": "Country / region",
+      "region": "State / province",
+      "city": "City",
+      "asn": "ASN",
+      "isp": "ISP",
+      "organization": "Organization",
+      "exitTimezone": "IP timezone",
+      "utcOffset": "UTC offset",
+      "localTimezone": "Local timezone",
+      "locationSource": "Location and network data: ipwho.is. Database estimates can be inaccurate.",
+      "errors": {
+        "network": "Connection failed or timed out",
+        "http": "Service returned an HTTP error",
+        "invalidResponse": "Service returned invalid data",
+        "unavailable": "Service could not provide data"
+      }
+    },
+    "configDirectoryOverride": "Configuration Directory Override (Advanced)",
+    "claudeConfigDir": "Claude Code Configuration Directory",
+    "codexConfigDir": "Codex Configuration Directory",
+    "geminiConfigDir": "Gemini Configuration Directory",
+    "grokConfigDir": "Grok Build Configuration Directory",
+    "opencodeConfigDir": "OpenCode Configuration Directory",
+    "openclawConfigDir": "OpenClaw Configuration Directory",
+    "hermesConfigDir": "Hermes Configuration Directory",
+    "piConfigDir": "Pi Configuration Directory",
     "configHistory": {
       "title": "Config change history",
       "description": "See when zhishu-ccs writes each app's config file, what triggered it, and the exact before and after content. The latest 300 records stay on this device.",
@@ -1398,46 +1308,7 @@
       "summaryFiles": "Affected files",
       "summaryNoFiles": "No configuration files were changed."
     },
-    "ipDiagnostics": {
-      "title": "IP diagnostics",
-      "scope": "Inspect the selected outbound route. These samples do not verify DNS or browser isolation and do not predict account restrictions.",
-      "exitScope": "This shows the exit CC Switch uses to reach the check services over the selected route, which may differ from other apps: in Direct mode, clients such as Claude Code and Codex use their own proxy settings, and a proxy tool with domain-based rules may send AI services and these check services through different nodes.",
-      "route": "Network route",
-      "saved": "Saved global proxy",
-      "custom": "Temporary proxy",
-      "proxyUrl": "Temporary proxy URL",
-      "explicitRoute": "Requests use this proxy without changing the saved configuration. A failed proxy does not fall back to a direct connection.",
-      "systemRoute": "No explicit proxy: follow CC Switch’s system proxy behavior. This may use a system proxy or a direct connection.",
-      "settingsError": "Could not load the saved proxy. Retry or choose a temporary proxy.",
-      "privacy": "Only runs when you click Check. Sends requests to icanhazip.com and ipify.org, then submits the observed IP to ipwho.is for location and network details.",
-      "run": "Check IP",
-      "running": "Checking…",
-      "invalidProxy": "Invalid proxy URL. Use HTTP, HTTPS, SOCKS5 or SOCKS5H.",
-      "failed": "Could not run the checks. Please retry.",
-      "unknown": "Unknown",
-      "checkedAt": "Checked at",
-      "incomplete": "Exit sampling is incomplete. Failed checks are not evidence of a safe route.",
-      "consistent": "Both services observed the same exit IP. This only describes these requests.",
-      "different": "The services observed different IPs. Routing rules or a rotating proxy may explain this; check your proxy configuration.",
-      "locationError": "Location lookup failed",
-      "locationIp": "Location queried for",
-      "country": "Country / region",
-      "region": "State / province",
-      "city": "City",
-      "asn": "ASN",
-      "isp": "ISP",
-      "organization": "Organization",
-      "exitTimezone": "IP timezone",
-      "utcOffset": "UTC offset",
-      "localTimezone": "Local timezone",
-      "locationSource": "Location and network data: ipwho.is. Database estimates can be inaccurate.",
-      "errors": {
-        "network": "Connection failed or timed out",
-        "http": "Service returned an HTTP error",
-        "invalidResponse": "Service returned invalid data",
-        "unavailable": "Service could not provide data"
-      }
-    }
+    "ompConfigDir": "Oh My Pi Configuration Directory"
   },
   "apps": {
     "claude": "Claude",
@@ -1479,6 +1350,9 @@
       "modelsHint": "Add at least one model. The model ID is sent to the API as-is. WorkBuddy doesn't support adding the same model more than once yet, so a model ID can be in only one card. With the name left blank, WorkBuddy's menu shows \"vendor label:model ID\".",
       "maxInputTokens": "Max input tokens",
       "maxOutputTokens": "Max output tokens",
+      "thinkingEfforts": "Thinking effort",
+      "thinkingEffortsHint": "Selected efforts are listed in WorkBuddy's model menu; the chosen one is sent to the API as reasoning_effort. With none selected, only a thinking on/off switch is shown.",
+      "canDisableThinking": "Thinking can be turned off",
       "modelIdTaken": "WorkBuddy doesn't support adding the same model more than once yet, and this model is already in \"{{owner}}\". To move it to this card, remove it there first.",
       "modelOwnerUser": "a model added in WorkBuddy itself",
       "presetModelsSkipped": "WorkBuddy doesn't support adding the same model more than once yet, so models already in other cards were skipped: {{models}}. To move one to this card, remove it from its current card first, then add it back here."
@@ -1511,6 +1385,8 @@
       "credits": "Credits",
       "leftOf": "{{remaining}} / {{total}} left",
       "usedOf": "{{used}} / {{total}} used",
+      "unlimited": "Unlimited",
+      "unlimitedUsed": "Unlimited, {{used}} used",
       "usedUp": "Used up (of {{total}})",
       "detail": "{{remaining}} of {{total}} credits left, {{used}} used",
       "staleNotRunning": "WorkBuddy isn't running; showing the last result",
@@ -1694,7 +1570,7 @@
     "keyFieldsHint": "The default model (models.default) and the model table it points to follow the provider; everything else is Grok Build global settings and applies to every provider after saving.",
     "inactiveFieldsHint": "Saved in this provider by an older version; switching no longer applies them. Click one to copy its TOML and paste it above if you need it.",
     "inactiveFieldCopied": "Copied",
-    "routeOnlySettingsHint": "The two settings below only apply in routing mode."
+    "routeOnlySettingsHint": "The settings below only apply in routing mode."
   },
   "sessionManager": {
     "searchPlaceholder": "Search titles, folders, first/last messages or session IDs",
@@ -1703,6 +1579,7 @@
     "contentSearchToggle": "Search message text",
     "contentSearchToggleFailed": "Couldn’t change the message text search setting: {{error}}",
     "contentIndexing": "Indexing message text ({{processed}}/{{total}}). Text matches may be incomplete",
+    "contentSearchFailed": "Text search failed, so only titles, folders and first/last messages can be searched right now",
     "contentHitPrefix": "Text: ",
     "contentHitMore": " ({{count}} messages match)",
     "moreContentHits": "More text matches",
@@ -1909,7 +1786,17 @@
         "prLink": "Linked PR #{{number}}",
         "prLinkPlain": "Linked a PR",
         "slashCommand": "Ran {{command}}",
-        "subAgent": "Subagent {{name}}"
+        "subAgent": "Subagent {{name}}",
+        "goal": "Goal · {{status}}",
+        "goalPlain": "Goal",
+        "goalStatus": {
+          "active": "Active",
+          "paused": "Paused",
+          "blocked": "Blocked",
+          "usageLimited": "Usage limit reached",
+          "budgetLimited": "Budget reached",
+          "complete": "Complete"
+        }
       },
       "injectedToggle": "Show injected context",
       "injectedRow": "Context · {{label}} · {{chars}} chars",
@@ -1976,6 +1863,7 @@
       "outlineFailed": "Has failed steps",
       "outlineAborted": "Interrupted",
       "outlineNoReply": "No reply",
+      "chapter": "Chapter",
       "viewOptions": "Display options",
       "noChanges": "No file changes in this session",
       "rawMatch": "Matches in source",
@@ -1985,25 +1873,28 @@
     "copilotDeleteHint": "Delete this session in GitHub Copilot CLI so its session store stays consistent"
   },
   "console": {
+    "openLinkFailed": "Failed to open link:",
+    "updateFailed": "Update failed:",
+    "checkUpdateFailed": "Check for updates failed:",
+    "openReleaseNotesFailed": "Failed to open release notes:",
     "providerSwitchReceived": "Received provider switch event:",
     "setupListenerFailed": "Failed to setup provider switch listener:",
     "updateProviderFailed": "Update provider failed:",
     "autoImportFailed": "Auto import default configuration failed:",
-    "openLinkFailed": "Failed to open link:",
     "getVersionFailed": "Failed to get version info:",
     "loadSettingsFailed": "Failed to load settings:",
     "getConfigPathFailed": "Failed to get config path:",
     "getConfigDirFailed": "Failed to get config directory:",
     "detectPortableFailed": "Failed to detect portable mode:",
     "saveSettingsFailed": "Failed to save settings:",
-    "updateFailed": "Update failed:",
-    "checkUpdateFailed": "Check for updates failed:",
     "openConfigFolderFailed": "Failed to open config folder:",
     "selectConfigDirFailed": "Failed to select config directory:",
-    "getDefaultConfigDirFailed": "Failed to get default config directory:",
-    "openReleaseNotesFailed": "Failed to open release notes:"
+    "getDefaultConfigDirFailed": "Failed to get default config directory:"
   },
   "providerForm": {
+    "billingMultiplier": "Provider cost multiplier",
+    "billingMultiplierHelp": "Every model's reference price for this provider is multiplied by this value to estimate what requests through local routing cost. 0.5 means half price; leave blank for 1×. Only affects future requests; in direct mode (routing off), usage imported from session logs is still counted at 1×.",
+    "billingMultiplierInvalid": "Enter a number from 0 to 1000, or leave blank for 1×.",
     "nativeConfig": {
       "title": "Config file {{path}} (this provider only)",
       "hint": "Shows this provider's part of the file in the app's own format and writes it there on save. Global settings such as the default model are not here. Comments typed here are not saved.",
@@ -2064,6 +1955,7 @@
       "subrouter": "SubRouter is an AI relay aggregator that lets one key access multiple models and providers.",
       "qiniu": "Qiniu Cloud is a multi-protocol AI relay: one key for native Claude, GPT, and Gemini models, with the Anthropic, OpenAI, and Gemini APIs all supported.",
       "haoai": "hao.ai is a fast, stable unified LLM API gateway for developers and teams: one key reaches GPT, Claude, Grok, and other leading models over OpenAI- and Anthropic-compatible APIs, with model routing, failover, and full request logs, at prices as low as 15% of official reference rates. CC Switch users who register via this link get 5% bonus credit on their first order!",
+      "stringai": "StringAI is a cost-effective, fast, and stable model API platform with one-stop access to AI coding, image generation, text-to-speech, and video generation. Exclusive CC Switch offer: register via this link and your first top-up of $3.74 earns an extra $3.74 in bonus credit!",
       "fenno": "Fenno.ai is a stable, efficient API relay giving you access to a wide range of mainstream models. Exclusive CC Switch offer: subscribe via this link to the $1.99 Trial Plan worth $50 in credits, valid for 7 days!",
       "teamorouter": "TeamoRouter gives Claude Code one key for Opus 5.5, Sonnet 5.5 and Fable 5.1, with Opus 5.5 at about 28% of the official price, pay as you go, on the native Anthropic protocol. CC Switch users who sign up through this link get an extra 10% credit on a first top-up of $10, $20 or $50!",
       "ppio": "PPIO is a leading independent Agentic Cloud provider in China, serving every flagship open-source model through a single API key. Register via this link and complete identity verification to receive a ¥10 credit voucher.",
@@ -2079,7 +1971,8 @@
       "grooroute": "GrooRoute Pro is a reliable AI API relay with access to OpenAI, Claude, DeepSeek, and other mainstream models, offering pay-as-you-go and subscription plans. CC Switch users get ¥5 in free trial credit by registering via this link!",
       "buytoken": "BuyToken offers relay access for Claude Code, Codex, DeepSeek, and more, with enterprise-grade concurrency and fast invoicing, built to be a stable, long-running service. CC Switch users who register via this link get ¥3 in trial credit and 10% off their first top-up!",
       "vapi": "V-API is a three-year-old brand offering stable, fast, and secure high-quality LLM API services for individuals, developers, and businesses, with formal contracts and official invoices (general / special VAT). CC Switch users who register via this link get ¥2 off and 10% off their first order!",
-      "ospreyai": "ACS OspreyAI is a one-stop multi-model API platform for developers and businesses. A single API key gives you access to leading Chinese and international models, including Claude, Gemini, GPT, GLM, Kimi, Qwen, DeepSeek, and Tencent Hunyuan. The platform is compatible with OpenAI, Anthropic, and other mainstream API protocols, and works with popular AI tools such as Claude Code, Codex, OpenCode, Pi, and Hermes. International models cost 20–40% less than official prices, and Chinese models 30–50% less. Unified top-ups, unified billing, usage tracking, and flexible model switching make it a fit for AI app development, content production, and automated workflows. Create an account via this link to get a discount and quickly connect to leading models from China and abroad."
+      "ospreyai": "ACS OspreyAI is a one-stop multi-model API platform for developers and businesses. A single API key gives you access to leading Chinese and international models, including Claude, Gemini, GPT, GLM, Kimi, Qwen, DeepSeek, and Tencent Hunyuan. The platform is compatible with OpenAI, Anthropic, and other mainstream API protocols, and works with popular AI tools such as Claude Code, Codex, OpenCode, Pi, and Hermes. International models cost 20–40% less than official prices, and Chinese models 30–50% less. Unified top-ups, unified billing, usage tracking, and flexible model switching make it a fit for AI app development, content production, and automated workflows. Create an account via this link to get a discount and quickly connect to leading models from China and abroad.",
+      "ccsub": "CCSub is a stable, affordable AI API relay — a drop-in replacement for Claude.ai & OpenAI subscriptions, with one key for all models at ~30% of direct API cost."
     },
     "presets": {
       "ucloud": "Compshare",
@@ -2178,6 +2071,8 @@
     "requestModelLabel": "Requested model",
     "modelOneMHeader": "Declare 1M",
     "modelOneMLabel": "1M",
+    "copilotOneMUnavailable": "Copilot has no 1M version of this model",
+    "copilotOneMMismatch": "Copilot has no 1M version of {{models}}: requests fall back to the regular model, but Claude Code still plans for a 1M context, so long sessions may exceed the limit. Uncheck 1M.",
     "fallbackModelLabel": "Default fallback model",
     "fallbackModelHelpDirect": "Written to ANTHROPIC_MODEL: the main model Claude Code starts with. Background tasks use the Haiku tier instead.",
     "fallbackModelHelp": "Requests that don't map to the Sonnet, Opus, Fable, or Haiku tier are sent upstream with this model.",
@@ -2261,12 +2156,10 @@
     "selectAccount": "Select Account",
     "selectAccountPlaceholder": "Select a GitHub account",
     "useDefaultAccount": "Use default account",
-    "loggedInAccounts": "Logged in accounts",
     "defaultAccount": "Default",
     "selected": "Selected",
     "removeAccount": "Remove account",
     "setAsDefault": "Set as default",
-    "addAnotherAccount": "Add another account",
     "retry": "Retry",
     "copyCode": "Copy code",
     "migrationFailed": "Legacy auth migration failed: {{error}}",
@@ -2307,7 +2200,14 @@
       "notSignedIn": "Copilot CLI isn't signed in. Run copilot and use /login, or bind an Auth Center account on this card."
     },
     "defaultCannotRemove": "Copilot's default model belongs to this provider, so it can't be removed or deleted. Pick another provider's model with /model in copilot first.",
-    "terminalNeedsAdd": "Add this provider to Copilot first so the terminal can select its model."
+    "terminalNeedsAdd": "Add this provider to Copilot first so the terminal can select its model.",
+    "loggedInAccounts": "Logged in accounts",
+    "addAnotherAccount": "Add another account",
+    "section": {
+      "official": "Official sign-in · {{count}}",
+      "officialHelpTitle": "Official sign-in",
+      "officialHelp": "Uses Copilot CLI's own GitHub sign-in and writes no files. Open Terminal starts copilot with the card's model and bound account."
+    }
   },
   "codexOauth": {
     "authStatus": "Auth status",
@@ -2320,7 +2220,6 @@
     "enterCode": "Enter the code in your browser:",
     "accountCount": "{{count}} account(s)",
     "selectAccount": "Select account",
-    "chatgptAccount": "ChatGPT account",
     "accountToUse": "Account to use",
     "signInMethod": "Sign-in method",
     "manageAccounts": "Manage accounts",
@@ -2330,18 +2229,14 @@
     "explicitSelectionRequired": "Choose a sign-in method",
     "useDefaultAccount": "Use default account",
     "noneOptionLabel": "Follow Codex login",
-    "reauthDescription": "To match the browser-login behavior, these accounts must sign in again to restore the required login credential (id_token). Once re-authenticated they can be used for managed binding.",
     "reauthBadge": "Re-login required",
-    "reauthLogin": "Re-login",
     "reauthSelectHint": "This account needs to sign in again to enable managed binding.",
     "reauthNow": "Re-login now",
     "duplicateAccount": "This ChatGPT account has already been added. Use the existing account.",
-    "loggedInAccounts": "Logged in accounts",
     "defaultAccount": "Default",
     "selected": "Selected",
     "removeAccount": "Remove account",
     "setAsDefault": "Set as default",
-    "addAnotherAccount": "Add another account",
     "logoutAll": "Logout all accounts",
     "retry": "Retry",
     "copyCode": "Copy code",
@@ -2350,8 +2245,13 @@
     "loginMethod": "Login method",
     "browserLogin": "Browser login",
     "deviceCodeLogin": "Device-code login",
-    "openBrowserLogin": "Open browser login",
-    "loginExpired": "Login expired. Please try again."
+    "loginExpired": "Login expired. Please try again.",
+    "chatgptAccount": "ChatGPT account",
+    "reauthDescription": "To match the browser-login behavior, these accounts must sign in again to restore the required login credential (id_token). Once re-authenticated they can be used for managed binding.",
+    "reauthLogin": "Re-login",
+    "loggedInAccounts": "Logged in accounts",
+    "addAnotherAccount": "Add another account",
+    "openBrowserLogin": "Open browser login"
   },
   "xaiOauth": {
     "authStatus": "xAI OAuth authentication",
@@ -2361,6 +2261,7 @@
     "selectAccount": "Select account",
     "selectAccountPlaceholder": "Select an xAI account",
     "useDefaultAccount": "Use default account",
+    "account": "xAI account",
     "accounts": "xAI accounts",
     "defaultAccount": "Default",
     "expired": "Credentials expired",
@@ -2404,7 +2305,6 @@
     "testing": "Testing",
     "addEndpointPlaceholder": "https://api.example.com",
     "done": "Done",
-    "noEndpoints": "No endpoints",
     "failed": "Failed",
     "enterValidUrl": "Please enter a valid URL",
     "invalidUrlFormat": "Invalid URL format",
@@ -2412,15 +2312,16 @@
     "urlExists": "This URL already exists",
     "saveFailed": "Save failed, please try again",
     "loadEndpointsFailed": "Failed to load custom endpoints:",
+    "pleaseAddEndpoint": "Please add an endpoint first",
+    "noResult": "No result returned",
+    "testFailed": "Speed test failed: {{error}}",
+    "empty": "No endpoints",
+    "noEndpoints": "No endpoints",
     "addEndpointFailed": "Failed to add custom endpoint:",
     "removeEndpointFailed": "Failed to remove custom endpoint:",
     "removeFailed": "Remove failed: {{error}}",
     "updateLastUsedFailed": "Failed to update endpoint last used time",
-    "pleaseAddEndpoint": "Please add an endpoint first",
-    "testUnavailable": "Speed test unavailable",
-    "noResult": "No result returned",
-    "testFailed": "Speed test failed: {{error}}",
-    "empty": "No endpoints"
+    "testUnavailable": "Speed test unavailable"
   },
   "codexConfig": {
     "authJson": "auth.json (JSON) *",
@@ -2511,7 +2412,7 @@
     "inactiveFieldCopied": "Copied",
     "upstreamFormatCopilotRouteHint": "Every mode requires routing, which injects the Copilot account credentials. A protocol you pick explicitly fails for models that don't support it.",
     "maxOutputTokensWarning": "Don't exceed the real output limit of the model or gateway, or requests return 400.",
-    "routeOnlySettingsHint": "The two settings below only apply in routing and Aggregation modes."
+    "routeOnlySettingsHint": "The settings below only apply in routing and Aggregation modes."
   },
   "geminiConfig": {
     "envFile": "Environment Variables (.env)",
@@ -2799,8 +2700,8 @@
     "input": "Input",
     "output": "Output",
     "cacheWrite": "Creation",
-    "cacheWriteNotReported": "OpenAI protocol doesn't distinguish cache creation; only cache hits are reported",
-    "cacheWritePartial": "Some protocols (e.g. OpenAI) don't report cache creation; the value may be incomplete",
+    "cacheWriteNotReported": "Gemini and Grok Build don't report cache creation; only cache hits are reported",
+    "cacheWritePartial": "Some protocols (e.g. Gemini) don't report cache creation; the value may be incomplete",
     "cacheRead": "Hit",
     "baseCost": "Base",
     "costMultiplier": "Cost Multiplier",
@@ -2872,7 +2773,6 @@
       "configLoadFailed": "Failed to load local pricing configuration: {{error}}",
       "neverSynced": "Never",
       "lastSync": "Last sync",
-      "commonStatus": "Common models",
       "lastError": "Last automatic sync failed: {{error}}",
       "localFile": "Local pricing file",
       "openFolder": "Open folder",
@@ -2880,7 +2780,8 @@
       "reloadLocalFile": "Reload file",
       "localFileReloaded": "Local pricing file reloaded",
       "localFileReloadFailed": "Failed to reload local pricing file: {{error}}",
-      "syncNow": "Sync now"
+      "syncNow": "Sync now",
+      "commonStatus": "Common models"
     },
     "cacheReadCostPerMillion": "Cache Read Cost (per million tokens, USD)",
     "cacheCreationCostPerMillion": "Cache Write Cost (per million tokens, USD)",
@@ -2942,7 +2843,7 @@
       "label": "Metrics",
       "more": "More metrics",
       "realTotalHelpTitle": "How total tokens are counted",
-      "realTotalHelp": "Fresh input + output + cache writes + cache hits. Fresh input excludes cache; some protocols (such as OpenAI) don't report cache writes, so that part may be low.",
+      "realTotalHelp": "Fresh input + output + cache writes + cache hits. Fresh input excludes cache; some protocols (such as Gemini) don't report cache writes, so that part may be low.",
       "hitRateHelpTitle": "How the cache hit rate is calculated",
       "hitRateHelp": "Cache hits ÷ (fresh input + cache writes + cache hits)."
     },
@@ -3017,7 +2918,9 @@
       "speedEstimateTooFew": "Under 200 output tokens, so no estimate",
       "noTimingSession": "Session logs have no timing data",
       "noFirstToken": "No first-token timing, so no speed",
-      "providerId": "Provider ID"
+      "providerId": "Provider ID",
+      "copyRequestId": "Copy request ID",
+      "requestIdCopied": "Request ID copied"
     },
     "sources": {
       "scanTitle": "Scan session logs automatically",
@@ -3189,9 +3092,9 @@
   "presetSelector": {
     "title": "Select Configuration Type",
     "custom": "Custom",
+    "presetDescription": "Use preset configuration, only API Key required",
     "customDescription": "Manually configure provider, requires complete configuration",
-    "officialDescription": "Official login, no API Key required",
-    "presetDescription": "Use preset configuration, only API Key required"
+    "officialDescription": "Official login, no API Key required"
   },
   "mcp": {
     "title": "MCP Management",
@@ -3203,13 +3106,8 @@
     "geminiTitle": "Gemini MCP Management",
     "unifiedPanel": {
       "title": "MCP Server Management",
-      "addServer": "Add Server",
-      "editServer": "Edit Server",
-      "deleteServer": "Delete Server",
       "deleteConfirm": "Are you sure you want to delete server \"{{id}}\"? This action cannot be undone.",
-      "noServers": "No servers yet",
       "enabledApps": "Enabled Apps",
-      "noImportFound": "No MCP servers to import found. All servers are already managed by CC Switch.",
       "importSuccess": "Successfully imported {{count}} MCP servers",
       "searchPlaceholder": "Search MCP name, description, tag, or command...",
       "searchAriaLabel": "Search managed MCP servers",
@@ -3223,7 +3121,12 @@
         "openclaw": "OpenClaw",
         "hermes": "Hermes",
         "mcode": "MiniMax Code"
-      }
+      },
+      "addServer": "Add Server",
+      "editServer": "Edit Server",
+      "deleteServer": "Delete Server",
+      "noServers": "No servers yet",
+      "noImportFound": "No MCP servers to import found. All servers are already managed by CC Switch."
     },
     "userLevelPath": "User-level MCP config path",
     "serverList": "Servers",
@@ -3245,25 +3148,25 @@
     },
     "form": {
       "title": "MCP Title (Unique)",
-      "titlePlaceholder": "my-mcp-server",
       "name": "Display Name",
       "namePlaceholder": "e.g. mcp-server-time",
       "enabledApps": "Enable for Apps",
-      "noAppsWarning": "At least one app must be selected",
       "description": "Description",
       "descriptionPlaceholder": "Optional description",
       "tags": "Tags (comma separated)",
       "tagsPlaceholder": "stdio, time, utility",
       "homepage": "Homepage",
-      "homepagePlaceholder": "https://example.com",
       "docs": "Docs",
+      "tomlConfig": "Full TOML Configuration",
+      "titlePlaceholder": "my-mcp-server",
+      "noAppsWarning": "At least one app must be selected",
+      "homepagePlaceholder": "https://example.com",
       "docsPlaceholder": "https://example.com/docs",
       "additionalInfo": "Additional Info",
       "jsonConfig": "Full JSON Configuration",
       "jsonConfigOrPrefix": "Full JSON configuration or use",
       "tomlConfigOrPrefix": "Full TOML configuration or use",
       "jsonPlaceholder": "{\n  \"type\": \"stdio\",\n  \"command\": \"uvx\",\n  \"args\": [\"mcp-server-fetch\"]\n}",
-      "tomlConfig": "Full TOML Configuration",
       "tomlPlaceholder": "type = \"stdio\"\ncommand = \"uvx\"\nargs = [\"mcp-server-fetch\"]",
       "useWizard": "Config Wizard",
       "syncOtherSide": "Mirror to {{target}}",
@@ -3274,22 +3177,22 @@
       "title": "MCP Configuration Wizard",
       "hint": "Quickly configure MCP server and auto-generate JSON configuration",
       "type": "Type",
-      "typeStdio": "stdio",
-      "typeHttp": "http",
-      "typeSse": "sse",
       "command": "Command",
       "commandPlaceholder": "npx or uvx",
       "args": "Arguments",
-      "argsPlaceholder": "arg1\narg2",
       "env": "Environment Variables",
-      "envPlaceholder": "KEY1=value1\nKEY2=value2",
       "url": "URL",
       "urlPlaceholder": "https://api.example.com/mcp",
       "urlRequired": "Please enter URL",
       "headers": "Headers (optional)",
-      "headersPlaceholder": "Authorization: Bearer your_token_here\nContent-Type: application/json",
       "preview": "Configuration Preview",
-      "apply": "Apply Configuration"
+      "apply": "Apply Configuration",
+      "typeStdio": "stdio",
+      "typeHttp": "http",
+      "typeSse": "sse",
+      "argsPlaceholder": "arg1\narg2",
+      "envPlaceholder": "KEY1=value1\nKEY2=value2",
+      "headersPlaceholder": "Authorization: Bearer your_token_here\nContent-Type: application/json"
     },
     "id": "Identifier (unique)",
     "type": "Type",
@@ -3309,16 +3212,16 @@
     },
     "error": {
       "idRequired": "Please enter identifier",
-      "idExists": "Identifier already exists. Please choose another.",
       "jsonInvalid": "Invalid JSON format",
       "tomlInvalid": "Invalid TOML format",
       "commandRequired": "Please enter command",
-      "singleServerObjectRequired": "Please paste a single MCP server object (do not include top-level mcpServers)",
       "piSseUnsupported": "Pi does not support SSE MCP servers. Use HTTP (streamable HTTP) instead",
       "piInvalidName": "Pi MCP server names may only contain letters, digits, _ and -: {{id}}",
       "piNameConflict": "Pi treats server names that differ only by - and _ as the same server: {{id}} conflicts with existing {{other}}",
       "saveFailed": "Save failed",
-      "deleteFailed": "Delete failed"
+      "deleteFailed": "Delete failed",
+      "idExists": "Identifier already exists. Please choose another.",
+      "singleServerObjectRequired": "Please paste a single MCP server object (do not include top-level mcpServers)"
     },
     "validation": {
       "ok": "Command available",
@@ -3334,7 +3237,6 @@
       "enabled": "Enabled",
       "installed": "Installed",
       "docs": "Docs",
-      "requiresEnv": "Requires env",
       "fetch": {
         "name": "mcp-server-fetch",
         "description": "Universal HTTP request tool, supports GET/POST and other HTTP methods, suitable for quick API requests and web data scraping"
@@ -3354,7 +3256,8 @@
       "context7": {
         "name": "@upstash/context7-mcp",
         "description": "Context7 documentation search tool providing latest library docs and code examples, with higher limits when configured with a key"
-      }
+      },
+      "requiresEnv": "Requires env"
     }
   },
   "prompts": {
@@ -3536,7 +3439,6 @@
     "openDirectory": "Open in file manager",
     "dailyMemory": {
       "title": "Daily Memory",
-      "sectionTitle": "Daily Memory",
       "cardTitle": "Daily Memory Files",
       "createToday": "Add Memory",
       "empty": "No daily memory files yet",
@@ -3552,7 +3454,8 @@
       "noSearchResults": "No daily memories match your search.",
       "searching": "Searching...",
       "searchFailed": "Search failed",
-      "matchCount": "{{count}} match(es)"
+      "matchCount": "{{count}} match(es)",
+      "sectionTitle": "Daily Memory"
     }
   },
   "openclaw": {
@@ -3808,56 +3711,79 @@
       "skillNotFound": "Skill not found: {{directory}}",
       "missingRepoInfo": "Missing repository info (owner or name)",
       "downloadTimeout": "Download repository {{owner}}/{{name}} timeout ({{timeout}}s)",
-      "downloadTimeoutHint": "Please check network connection or retry later",
-      "skillPathNotFound": "Skill path '{{path}}' not found in repository {{owner}}/{{name}}",
+      "downloadStalled": "Download of repository {{owner}}/{{name}} stalled: no data received for {{timeout}}s",
       "skillDirNotFound": "Skill directory not found: {{path}}",
       "directoryConflict": "Skill directory '{{directory}}' is already occupied by {{existing_repo}}, cannot install from {{new_repo}}",
       "emptyArchive": "Downloaded archive is empty",
+      "archiveInvalid": "The download isn't a ZIP archive: this site may not be a GitHub / GitLab / Gitea repository, which isn't supported yet",
       "invalidRepoRef": "Invalid repository reference: {{owner}}/{{name}}",
       "archiveTooLarge": "Archive exceeds the {{limit_mb}} MB extraction limit; aborted",
       "archiveDownloadTooLarge": "Repository archive download exceeds the {{limit_mb}} MB limit; aborted",
       "archiveTooManyEntries": "Archive has too many entries ({{count}}); the limit is {{limit}}",
       "downloadFailed": "Download failed: HTTP {{status}}",
-      "allBranchesFailed": "All branches failed, tried: {{branches}}",
-      "httpError": "HTTP error {{status}}",
       "http403": "GitHub access restricted, possibly rate limited",
-      "http404": "Repository or branch not found, please check URL",
+      "http404": "Repository or branch not found, please check URL. Private repositories need an access token set in Manage Skill Repositories first",
       "http429": "Too many requests, please wait and retry",
-      "parseMetadataFailed": "Failed to parse skill metadata",
+      "http401Token": "The access token is invalid or has expired. Set it again in Manage Skill Repositories",
+      "http403Token": "The access token can't read this repository, or requests are too frequent",
+      "http404Token": "Repository or branch not found, or the access token can't read this repository",
+      "httpAuthRequired": "This site requires sign-in. Set an access token for it in Manage Skill Repositories",
+      "invalidTokenHost": "Invalid site: {{host}}. Enter just the host name, such as gitlab.example.com",
+      "invalidRepoToken": "Invalid token: use only letters, digits and - _ . ~ + / =, up to {{limit}} characters",
+      "repoTokenStorageFailed": "Couldn't read or write the access token for {{host}}. Check that the system credential store is available",
       "getHomeDirFailed": "Unable to get user home directory",
       "noSkillsInZip": "No skills found in ZIP file (requires SKILL.md file)",
-      "networkError": "Network error",
-      "fsError": "File system error",
       "unknownError": "Unknown error",
       "suggestion": {
         "checkNetwork": "Please check network connection",
         "checkProxy": "Consider configuring HTTP proxy",
         "retryLater": "Please retry later",
         "checkRepoUrl": "Please check repository URL and branch name",
-        "checkDiskSpace": "Please check disk space",
         "checkPermission": "Please check directory permissions",
         "uninstallFirst": "Please uninstall the existing skill with the same name first",
-        "checkZipContent": "Please verify the ZIP file contains valid skill directories (with SKILL.md files)"
-      }
+        "checkZipContent": "Please verify the ZIP file contains valid skill directories (with SKILL.md files)",
+        "checkDiskSpace": "Please check disk space"
+      },
+      "downloadTimeoutHint": "Please check network connection or retry later",
+      "skillPathNotFound": "Skill path '{{path}}' not found in repository {{owner}}/{{name}}",
+      "allBranchesFailed": "All branches failed, tried: {{branches}}",
+      "httpError": "HTTP error {{status}}",
+      "parseMetadataFailed": "Failed to parse skill metadata",
+      "networkError": "Network error",
+      "fsError": "File system error"
     },
     "repo": {
       "title": "Manage Skill Repositories",
-      "description": "Add or remove GitHub skill repository sources",
+      "description": "Add or remove GitHub / GitLab / Gitea skill repository sources",
       "url": "Repository URL",
-      "urlPlaceholder": "owner/name or https://github.com/owner/name",
+      "urlPlaceholder": "owner/name, https://github.com/owner/name or https://gitlab.com/group/project",
       "branch": "Branch",
       "branchPlaceholder": "main",
       "path": "Skills Path",
-      "pathPlaceholder": "skills (optional, leave empty for root)",
       "add": "Add Repository",
       "list": "Added Repositories",
       "empty": "No repositories",
       "invalidUrl": "Invalid repository URL format",
+      "httpsOnly": "GitLab and Gitea repositories must use an https address",
+      "token": {
+        "title": "Access tokens",
+        "description": "Used to read private repositories. Tokens are stored per site in the system credential store (macOS Keychain, Windows Credential Manager) and never synced. Read-only access is enough.",
+        "descriptionFile": "Used to read private repositories. Tokens are stored per site in a file on this computer that only you can read, and never synced. Read-only access is enough.",
+        "host": "Site",
+        "hostPlaceholder": "github.com or gitlab.example.com",
+        "value": "Token",
+        "valuePlaceholder": "Paste an access token",
+        "save": "Save token",
+        "empty": "No access tokens yet",
+        "removeAria": "Remove the access token for {{host}}",
+        "missingFields": "Enter both a site and a token"
+      },
       "addSuccess": "Repository {{owner}}/{{name}} added, detected {{count}} skills",
       "addFailed": "Failed to add",
       "removeSuccess": "Repository {{owner}}/{{name}} removed",
-      "removeFailed": "Failed to remove",
-      "skillCount": "{{count}} skills detected"
+      "skillCount": "{{count}} skills detected",
+      "pathPlaceholder": "skills (optional, leave empty for root)",
+      "removeFailed": "Failed to remove"
     },
     "search": "Search Skills",
     "searchPlaceholder": "Search skill name or repo...",
@@ -3931,13 +3857,13 @@
     "installFromZip": {
       "button": "Install from ZIP",
       "installing": "Installing...",
-      "successSingle": "Skill {{name}} installed",
-      "successMultiple": "Successfully installed {{count}} skills",
       "noSkillsFound": "No skills found in ZIP file (requires SKILL.md file)",
       "skippedTitle": "Skipped {{count}} Skills: folder name already in use",
       "allSkipped": "Nothing installed: all {{count}} Skills in the ZIP use folder names that are already taken",
       "skippedItem": "{{directory}} (used by {{name}})",
-      "skippedBody": "{{list}}. To use the version in the ZIP, uninstall the Skill with the same name first."
+      "skippedBody": "{{list}}. To use the version in the ZIP, uninstall the Skill with the same name first.",
+      "successSingle": "Skill {{name}} installed",
+      "successMultiple": "Successfully installed {{count}} skills"
     },
     "backToInstalled": "Back to installed",
     "moreActions": "More Skills actions",
@@ -4031,7 +3957,10 @@
       "command": "Command",
       "args": "Args",
       "env": "Env",
-      "url": "URL"
+      "url": "URL",
+      "type": "Type",
+      "cwd": "CWD",
+      "headers": "Headers"
     },
     "prompt": {
       "title": "Import System Prompt",
@@ -4047,9 +3976,9 @@
       "repo": "GitHub Repository",
       "directory": "Target Directory",
       "branch": "Branch",
-      "skillsPath": "Skills Path",
       "hint": "This will add the Skill repository to the list.",
-      "hintDetail": "After adding, you can install specific Skills from the Skills management page."
+      "hintDetail": "After adding, you can install specific Skills from the Skills management page.",
+      "skillsPath": "Skills Path"
     },
     "usageScript": "Usage Query",
     "usageScriptEnabled": "Enabled",
@@ -4066,7 +3995,8 @@
     "risk": {
       "envHijack": "This config sets environment variables that change how processes load code (e.g. injecting libraries or replacing CA certificates). Import only from a source you trust.",
       "privateEndpoint": "This address points at localhost or a private network. Do not import unless it is your own local service.",
-      "shellCommand": "This config runs a full command line through a shell — what actually executes is in the arguments. Review each line."
+      "shellCommand": "This config runs a full command line through a shell — what actually executes is in the arguments. Review each line.",
+      "mcpDangerousField": "This MCP config contains high-risk fields that can read host environment variables (e.g. bearer_token_env_var, env_http_headers, env_vars), execute helper commands (http_headers_helper), or override the working directory (cwd). Import only if you fully trust the source."
     }
   },
   "iconPicker": {
@@ -4100,20 +4030,20 @@
       "dimensions": "The image is too large (width and height must not exceed 4096 px)"
     },
     "category": {
-      "aiProvider": "AI Providers",
       "cloud": "Cloud Platforms",
       "tool": "Dev Tools",
-      "other": "Other"
+      "other": "Other",
+      "aiProvider": "AI Providers"
     }
   },
   "providerIcon": {
     "label": "Icon",
-    "colorLabel": "Icon Color",
     "selectIcon": "Select Icon",
     "preview": "Preview",
     "clickToChange": "Click to change icon",
     "clickToSelect": "Click to select icon",
-    "change": "Change icon"
+    "change": "Change icon",
+    "colorLabel": "Icon Color"
   },
   "migration": {
     "success": "Configuration migrated successfully",
@@ -4147,26 +4077,23 @@
   },
   "proxy": {
     "panel": {
-      "serviceAddress": "Service Address",
-      "addressCopied": "Address copied",
-      "currentProvider": "Current Provider:",
-      "waitingFirstRequest": "Current Provider: Waiting for first request...",
-      "stoppedTitle": "Routing Service Stopped",
-      "stoppedDescription": "Use the toggle above to start the service",
       "openSettings": "Configure Routing Service",
       "stats": {
         "activeConnections": "Active Connections",
         "totalRequests": "Total Requests",
         "successRate": "Success Rate",
         "uptime": "Uptime"
-      }
+      },
+      "serviceAddress": "Service Address",
+      "addressCopied": "Address copied",
+      "currentProvider": "Current Provider:",
+      "waitingFirstRequest": "Current Provider: Waiting for first request...",
+      "stoppedTitle": "Routing Service Stopped",
+      "stoppedDescription": "Use the toggle above to start the service"
     },
     "settings": {
       "title": "Routing Service Settings",
       "description": "Configure local routing server listening address, port and runtime parameters. Changes take effect immediately after saving.",
-      "alert": {
-        "autoApply": "Changes will be automatically synced to the running routing service without manual restart."
-      },
       "basic": {
         "title": "Basic Settings",
         "description": "Configure routing service listening address and port."
@@ -4217,18 +4144,6 @@
           "description": "Total timeout for non-streaming requests"
         }
       },
-      "validation": {
-        "addressInvalid": "Please enter a valid IP address",
-        "portMin": "Port must be greater than 1024",
-        "portMax": "Port must be less than 65535",
-        "retryMin": "Retry count cannot be negative",
-        "retryMax": "Retry count cannot exceed 10",
-        "timeoutNonNegative": "Timeout cannot be negative",
-        "timeoutMax": "Timeout cannot exceed 600 seconds",
-        "timeoutRange": "Please enter 0 or a value between 10-600",
-        "streamingTimeoutMin": "Timeout must be at least 5 seconds",
-        "streamingTimeoutMax": "Timeout cannot exceed 300 seconds"
-      },
       "actions": {
         "save": "Save Configuration"
       },
@@ -4240,7 +4155,22 @@
       "invalidAddress": "Invalid address. Enter an IPv4 (e.g. 127.0.0.1), IPv6 (e.g. ::1), or localhost",
       "configSaved": "Routing configuration saved",
       "configSaveFailed": "Failed to save configuration",
-      "restartRequired": "Restart routing service for address or port changes to take effect"
+      "restartRequired": "Restart routing service for address or port changes to take effect",
+      "alert": {
+        "autoApply": "Changes will be automatically synced to the running routing service without manual restart."
+      },
+      "validation": {
+        "addressInvalid": "Please enter a valid IP address",
+        "portMin": "Port must be greater than 1024",
+        "portMax": "Port must be less than 65535",
+        "retryMin": "Retry count cannot be negative",
+        "retryMax": "Retry count cannot exceed 10",
+        "timeoutNonNegative": "Timeout cannot be negative",
+        "timeoutMax": "Timeout cannot exceed 600 seconds",
+        "timeoutRange": "Please enter 0 or a value between 10-600",
+        "streamingTimeoutMin": "Timeout must be at least 5 seconds",
+        "streamingTimeoutMax": "Timeout cannot exceed 300 seconds"
+      }
     },
     "switchFailed": "Switch failed: {{error}}",
     "takeover": {
@@ -4259,7 +4189,6 @@
       "enabled": "{{app}} is now in Aggregation mode",
       "exitedToDirect": "{{apps}} switched back to direct",
       "ariaLabel": "{{appLabel}} Aggregation mode",
-      "failoverUnavailable": "{{appLabel}} is in Aggregation mode, which has no failover. The queue and settings are kept and apply again in routing mode",
       "codexStale": {
         "authTitle": "Codex may still cache the previous account; restart its background server to load the new login",
         "title": "Codex is still using an old model list, so the current models won't show",
@@ -4274,7 +4203,8 @@
         "restarted": "Codex daemon restarted. Reopen codex to load the current account and model list",
         "notRunning": "The Codex daemon isn't running. It will load the current login and model list the next time it starts",
         "failed": "Failed to restart the Codex daemon: {{error}}"
-      }
+      },
+      "failoverUnavailable": "{{appLabel}} is in Aggregation mode, which has no failover. The queue and settings are kept and apply again in routing mode"
     },
     "failover": {
       "proxyRequired": "Routing service must be started to configure failover",
@@ -4285,19 +4215,19 @@
       "title": "Failover Queue",
       "description": "Manage failover order for each app's providers",
       "info": "When auto failover is enabled, requests follow the queue priority order (P1 first). On failures, the system will try the next provider in the queue.",
-      "selectProvider": "Select a provider to add to queue",
-      "noAvailableProviders": "No providers available to add",
       "empty": "Failover queue is empty. Add providers to enable automatic failover.",
-      "orderHint": "Queue order matches the provider list order on the Home page. Reorder providers on the Home page to change priority.",
-      "dragHint": "Drag providers to adjust failover order. Lower numbers have higher priority.",
       "toggleEnabled": "Enable/Disable",
       "addSuccess": "Added to failover queue",
       "addFailed": "Failed to add",
       "removeSuccess": "Removed from failover queue",
+      "toggleFailed": "Failed to update status",
+      "selectProvider": "Select a provider to add to queue",
+      "noAvailableProviders": "No providers available to add",
+      "orderHint": "Queue order matches the provider list order on the Home page. Reorder providers on the Home page to change priority.",
+      "dragHint": "Drag providers to adjust failover order. Lower numbers have higher priority.",
       "removeFailed": "Failed to remove",
       "reorderSuccess": "Queue order updated",
-      "reorderFailed": "Failed to update order",
-      "toggleFailed": "Failed to update status"
+      "reorderFailed": "Failed to update order"
     },
     "autoFailover": {
       "info": "When the failover queue has multiple providers, the system will try them in priority order when requests fail. When a provider reaches the consecutive failure threshold, the circuit breaker will open and skip it temporarily.",
@@ -4316,15 +4246,6 @@
       "errorRateHint": "Open circuit breaker when error rate exceeds this value",
       "minRequests": "Minimum Requests",
       "minRequestsHint": "Minimum requests before calculating error rate",
-      "explanationTitle": "How It Works",
-      "failureThresholdLabel": "Failure Threshold",
-      "failureThresholdExplain": "Circuit breaker opens after this many consecutive failures, making the provider temporarily unavailable",
-      "timeoutLabel": "Recovery Wait Time",
-      "timeoutExplain": "After circuit opens, wait this long before trying half-open state",
-      "successThresholdLabel": "Recovery Success Threshold",
-      "successThresholdExplain": "In half-open state, close circuit breaker after this many successes, making provider available again",
-      "errorRateLabel": "Error Rate Threshold",
-      "errorRateExplain": "Open circuit breaker when error rate exceeds this value, even if failure threshold not reached",
       "maxRetries": "Max Retries",
       "timeoutSettings": "Timeout Settings",
       "streamingFirstByte": "Streaming First Byte Timeout",
@@ -4333,7 +4254,16 @@
       "maxRetriesHint": "Number of retries on request failure (0-10)",
       "streamingFirstByteHint": "Max time to wait for first data chunk, range 1-120s, default 60s",
       "streamingIdleHint": "Max interval between data chunks, range 60-600s, 0 to disable (prevents mid-stream stalls)",
-      "nonStreamingHint": "Total timeout for non-streaming requests, range 60-1200s, default 600s (10 min)"
+      "nonStreamingHint": "Total timeout for non-streaming requests, range 60-1200s, default 600s (10 min)",
+      "explanationTitle": "How It Works",
+      "failureThresholdLabel": "Failure Threshold",
+      "failureThresholdExplain": "Circuit breaker opens after this many consecutive failures, making the provider temporarily unavailable",
+      "timeoutLabel": "Recovery Wait Time",
+      "timeoutExplain": "After circuit opens, wait this long before trying half-open state",
+      "successThresholdLabel": "Recovery Success Threshold",
+      "successThresholdExplain": "In half-open state, close circuit breaker after this many successes, making provider available again",
+      "errorRateLabel": "Error Rate Threshold",
+      "errorRateExplain": "Open circuit breaker when error rate exceeds this value, even if failure threshold not reached"
     },
     "logging": {
       "enabled": "Logging enabled",
@@ -4358,19 +4288,19 @@
   },
   "proxyConfig": {
     "proxyEnabled": "Routing Master Switch",
-    "appTakeover": "Routing Enabled",
-    "perAppConfig": "Per-App Config",
     "circuitBreaker": "Circuit Breaker",
     "circuitBreakerSettings": "Circuit Breaker Settings",
     "failureThreshold": "Failure Threshold",
     "successThreshold": "Success Threshold",
-    "recoveryTimeout": "Recovery Timeout",
     "errorRateThreshold": "Error Rate Threshold",
     "minRequests": "Min Requests",
     "timeoutConfig": "Timeout Config",
     "streamingFirstByte": "Streaming First Byte Timeout",
     "streamingIdle": "Streaming Idle Timeout",
-    "nonStreaming": "Non-Streaming Timeout"
+    "nonStreaming": "Non-Streaming Timeout",
+    "appTakeover": "Routing Enabled",
+    "perAppConfig": "Per-App Config",
+    "recoveryTimeout": "Recovery Timeout"
   },
   "universalProvider": {
     "duplicate": "Duplicate",
@@ -4586,12 +4516,12 @@
       "title": "Default Model",
       "description": "Configure the default primary model and fallback models for OpenClaw",
       "primary": "Primary Model",
-      "primaryPlaceholder": "e.g., deepseek/deepseek-chat",
       "fallbacks": "Fallback Models",
-      "fallbacksPlaceholder": "e.g., openrouter/anthropic/claude-sonnet-4.5",
       "addFallback": "Add Fallback Model",
       "saved": "Default model configuration saved",
-      "saveFailed": "Failed to save default model"
+      "saveFailed": "Failed to save default model",
+      "primaryPlaceholder": "e.g., deepseek/deepseek-chat",
+      "fallbacksPlaceholder": "e.g., openrouter/anthropic/claude-sonnet-4.5"
     },
     "modelCatalog": {
       "title": "Model Catalog",
@@ -4599,13 +4529,13 @@
       "modelId": "Model ID",
       "modelIdPlaceholder": "e.g., deepseek/deepseek-chat",
       "alias": "Alias",
-      "aliasPlaceholder": "e.g., DeepSeek",
-      "addEntry": "Add Model",
-      "removeEntry": "Remove",
       "saved": "Model catalog saved",
       "saveFailed": "Failed to save model catalog",
       "empty": "No model catalog entries",
-      "emptyHint": "Add models to the catalog to configure aliases"
+      "emptyHint": "Add models to the catalog to configure aliases",
+      "aliasPlaceholder": "e.g., DeepSeek",
+      "addEntry": "Add Model",
+      "removeEntry": "Remove"
     },
     "suggestedDefaults": "Apply Suggested Defaults",
     "suggestedDefaultsHint": "Use this preset's recommended default model configuration"
@@ -4614,7 +4544,6 @@
     "title": "Subscription Quota",
     "short": {
       "fiveHour": "5h",
-      "daily": "Day",
       "sevenDay": "Wk",
       "sevenDayFable": "Fable",
       "sevenDayOpus": "Opus",
@@ -4630,10 +4559,10 @@
       "agyThirdPartyWeekly": "Claude Wk",
       "monthly": "Mo",
       "credits": "Credits",
-      "copilotPremium": "Credits"
+      "copilotPremium": "Credits",
+      "daily": "Day"
     },
     "fiveHour": "5-hour",
-    "daily": "Daily",
     "sevenDay": "Weekly",
     "sevenDayFable": "Fable",
     "sevenDayOpus": "Weekly Opus",
@@ -4664,7 +4593,8 @@
     "expiredHint": "Run the {{tool}} command to refresh your login",
     "expiredHintAccounts": "Sign in to this account again in Accounts",
     "queryFailed": "Query failed",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "daily": "Daily"
   },
   "nav": {
     "mainLabel": "Main navigation",
@@ -4678,6 +4608,7 @@
     "usage": "Usage",
     "auth": "Accounts",
     "authNeedsReauth": "An account needs to sign in again",
+    "skills": "Skills",
     "prompts": "Prompts",
     "sessions": "Sessions",
     "apps": "Apps",
@@ -4690,7 +4621,8 @@
       "stack": "Aggregation"
     },
     "needsAttention": "Needs attention",
-    "back": "Back"
+    "back": "Back",
+    "plugins": "Plugins"
   },
   "appsPage": {
     "showInSidebar": "Show {{name}} in the sidebar",
@@ -4735,7 +4667,8 @@
       "agy": "Installs with the official script",
       "copilot": "Installs with npm",
       "omp": "Installs with the official script"
-    }
+    },
+    "manuallyManaged": "Install and update manually"
   },
   "appPage": {
     "moreActions": "More actions for {{name}}",
@@ -4819,9 +4752,9 @@
       "routeSwitched": "Route switched to {{provider}}. New requests will use this provider.",
       "stackDefaultChanged": "Aggregation default set to {{provider}}. Selected aggregated models still use their respective providers.",
       "clientConfigChanged": " Client configuration also changed. Restart {{app}} to load the updated configuration.",
-      "defaultRemembered": "{{provider}} will be the default provider once you switch to Aggregation.",
       "restartHint": " Restart {{app}} to apply.",
-      "failed": "Couldn't switch: {{detail}}"
+      "failed": "Couldn't switch: {{detail}}",
+      "defaultRemembered": "{{provider}} will be the default provider once you switch to Aggregation."
     },
     "dialog": {
       "routeTitle": "Use routing for {{app}}?",
@@ -5115,7 +5048,7 @@
       "failedTitle": "Some apps couldn't be read",
       "filesTitle": "Which files were read",
       "claudeNote": " (top-level mcpServers)",
-      "dshNote": " (written to every initialized profile: web, desktop, headless, acp)",
+      "dshNote": " (written to every initialized profile: web, desktop, headless, acp. The home-level ~/.dsh/cordis.patch.yml is neither read nor written; manage the MCP servers in it there)",
       "ok": "Got it"
     },
     "templateLabels": {
@@ -5358,7 +5291,7 @@
       "disabledShort": "Off",
       "disabled": "Turned off, not used by Discover",
       "manage": "Add or manage repositories",
-      "openAria": "Open {{repo}} on GitHub",
+      "openAria": "Open {{repo}} in the browser",
       "removeAria": "Remove repository {{repo}}",
       "readFailed": "Read failed"
     },
@@ -5390,6 +5323,91 @@
     "updateAllCount": "Update all ({{count}})",
     "updatingProgress": "Updating {{done}}/{{total}}…",
     "copyDir": "Copy folder name"
+  },
+  "pluginsPage": {
+    "title": "Plugins",
+    "helpTitle": "Plugins",
+    "help": "Install, enable and remove plugins for Claude Code, Codex, Grok Build, MiniMax Code, OpenClaw, Pi and Antigravity CLI. CC Switch runs each app's own CLI, so the result is the same as using its plugin command in a terminal. For Pi, plugins are Pi packages and the catalog comes from npm.",
+    "appAria": "App",
+    "viewAria": "Plugin views",
+    "viewInstalled": "Installed",
+    "viewInstalledCount": "Installed · {{count}}",
+    "viewDiscover": "Discover",
+    "viewDiscoverCount": "Discover · {{count}}",
+    "viewMarketplaces": "Marketplaces",
+    "searchPlaceholder": "Search plugins",
+    "searchAria": "Search plugins",
+    "count": "{{count}} plugins",
+    "countFiltered": "{{shown}} of {{count}}",
+    "noMatches": "No plugins match “{{query}}”",
+    "loading": "Reading {{app}} plugins…",
+    "loadFailed": "Couldn't read {{app}} plugins",
+    "catalogLoadFailed": "Couldn't read the marketplace catalog",
+    "loadingCatalog": "Reading the {{app}} marketplace catalog…",
+    "refreshing": "Refreshing…",
+    "marketsLoadFailed": "Couldn't read marketplaces",
+    "cliMissingTitle": "{{app}} is not installed",
+    "cliMissingBody": "Plugins are managed through the {{app}} CLI. Install it on the Apps page, then come back.",
+    "emptyInstalledTitle": "No plugins installed",
+    "emptyInstalledBody": "Browse the marketplaces to add skills, commands, agents and MCP servers to {{app}}.",
+    "browse": "Browse plugins",
+    "emptyDiscoverTitle": "Nothing new to install",
+    "emptyDiscoverBody": "Every plugin from your marketplaces is installed. Add a marketplace to see more.",
+    "emptyCatalogBody": "Every plugin in the catalog is installed.",
+    "emptyMarketsTitle": "No marketplaces added",
+    "emptyMarketsBody": "{{app}} still shows its built-in catalog. Add a GitHub repository or Git URL to list more plugins.",
+    "builtIn": "Built-in",
+    "builtInPlugin": "Ships with the app. You can turn it on or off, but not uninstall it.",
+    "scope": "{{scope}} scope",
+    "scopeReadOnly": "Installed in {{scope}} scope. Manage it with the CLI from that project.",
+    "enableAria": "Enable {{name}}",
+    "moreActions": "More actions for {{name}}",
+    "working": "Working…",
+    "install": "Install",
+    "installing": "Installing…",
+    "notInstallable": "Not available",
+    "update": "Update",
+    "uninstall": "Uninstall",
+    "restartNote": "Changes apply to new {{app}} sessions.",
+    "restartNoteGateway": "Changes apply after the {{app}} Gateway restarts.",
+    "refreshMarketplaces": "Refresh marketplaces",
+    "refreshCatalog": "Refresh catalog",
+    "addMarketplace": "Add marketplace",
+    "addMarketplaceTitle": "Add a {{app}} marketplace",
+    "addMarketplaceBody": "A GitHub owner/repo, a Git URL, or a local folder (use forward slashes, no spaces).",
+    "addMarketplaceWaiting": "Downloading the marketplace repository. Large repositories can take a few minutes (up to 5). You can close this window; you'll be notified when it finishes.",
+    "sourceLabel": "Source",
+    "removeMarketplace": "Remove",
+    "confirmUninstallTitle": "Uninstall {{name}}?",
+    "confirmUninstallBody": "Removes the plugin and its cached files from {{app}}. You can install it again from Discover.",
+    "confirmUninstallClaudeBody": "Uninstalls the plugin from {{app}} and keeps its data directory. If this is the last installation, saved options and credentials will be deleted and won't be restored by reinstalling.",
+    "confirmInstallTitle": "Install {{name}}?",
+    "confirmInstallBody": "Plugins run with your permissions: {{app}} will load its skills, hooks and MCP servers and grant the capabilities it declares. Only install plugins from sources you trust.",
+    "confirmRemoveMarketTitle": "Remove marketplace {{name}}?",
+    "confirmRemoveMarketBody": "{{app}} will stop listing plugins from this marketplace and may uninstall the plugins you installed from it. You can add it again later.",
+    "toast": {
+      "installed": "Installed {{name}}",
+      "installedNeedsConfig": "Installed disabled. Run /plugin in {{app}} to configure its MCP servers and enable it.",
+      "installFailed": "Couldn't install {{name}}",
+      "installNeedsTerminal": "This plugin runs a marketplace-declared command on your machine during install, and CC Switch won't accept it for you. Run {{command}} in a terminal, confirm there, then come back and refresh.",
+      "authRequired": "{{app}} needs you to sign in first. Run {{command}} in a terminal, then come back and try again.",
+      "pluginInUse": "This plugin is currently in use by another {{app}} process (such as an active {{cli}} session, Hub, or background daemon). Close it and try again.",
+      "uninstalled": "Uninstalled {{name}}",
+      "uninstallFailed": "Couldn't uninstall {{name}}",
+      "enabled": "Enabled {{name}}",
+      "disabled": "Disabled {{name}}",
+      "toggleFailed": "Couldn't change {{name}}",
+      "updated": "Updated {{name}}",
+      "upToDate": "{{name}} is already up to date",
+      "updateFailed": "Couldn't update {{name}}",
+      "updateNeedsReinstall": "This plugin is in a folder used by older versions of Antigravity, so CC Switch can't update it. Uninstall it, then install it again from Discover to get the latest version.",
+      "refreshed": "Marketplaces refreshed",
+      "refreshFailed": "Couldn't refresh marketplaces",
+      "marketAdded": "Added marketplace {{source}}",
+      "marketAddFailed": "Couldn't add the marketplace",
+      "marketRemoved": "Removed marketplace {{name}}",
+      "marketRemoveFailed": "Couldn't remove {{name}}"
+    }
   },
   "newLayoutNotice": {
     "title": "CC Switch has a new look",
@@ -5478,7 +5496,9 @@
       "empty": "No Antigravity accounts yet. The account agy is signed in with appears here automatically.",
       "removeNote": "agy stays signed in: if agy is using this account, it keeps working after removal.",
       "switched": "Switched. New agy sessions will use this account.",
-      "switchedWhileRunning": "Switched. agy is running: open agy sessions keep using the previous account and may write it back. Quit agy and open it again."
+      "switchedWhileRunning": "Switched. agy is running: open agy sessions keep using the previous account and may write it back. Quit agy and open it again.",
+      "current": "In use by agy",
+      "switchTo": "Switch agy to this account"
     },
     "workbuddy": {
       "addedOn": "Added {{date}}",
@@ -5560,7 +5580,9 @@
       "connectionManaged": "The connection and login are managed in the Authorization Center; edit only the models here. Fetching models reads the official models currently available to this account.",
       "primaryShort": "Kimi Code's own login",
       "empty": "No Kimi accounts yet. The account signed in to Kimi Code shows up here automatically.",
-      "help": "Add several Kimi coding plan accounts; each gets its own provider and models in Kimi Code. \"Use this account\" switches Kimi Code's default model to that account, and new sessions use it from then on. The account Kimi Code itself is signed in with shows up here automatically and is always used for web search and fetch; removing it here only hides it from the list and never signs Kimi Code out."
+      "help": "Add several Kimi coding plan accounts; each gets its own provider and models in Kimi Code. \"Use this account\" switches Kimi Code's default model to that account, and new sessions use it from then on. The account Kimi Code itself is signed in with shows up here automatically and is always used for web search and fetch; removing it here only hides it from the list and never signs Kimi Code out.",
+      "useAccount": "Use this account",
+      "current": "In use by Kimi"
     },
     "modelSelectionHint": "Use the switch button on a provider card to select it. To choose another model, use /model in Kimi Code.",
     "contextSize": "Context size",
@@ -5585,41 +5607,6 @@
       "defaultModelInUse": "Kimi Code is using a model from this provider. Switch to another model with /model in Kimi Code first.",
       "secondaryModelInUse": "Kimi Code's subagent model uses a model from this provider. Change it with /secondary-model in Kimi Code first."
     }
-  },
-  "platformAuth": {
-    "title": "Sign in to 智枢router",
-    "subtitle": "Sign in with your platform account to manage AI coding tools.",
-    "address": "Platform API address",
-    "loading": "Checking your session…",
-    "back": "Back to sign in",
-    "logout": "Sign out of platform",
-    "account": "Platform account",
-    "balance": "Balance",
-    "refreshBalance": "Click to refresh balance",
-    "sessionHint": "Stay signed in across restarts. Sign in again after more than 7 days without use.",
-    "restoreFailed": "Unable to restore your session",
-    "restoreHint": "Check your connection or unlock your system credential store, then retry. Your saved session is kept.",
-    "retryRestore": "Retry restoring session",
-    "oauthLogin": "Sign in to Zhishu",
-    "oauthHint": "A Zhishu authorization page will open in your browser. Sign-in completes automatically after you approve.",
-    "oauthWaiting": "Waiting for browser authorization…",
-    "oauthCancel": "Cancel authorization",
-    "advanced": "Advanced settings",
-    "oauthUnavailable": "OAuth2 browser authorization is unavailable. Check the server address or contact your administrator.",
-    "retryConfig": "Check sign-in settings again"
-  },
-  "platformUsage": {
-    "accountBalance": "Account balance",
-    "sharedBalance": "Shared by all usage-based groups",
-    "sharedQuota": "Shared across tools",
-    "expiresInDays": "{{count}} days left",
-    "unlimited": "Unlimited",
-    "subscriptionUnavailable": "Subscription quota unavailable: {{reason}}",
-    "manageSubscription": "Manage subscription",
-    "renewSubscription": "Renew subscription",
-    "subscriptionInactive": "Subscription unavailable",
-    "subscriptionLoading": "Loading subscription details",
-    "openSubscriptionFailed": "Unable to open the subscription page. Please try again."
   },
   "omp": {
     "empty": {
@@ -5662,6 +5649,248 @@
       "providerMissing": "This Oh My Pi provider is no longer saved.",
       "legacyModelsJson": "Oh My Pi still has a legacy models.json, which omp migrates to models.yml on its next start. Run omp once, then add the provider again."
     }
+  },
+  "dsh": {
+    "empty": {
+      "title": "Add a DeepSeek Harness provider",
+      "description": "Configure an endpoint, API key and models. Existing custom providers appear here automatically."
+    },
+    "sharedProviders": "Added providers are written into both the Web and Desktop configs of DeepSeek Harness (plus any initialized headless or acp profile); pick the model inside DeepSeek Harness.",
+    "sharedProvidersNote": "Shared by Web and Desktop",
+    "account": {
+      "help": "The DeepSeek account signs in through the browser (OAuth), here or in DeepSeek Harness. The sign-in is stored in $DSH_HOME/.credentials.yaml (default ~/.dsh/.credentials.yaml) and shared by DeepSeek Harness Web and Desktop: signing in or out anywhere applies to both, and a running DeepSeek Harness reloads it automatically. Usage of the account's models appears separately on the Usage page as \"DeepSeek account (OAuth)\".",
+      "statusFailed": "Couldn't read the DeepSeek account sign-in",
+      "empty": "Not signed in to a DeepSeek account",
+      "unnamed": "DeepSeek account",
+      "expired": "Sign-in expired. Sign in again",
+      "shared": "Shared by Web and Desktop",
+      "signOut": "Sign out",
+      "signOutConfirm": "Sign out of the DeepSeek account \"{{name}}\"? DeepSeek Harness Web and Desktop will both be signed out. API key providers aren't affected.",
+      "signOutFailed": "Couldn't sign out of the DeepSeek account",
+      "balance": "Balance {{amount}}",
+      "bonus": "Bonus {{amount}}",
+      "balanceFailed": "Balance unavailable right now",
+      "signedIn": "Signed in to the DeepSeek account for both Web and Desktop",
+      "signInFailed": "Couldn't sign in to the DeepSeek account",
+      "presetName": "DeepSeek official sign-in",
+      "presetDescription": "After you sign in to your DeepSeek account in the browser, DeepSeek Harness serves the account's models directly; no provider needs to be added. Web and Desktop share this sign-in. Sign in and out in the Auth Center; once signed in, the account appears under Added.",
+      "manageAccounts": "Manage DeepSeek account",
+      "cardSubtitle": "Official account · shared by Web and Desktop",
+      "expiredChip": "Sign-in expired",
+      "editDisabled": "DeepSeek Harness provides this account's models itself; there is nothing to edit.",
+      "managedHint": "This account is managed in the Auth Center; the card disappears after you sign out."
+    },
+    "deleteSessionHint": "Delete this session in DeepSeek Harness to keep its history consistent."
+  },
+  "autoUpdate": {
+    "toggle": "Download updates automatically",
+    "toggleHelp": "Downloads new versions in the background and asks before installing. Nothing is installed without your confirmation.",
+    "unsupported": "Not available for the portable build or Linux deb / rpm packages",
+    "readyTitle": "v{{version}} has been downloaded",
+    "readyBody": "Install it now? CC Switch will restart.",
+    "readyBodyRouting": "Install it now? CC Switch will restart, and requests in progress through local routing will be cut off.",
+    "later": "Later",
+    "installNow": "Install and restart",
+    "installFailed": "Update installation failed",
+    "downloadingInline": "Downloading the new version in the background…",
+    "downloadedInline": "Downloaded"
+  },
+  "unreadableEntry": {
+    "title": "“{{name}}” can't be read",
+    "hint": "It may have been saved by a newer version of CC Switch. The stored data is kept as is and can't be edited or enabled; upgrading restores it, or you can delete it.",
+    "confirmTitle": "Delete unreadable entry",
+    "confirmMessage": "Delete “{{name}}”? Only this CC Switch record is removed; the apps' own config files are not changed."
+  },
+  "platformCatalog": {
+    "accountIsolation": "Catalogs are stored separately by platform address and user ID. Only the currently signed-in account is shown here.",
+    "deleteAllHint": "Delete the current account’s platform providers across all Agent apps, including hidden apps. Keep platform base data and server keys.",
+    "deleteAllResult": "Deletion results for all Agent apps",
+    "deleteResultApp": "Agent app",
+    "deleteResultStatus": "Deletion result",
+    "deleteAppFailed": "Deletion failed: {{message}}",
+    "deleteProviders": "Delete all platform providers",
+    "deletingProviders": "Deleting platform providers…",
+    "deleteAction": "Platform provider deletion",
+    "deleteCompleted": "Deleted {{removed}} platform providers; kept {{skipped}}",
+    "syncAction": "Platform provider sync",
+    "syncResult": "Provider sync result",
+    "syncResultDescription": "View this sync's results, native file changes, and backup location.",
+    "deleteResultDescription": "View this deletion's results, native file changes, and backup location.",
+    "syncStats": "Providers: {{added}} added, {{updated}} updated, {{removed}} removed, {{unchanged}} unchanged",
+    "nativeChanges": "Native Agent configuration files",
+    "noNativeChanges": "No native Agent configuration was changed. Only the provider list in CCS was synchronized.",
+    "syncBackup": "Backup before sync",
+    "openBackup": "Open backup folder",
+    "copyBackupPath": "Copy backup path",
+    "noSyncBackup": "No backup directory was created for this sync.",
+    "openBackupFailed": "Unable to open backup folder",
+    "backupPathCopied": "Backup path copied",
+    "nativeChangedCount": "{{count}} native configuration files changed",
+    "noNativeChangesShort": "No native configuration files changed",
+    "syncCompleted": "Providers: {{added}} added, {{updated}} updated, {{removed}} removed; {{fileState}}. See configuration history for details.",
+    "group": "Group",
+    "actions": "Actions",
+    "groupStatus": "Group status",
+    "userId": "User ID",
+    "keyId": "Key ID",
+    "keyName": "Key name",
+    "showKey": "Show API Key",
+    "hideKey": "Hide API Key",
+    "copyKey": "Copy API Key",
+    "keyCopied": "API Key copied",
+    "copyFailed": "Unable to copy API Key. Please retry.",
+    "noKey": "No API Key is available for this group. Sync platform data again.",
+    "expandCatalog": "Expand model catalog",
+    "collapseCatalog": "Collapse model catalog",
+    "toggleModel": "Model parameters for {{name}}",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "viewDetails": "View details",
+    "viewDetailsFor": "View details for {{name}}",
+    "detailsDescription": "Group information and model parameters",
+    "groupId": "Group ID",
+    "platform": "Platform type",
+    "billing": "Billing type",
+    "source": "Platform URL",
+    "status": "Sync status",
+    "subscription": "Subscription",
+    "standard": "Pay as you go",
+    "modelCatalog": "Model catalog",
+    "noModels": "No model data available",
+    "contextWindow": "Context window",
+    "maxOutput": "Maximum output tokens",
+    "endpoints": "API protocols",
+    "inputModalities": "Input modalities",
+    "tools": "Tool calling",
+    "streaming": "Streaming output",
+    "reasoningLevels": "Reasoning levels",
+    "defaultReasoning": "Default reasoning level",
+    "notReported": "Not provided",
+    "supported": "Supported",
+    "unsupported": "Not supported",
+    "title": "Platform data",
+    "description": "Fetch groups and model catalogs from the Zhishu platform as shared data for all apps. After an update, use Connect tools to apply it to installed apps in one step, or sync each app individually.",
+    "sync": "Sync platform data",
+    "syncing": "Syncing platform data…",
+    "success": "Platform data updated. Use Connect tools to apply it, or sync each app.",
+    "partial": "Some groups could not be synced. Available data was saved; you can retry.",
+    "account": "Current account",
+    "lastSync": "Last synced",
+    "never": "Never synced",
+    "counts": "{{groups}} groups · {{models}} models",
+    "loading": "Reading local platform data…",
+    "empty": "No platform data for this account yet. Use the button above to sync.",
+    "noGroups": "This account has no groups available to sync.",
+    "models": "models",
+    "failed": "Sync failed; retry available",
+    "ready": "Synced",
+    "localHint": "Generate provider configurations using platform data already saved on this device",
+    "changes": "Added {{added}}, removed {{removed}}, skipped {{skipped}}",
+    "providersSuccess": "Platform providers synced: added {{added}}, removed {{removed}}, skipped {{skipped}}",
+    "providersSyncing": "Syncing platform providers…",
+    "providersSync": "Sync platform providers",
+    "bulkAdd": "Add all",
+    "bulkRemove": "Remove all",
+    "bulkAddHint": "Add every platform provider that is not enabled yet to the added list",
+    "bulkRemoveHint": "Remove enabled platform providers from the configuration; they stay in the available list",
+    "bulkAddStackHint": "Add all platform providers to the stack member list",
+    "bulkRemoveStackHint": "Remove platform providers from the stack member list",
+    "bulkAddDone": "Added {{count}} platform providers",
+    "bulkRemoveDone": "Removed {{count}} platform providers",
+    "bulkPartial": "{{success}} succeeded, {{failed}} failed"
+  },
+  "platformOnboarding": {
+    "title": "Connect tools",
+    "description": "Choose the apps and access mode. Mode apps can use direct, route, or stack; additive apps add every platform provider. Existing providers stay in the list so you can switch back at any time.",
+    "button": "Connect tools",
+    "buttonHint": "Pick apps and access mode, then create and connect their platform providers in one step",
+    "detecting": "Detecting installed tools…",
+    "loadingCatalog": "Reading platform data…",
+    "detectFailed": "Could not detect installations. Select the apps to connect manually.",
+    "installed": "Installed",
+    "notInstalled": "Not installed",
+    "noApps": "No supported apps are visible. Show at least one supported tool on the Apps page first.",
+    "noCatalog": "This account has no groups to sync. Sync platform data first.",
+    "groupsAvailable": "{{count}} groups available",
+    "selectAll": "Select all",
+    "clearAll": "Clear",
+    "confirm": "Connect selected apps",
+    "later": "Later",
+    "provisioning": "Connecting…",
+    "warning": "Connecting rewrites the current provider configuration of the selected tools.",
+    "resultTitle": "Connection results",
+    "resultSummary": "Connected {{success}} app(s); {{failed}} failed",
+    "resultSuccess": "Connected: {{provider}}",
+    "resultFailed": "Failed: {{message}}",
+    "noProvider": "No platform model is available for this app",
+    "done": "Done",
+    "retry": "Retry failed",
+    "modeLabel": "Access mode for {{name}}",
+    "mode": {
+      "direct": "Direct",
+      "route": "Route",
+      "stack": "Stack"
+    },
+    "additiveMode": "Added to provider list",
+    "modeHint": "Mode apps can use direct or route; Claude, Codex, and Claude Desktop also support stack. Additive apps add every platform provider.",
+    "resultDirect": "Direct configuration written: {{provider}}",
+    "resultRoute": "Route switched: {{provider}}",
+    "resultStack": "Added to stack: {{provider}} ({{count}} platform providers)",
+    "resultAdditive": "Added to provider list: {{count}} platform providers",
+    "defaultModelHint": "The default model was not changed automatically; select this provider's model in the tool.",
+    "groupLabel": "Group for {{name}}",
+    "groupOption": "{{name}} ({{count}} models)",
+    "groupLoading": "Reading groups…",
+    "noGroupsForApp": "No group is available for this app",
+    "stackDefaultHint": "Stack adds every platform provider for this app; the selected group is the default."
+  },
+  "simpleMode": {
+    "navApps": "Apps",
+    "title": "Apps",
+    "description": "Pick a provider for each tool. \"Zhishu Platform\" models sync with your account automatically.",
+    "notConnected": "Not connected",
+    "connected": "Connected",
+    "inactiveHint": "Platform models not in use",
+    "emptyProvidersHint": "No platform providers for this app yet. Turn on the switch on the Apps page to connect.",
+    "switchOnLabel": "Connect {{name}} to platform providers",
+    "switchOffLabel": "Remove platform providers of {{name}}",
+    "toSimple": "Simple mode",
+    "toAdvanced": "Advanced mode"
+  },
+  "platformAuth": {
+    "title": "Sign in to 智枢router",
+    "subtitle": "Sign in with your platform account to manage AI coding tools.",
+    "address": "Platform API address",
+    "loading": "Checking your session…",
+    "back": "Back to sign in",
+    "logout": "Sign out of platform",
+    "account": "Platform account",
+    "balance": "Balance",
+    "refreshBalance": "Click to refresh balance",
+    "sessionHint": "Stay signed in across restarts. Sign in again after more than 7 days without use.",
+    "restoreFailed": "Unable to restore your session",
+    "restoreHint": "Check your connection or unlock your system credential store, then retry. Your saved session is kept.",
+    "retryRestore": "Retry restoring session",
+    "oauthLogin": "Sign in to Zhishu",
+    "oauthHint": "A Zhishu authorization page will open in your browser. Sign-in completes automatically after you approve.",
+    "oauthWaiting": "Waiting for browser authorization…",
+    "oauthCancel": "Cancel authorization",
+    "advanced": "Advanced settings",
+    "oauthUnavailable": "OAuth2 browser authorization is unavailable. Check the server address or contact your administrator.",
+    "retryConfig": "Check sign-in settings again"
+  },
+  "platformUsage": {
+    "accountBalance": "Account balance",
+    "sharedBalance": "Shared by all usage-based groups",
+    "sharedQuota": "Shared across tools",
+    "expiresInDays": "{{count}} days left",
+    "unlimited": "Unlimited",
+    "subscriptionUnavailable": "Subscription quota unavailable: {{reason}}",
+    "manageSubscription": "Manage subscription",
+    "renewSubscription": "Renew subscription",
+    "subscriptionInactive": "Subscription unavailable",
+    "subscriptionLoading": "Loading subscription details",
+    "openSubscriptionFailed": "Unable to open the subscription page. Please try again."
   },
   "clientQuota": {
     "noLimit": "No window limit set",
@@ -5723,48 +5952,5 @@
     "search": "Search models by name or ID",
     "modelCount": "Showing {{shown}} of {{total}} models",
     "noMatches": "No matching models. Try another name or ID."
-  },
-  "dsh": {
-    "empty": {
-      "title": "Add a DeepSeek Harness provider",
-      "description": "Configure an endpoint, API key and models. Existing custom providers appear here automatically."
-    },
-    "sharedProviders": "Added providers are written into both the Web and Desktop configs of DeepSeek Harness (plus any initialized headless or acp profile); pick the model inside DeepSeek Harness.",
-    "sharedProvidersNote": "Shared by Web and Desktop",
-    "account": {
-      "help": "The DeepSeek account signs in through the browser (OAuth), here or in DeepSeek Harness. The sign-in is stored in $DSH_HOME/.credentials.yaml (default ~/.dsh/.credentials.yaml) and shared by DeepSeek Harness Web and Desktop: signing in or out anywhere applies to both, and a running DeepSeek Harness reloads it automatically. Usage of the account's models appears separately on the Usage page as \"DeepSeek account (OAuth)\".",
-      "statusFailed": "Couldn't read the DeepSeek account sign-in",
-      "empty": "Not signed in to a DeepSeek account",
-      "unnamed": "DeepSeek account",
-      "expired": "Sign-in expired. Sign in again",
-      "shared": "Shared by Web and Desktop",
-      "signOut": "Sign out",
-      "signOutConfirm": "Sign out of the DeepSeek account \"{{name}}\"? DeepSeek Harness Web and Desktop will both be signed out. API key providers aren't affected.",
-      "signOutFailed": "Couldn't sign out of the DeepSeek account",
-      "balance": "Balance {{amount}}",
-      "bonus": "Bonus {{amount}}",
-      "balanceFailed": "Balance unavailable right now",
-      "signedIn": "Signed in to the DeepSeek account for both Web and Desktop",
-      "signInFailed": "Couldn't sign in to the DeepSeek account",
-      "presetName": "DeepSeek official sign-in",
-      "presetDescription": "After you sign in to your DeepSeek account in the browser, DeepSeek Harness serves the account's models directly; no provider needs to be added. Web and Desktop share this sign-in. Sign in and out in the Auth Center; once signed in, the account appears under Added.",
-      "manageAccounts": "Manage DeepSeek account",
-      "cardSubtitle": "Official account · shared by Web and Desktop",
-      "expiredChip": "Sign-in expired",
-      "editDisabled": "DeepSeek Harness provides this account's models itself; there is nothing to edit.",
-      "managedHint": "This account is managed in the Auth Center; the card disappears after you sign out."
-    },
-    "deleteSessionHint": "Delete this session in DeepSeek Harness to keep its history consistent."
-  },
-  "autoUpdate": {
-    "toggle": "Download updates automatically",
-    "toggleHelp": "Downloads new versions in the background and asks before installing. Nothing is installed without your confirmation.",
-    "unsupported": "Not available for the portable build or Linux deb / rpm packages",
-    "readyTitle": "v{{version}} has been downloaded",
-    "readyBody": "Install it now? CC Switch will restart.",
-    "readyBodyRouting": "Install it now? CC Switch will restart, and requests in progress through local routing will be cut off.",
-    "later": "Later",
-    "installNow": "Install and restart",
-    "installFailed": "Update installation failed"
   }
 }

@@ -30,7 +30,7 @@ pub(crate) fn read_settings(state: &AppState, app: &AppType) -> Result<Value, Ap
             }
             let provider = state
                 .db
-                .get_provider_by_id(&current, AppType::ClaudeDesktop.as_str())?
+                .get_provider_by_id(&current, &AppType::ClaudeDesktop)?
                 .ok_or_else(|| AppError::Message(format!("供应商 {current} 不存在")))?;
             let model = provider
                 .meta

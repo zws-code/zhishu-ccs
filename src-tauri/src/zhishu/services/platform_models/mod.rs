@@ -354,7 +354,7 @@ fn sync_agent_providers(
     let agent = app.as_str();
     let live = local_error(connection::read_settings(state, app))?;
     // Expired subscriptions may have no catalog. Update only their marker through the adapter.
-    let ids = local_error(state.db.get_all_providers(agent))?;
+    let ids = local_error(state.db.get_all_providers(app))?;
     for provider in ids.values().filter(|provider| {
         provider
             .meta
@@ -378,7 +378,7 @@ fn sync_agent_providers(
             &discovery.subscription_group_ids,
         ))?;
     }
-    let mut existing = local_error(state.db.get_all_providers(agent))?;
+    let mut existing = local_error(state.db.get_all_providers(app))?;
     let mut failed_group_ids = discovery.failed_group_ids.clone();
     let mut warnings = Vec::new();
     // 无凭证不等于目录失败，更不能将未知 Key 写入工具配置。
@@ -840,7 +840,10 @@ mod tests {
         let _home = SyncTestHome::new();
         let state = AppState::new(std::sync::Arc::new(Database::memory().unwrap()));
         let provider = deletion_provider("workbuddy", "subscription", "https://platform.test", 1);
-        state.db.save_provider("workbuddy", &provider).unwrap();
+        state
+            .db
+            .save_provider(&crate::app_config::AppType::WorkBuddy, &provider)
+            .unwrap();
         // Unknown future fields must survive; a fresh edit made after discovery must survive too.
         let mut raw = serde_json::to_value(provider.meta.as_ref().unwrap()).unwrap();
         raw["future"] = json!({"keep":true});
@@ -894,7 +897,7 @@ mod tests {
         .unwrap());
         let saved = state
             .db
-            .get_provider_by_id(&provider.id, "workbuddy")
+            .get_provider_by_id(&provider.id, &crate::app_config::AppType::WorkBuddy)
             .unwrap()
             .unwrap();
         assert_eq!(saved.name, "edited");
@@ -937,7 +940,10 @@ mod tests {
             )
             .unwrap();
         assert_eq!(after_failure, saved_raw);
-        state.db.delete_provider("workbuddy", &provider.id).unwrap();
+        state
+            .db
+            .delete_provider(&crate::app_config::AppType::WorkBuddy, &provider.id)
+            .unwrap();
         assert!(!ProviderService::mark_subscription(
             &state,
             AppType::WorkBuddy,
@@ -949,7 +955,7 @@ mod tests {
         .unwrap());
         assert!(state
             .db
-            .get_provider_by_id(&provider.id, "workbuddy")
+            .get_provider_by_id(&provider.id, &crate::app_config::AppType::WorkBuddy)
             .unwrap()
             .is_none());
     }
@@ -967,7 +973,7 @@ mod tests {
         state
             .db
             .save_provider(
-                "workbuddy",
+                &crate::app_config::AppType::WorkBuddy,
                 &Provider::with_id("concurrent".into(), "Original".into(), json!({}), None),
             )
             .unwrap();
@@ -1068,7 +1074,13 @@ mod tests {
             .map(|agent| {
                 (
                     *agent,
-                    serde_json::to_value(store.db.get_all_providers(agent).unwrap()).unwrap(),
+                    serde_json::to_value(
+                        store
+                            .db
+                            .get_all_providers(&adapter::app(agent).unwrap())
+                            .unwrap(),
+                    )
+                    .unwrap(),
                 )
             })
             .collect();
@@ -1092,7 +1104,13 @@ mod tests {
         });
         for agent in adapter::AGENTS {
             assert_eq!(
-                serde_json::to_value(store.db.get_all_providers(agent).unwrap()).unwrap(),
+                serde_json::to_value(
+                    store
+                        .db
+                        .get_all_providers(&adapter::app(agent).unwrap())
+                        .unwrap()
+                )
+                .unwrap(),
                 providers_before[agent],
                 "{agent}"
             );
@@ -1143,16 +1161,25 @@ mod tests {
             ] {
                 state
                     .db
-                    .save_provider(agent, &deletion_provider(agent, id, base, user))
+                    .save_provider(
+                        &adapter::app(agent).unwrap(),
+                        &deletion_provider(agent, id, base, user),
+                    )
                     .unwrap();
             }
             let mut manual = deletion_provider(agent, "manual", origin, 1);
             manual.meta.as_mut().unwrap().platform_managed = None;
-            state.db.save_provider(agent, &manual).unwrap();
+            state
+                .db
+                .save_provider(&adapter::app(agent).unwrap(), &manual)
+                .unwrap();
         }
         for agent in adapter::AGENTS {
             let app = adapter::app(agent).unwrap();
-            let before = state.db.get_all_providers(agent).unwrap();
+            let before = state
+                .db
+                .get_all_providers(&adapter::app(agent).unwrap())
+                .unwrap();
             let result = delete::delete_for_identity(&auth, &state, &app, origin, 1).unwrap();
             assert_eq!(
                 (result.removed, result.skipped),
@@ -1160,7 +1187,10 @@ mod tests {
                 "{agent}: {:?}",
                 result.warnings
             );
-            let after = state.db.get_all_providers(agent).unwrap();
+            let after = state
+                .db
+                .get_all_providers(&adapter::app(agent).unwrap())
+                .unwrap();
             assert!(!after.contains_key("target"), "{agent}");
             for id in ["manual", "other-user", "other-platform"] {
                 assert_eq!(
@@ -1198,12 +1228,18 @@ mod tests {
             ] {
                 state
                     .db
-                    .save_provider(agent, &deletion_provider(agent, id, base, user))
+                    .save_provider(
+                        &adapter::app(agent).unwrap(),
+                        &deletion_provider(agent, id, base, user),
+                    )
                     .unwrap();
             }
             let mut manual = deletion_provider(agent, "manual", origin, 1);
             manual.meta.as_mut().unwrap().platform_managed = None;
-            state.db.save_provider(agent, &manual).unwrap();
+            state
+                .db
+                .save_provider(&adapter::app(agent).unwrap(), &manual)
+                .unwrap();
         }
         let result = delete::delete_all_for_identity(&auth, &state, origin, 1).unwrap();
         assert_eq!(
@@ -1219,7 +1255,10 @@ mod tests {
             assert_eq!(app.agent, *agent);
             assert_eq!((app.removed, app.skipped), (1, 0));
             assert!(app.error.is_none());
-            let after = state.db.get_all_providers(agent).unwrap();
+            let after = state
+                .db
+                .get_all_providers(&adapter::app(agent).unwrap())
+                .unwrap();
             assert!(!after.contains_key("target"), "{agent}");
             for id in ["manual", "other-user", "other-platform"] {
                 assert!(after.contains_key(id), "{agent}: {id}");
@@ -1254,7 +1293,10 @@ mod tests {
         for agent in adapter::AGENTS {
             state
                 .db
-                .save_provider(agent, &deletion_provider(agent, "target", origin, 1))
+                .save_provider(
+                    &adapter::app(agent).unwrap(),
+                    &deletion_provider(agent, "target", origin, 1),
+                )
                 .unwrap();
         }
         ProviderService::switch(&state, adapter::app("claude").unwrap(), "target").unwrap();
@@ -1292,7 +1334,10 @@ mod tests {
                 .sum::<usize>()
         );
         for app in &result.apps {
-            let row = state.db.get_provider_by_id("target", &app.agent).unwrap();
+            let row = state
+                .db
+                .get_provider_by_id("target", &adapter::app(&app.agent).unwrap())
+                .unwrap();
             match app.agent.as_str() {
                 "codex" => {
                     assert!(row.is_some());
@@ -1349,7 +1394,7 @@ mod tests {
         state
             .db
             .save_provider(
-                "claude",
+                &crate::app_config::AppType::Claude,
                 &deletion_provider("claude", "target", "https://platform.test", 1),
             )
             .unwrap();
@@ -1367,7 +1412,7 @@ mod tests {
         }
         assert!(state
             .db
-            .get_provider_by_id("target", "claude")
+            .get_provider_by_id("target", &crate::app_config::AppType::Claude)
             .unwrap()
             .is_some());
         assert!(crate::config_history::list(Some("claude".into()))
@@ -1401,7 +1446,7 @@ mod tests {
         assert_eq!(ProviderService::current(&state, app).unwrap(), "manual");
         assert!(state
             .db
-            .get_provider_by_id("target", "claude")
+            .get_provider_by_id("target", &crate::app_config::AppType::Claude)
             .unwrap()
             .is_none());
         let live: Value = serde_json::from_slice(
@@ -1443,12 +1488,12 @@ mod tests {
         );
         assert!(state
             .db
-            .get_provider_by_id("current", "claude")
+            .get_provider_by_id("current", &crate::app_config::AppType::Claude)
             .unwrap()
             .is_some());
         assert!(state
             .db
-            .get_provider_by_id("unused", "claude")
+            .get_provider_by_id("unused", &crate::app_config::AppType::Claude)
             .unwrap()
             .is_none());
         let report = crate::config_history::list(Some("claude".into()))
@@ -1504,7 +1549,7 @@ mod tests {
         assert_eq!(after["userPreference"], "keep");
         assert!(state
             .db
-            .get_provider_by_id("target", "workbuddy")
+            .get_provider_by_id("target", &crate::app_config::AppType::WorkBuddy)
             .unwrap()
             .is_none());
         let result = serde_json::to_value(result).unwrap();
@@ -1520,7 +1565,10 @@ mod tests {
         ));
         let app = adapter::app("workbuddy").unwrap();
         let provider = deletion_provider("workbuddy", "target", "https://platform.test", 1);
-        state.db.save_provider("workbuddy", &provider).unwrap();
+        state
+            .db
+            .save_provider(&crate::app_config::AppType::WorkBuddy, &provider)
+            .unwrap();
         let path = crate::workbuddy_config::config_path();
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(&path, b"{broken JSON").unwrap();
@@ -1533,7 +1581,7 @@ mod tests {
             serde_json::to_value(
                 state
                     .db
-                    .get_provider_by_id("target", "workbuddy")
+                    .get_provider_by_id("target", &crate::app_config::AppType::WorkBuddy)
                     .unwrap()
                     .unwrap()
             )
@@ -1713,7 +1761,7 @@ mod tests {
         assert_eq!(run().added, 1);
         let id = state
             .db
-            .get_all_providers("claude")
+            .get_all_providers(&crate::app_config::AppType::Claude)
             .unwrap()
             .keys()
             .next()
@@ -1876,7 +1924,11 @@ mod tests {
         discovery.account.user.id = 2;
         store.save(discovery).unwrap();
         assert!(matches!(sync(), Err(err) if err.code == "CATALOG_REQUIRED"));
-        assert!(state.db.get_all_providers("claude").unwrap().is_empty());
+        assert!(state
+            .db
+            .get_all_providers(&crate::app_config::AppType::Claude)
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
@@ -1898,7 +1950,11 @@ mod tests {
         ]);
         store.save(discovery).unwrap();
         // Layer 1 saves data without touching any Agent list.
-        assert!(state.db.get_all_providers("claude").unwrap().is_empty());
+        assert!(state
+            .db
+            .get_all_providers(&crate::app_config::AppType::Claude)
+            .unwrap()
+            .is_empty());
         let sync = || {
             sync_account_providers(
                 &state,
@@ -1914,7 +1970,11 @@ mod tests {
         assert!(first.warnings.is_empty());
         let second = sync();
         assert_eq!((second.added, second.removed, second.skipped), (0, 0, 1));
-        assert!(state.db.get_all_providers("codex").unwrap().is_empty());
+        assert!(state
+            .db
+            .get_all_providers(&crate::app_config::AppType::Codex)
+            .unwrap()
+            .is_empty());
         let mut partial = store
             .read("https://platform.test", 1)
             .unwrap()
@@ -1927,7 +1987,14 @@ mod tests {
         let third = sync();
         assert_eq!((third.added, third.removed), (0, 0));
         assert_eq!(third.warnings, vec!["Temporary group failure"]);
-        assert_eq!(state.db.get_all_providers("claude").unwrap().len(), 1);
+        assert_eq!(
+            state
+                .db
+                .get_all_providers(&crate::app_config::AppType::Claude)
+                .unwrap()
+                .len(),
+            1
+        );
     }
 
     #[test]
@@ -1952,7 +2019,11 @@ mod tests {
         assert!(warnings.is_empty());
         let id =
             adapter::service_provider_id("claude", 14, "anthropic", "https://platform.test", 1);
-        let mut provider = state.db.get_provider_by_id(&id, "claude").unwrap().unwrap();
+        let mut provider = state
+            .db
+            .get_provider_by_id(&id, &crate::app_config::AppType::Claude)
+            .unwrap()
+            .unwrap();
         assert_eq!(
             provider
                 .meta
@@ -1975,7 +2046,10 @@ mod tests {
             .as_mut()
             .unwrap()
             .subscription_type = None;
-        state.db.save_provider("claude", &provider).unwrap();
+        state
+            .db
+            .save_provider(&crate::app_config::AppType::Claude, &provider)
+            .unwrap();
         let original = provider.settings_config.clone();
         let manual = Provider::with_id(
             "manual-subscription".into(),
@@ -1983,7 +2057,10 @@ mod tests {
             json!({"env":{"ANTHROPIC_API_KEY":"manual-key"}}),
             None,
         );
-        state.db.save_provider("claude", &manual).unwrap();
+        state
+            .db
+            .save_provider(&crate::app_config::AppType::Claude, &manual)
+            .unwrap();
         let mut other_account = provider.clone();
         other_account.id = "other-subscription-account".into();
         other_account
@@ -1994,7 +2071,10 @@ mod tests {
             .as_mut()
             .unwrap()
             .user_id = 2;
-        state.db.save_provider("claude", &other_account).unwrap();
+        state
+            .db
+            .save_provider(&crate::app_config::AppType::Claude, &other_account)
+            .unwrap();
         let mut expired = active.clone();
         expired.catalogs[0].models.clear();
         expired.details.get_mut(&14).unwrap().quota = super::super::client_api::ClientQuota {
@@ -2004,7 +2084,11 @@ mod tests {
         let (_, removed, _, warnings) = sync_agent_providers(&state, &app, &expired).unwrap();
         assert_eq!(removed, 0);
         assert!(warnings.is_empty());
-        let retained = state.db.get_provider_by_id(&id, "claude").unwrap().unwrap();
+        let retained = state
+            .db
+            .get_provider_by_id(&id, &crate::app_config::AppType::Claude)
+            .unwrap()
+            .unwrap();
         assert_eq!(retained.settings_config, original);
         let managed = retained.meta.unwrap().platform_managed.unwrap();
         assert_eq!(managed.subscription_type.as_deref(), Some("subscription"));
@@ -2014,7 +2098,10 @@ mod tests {
         );
         let untouched = state
             .db
-            .get_provider_by_id("other-subscription-account", "claude")
+            .get_provider_by_id(
+                "other-subscription-account",
+                &crate::app_config::AppType::Claude,
+            )
             .unwrap()
             .unwrap();
         assert_eq!(untouched.settings_config, original);
@@ -2028,7 +2115,7 @@ mod tests {
         assert_eq!(
             state
                 .db
-                .get_provider_by_id("manual-subscription", "claude")
+                .get_provider_by_id("manual-subscription", &crate::app_config::AppType::Claude)
                 .unwrap()
                 .unwrap()
                 .settings_config,
@@ -2043,7 +2130,7 @@ mod tests {
         assert_eq!(
             state
                 .db
-                .get_provider_by_id(&id, "claude")
+                .get_provider_by_id(&id, &crate::app_config::AppType::Claude)
                 .unwrap()
                 .unwrap()
                 .settings_config,
@@ -2055,7 +2142,7 @@ mod tests {
         assert_eq!(removed, 1);
         assert!(state
             .db
-            .get_provider_by_id(&id, "claude")
+            .get_provider_by_id(&id, &crate::app_config::AppType::Claude)
             .unwrap()
             .is_none());
     }
@@ -2083,17 +2170,32 @@ mod tests {
         assert!(warnings.is_empty());
         let id =
             adapter::service_provider_id("claude", 42, "anthropic", "https://platform.test", 1);
-        let provider = state.db.get_provider_by_id(&id, "claude").unwrap().unwrap();
+        let provider = state
+            .db
+            .get_provider_by_id(&id, &crate::app_config::AppType::Claude)
+            .unwrap()
+            .unwrap();
         let managed = provider.meta.unwrap().platform_managed.unwrap();
         assert_eq!(managed.group_id, Some(42));
         assert_eq!(managed.group_platform.as_deref(), Some("anthropic"));
-        let mut customized = state.db.get_provider_by_id(&id, "claude").unwrap().unwrap();
+        let mut customized = state
+            .db
+            .get_provider_by_id(&id, &crate::app_config::AppType::Claude)
+            .unwrap()
+            .unwrap();
         customized.settings_config["customSetting"] = json!("keep");
-        state.db.save_provider("claude", &customized).unwrap();
+        state
+            .db
+            .save_provider(&crate::app_config::AppType::Claude, &customized)
+            .unwrap();
 
         let (added, removed, skipped, _) = sync_agent_providers(&state, &app, &discovery).unwrap();
         assert_eq!((added, removed, skipped), (0, 0, 1));
-        let restored = state.db.get_provider_by_id(&id, "claude").unwrap().unwrap();
+        let restored = state
+            .db
+            .get_provider_by_id(&id, &crate::app_config::AppType::Claude)
+            .unwrap()
+            .unwrap();
         let (_, restored_key) = restored.resolve_usage_credentials(&app);
         assert_eq!(restored_key, "key-42");
         assert_eq!(restored.settings_config["customSetting"], "keep");
@@ -2103,7 +2205,7 @@ mod tests {
         assert_eq!((added, removed, skipped), (0, 1, 0));
         assert!(state
             .db
-            .get_provider_by_id(&id, "claude")
+            .get_provider_by_id(&id, &crate::app_config::AppType::Claude)
             .unwrap()
             .is_none());
     }
@@ -2146,7 +2248,10 @@ mod tests {
             );
             assert!(warnings.is_empty(), "{agent}: {warnings:?}");
 
-            let providers = state.db.get_all_providers(agent).unwrap();
+            let providers = state
+                .db
+                .get_all_providers(&adapter::app(agent).unwrap())
+                .unwrap();
             assert_eq!(providers.len(), 1, "{agent}");
             let id =
                 adapter::service_provider_id(agent, 42, "composite", "https://platform.test", 1);
@@ -2218,7 +2323,7 @@ mod tests {
             );
             let provider = state
                 .db
-                .get_provider_by_id(&id, app.as_str())
+                .get_provider_by_id(&id, &app)
                 .unwrap()
                 .unwrap_or_else(|| panic!("{app:?} provider"));
             assert!(
@@ -2285,11 +2390,7 @@ mod tests {
             "https://platform.test",
             1,
         );
-        let provider = state
-            .db
-            .get_provider_by_id(&id, app.as_str())
-            .unwrap()
-            .unwrap();
+        let provider = state.db.get_provider_by_id(&id, &app).unwrap().unwrap();
         assert_eq!(
             provider
                 .meta
@@ -2353,11 +2454,7 @@ mod tests {
                 "https://platform.test",
                 1,
             );
-            let before = state
-                .db
-                .get_provider_by_id(&id, app.as_str())
-                .unwrap()
-                .unwrap();
+            let before = state.db.get_provider_by_id(&id, &app).unwrap().unwrap();
             assert_eq!(
                 before
                     .meta
@@ -2381,11 +2478,7 @@ mod tests {
                 sync_agent_providers(&state, &app, &discovery).unwrap();
             assert_eq!((added, removed, skipped), (0, 0, 1), "{app:?}");
             assert!(warnings.is_empty(), "{app:?}: {warnings:?}");
-            let after = state
-                .db
-                .get_provider_by_id(&id, app.as_str())
-                .unwrap()
-                .unwrap();
+            let after = state.db.get_provider_by_id(&id, &app).unwrap().unwrap();
             assert_eq!(
                 after
                     .meta
@@ -2448,14 +2541,10 @@ mod tests {
                     "https://platform.test",
                     1,
                 );
-                let mut provider = state
-                    .db
-                    .get_provider_by_id(&id, app.as_str())
-                    .unwrap()
-                    .unwrap();
+                let mut provider = state.db.get_provider_by_id(&id, &app).unwrap().unwrap();
                 *provider.settings_config.pointer_mut(base_path).unwrap() = json!(before);
                 provider.sort_index = Some(7);
-                state.db.save_provider(app.as_str(), &provider).unwrap();
+                state.db.save_provider(&app, &provider).unwrap();
                 ProviderService::switch(&state, app.clone(), &id).unwrap();
                 adapter::select_default(&app, &id, "claude-sonnet-5").unwrap();
 
@@ -2466,11 +2555,7 @@ mod tests {
                         sync_agent_providers(&state, &app, &discovery).unwrap();
                     assert_eq!((added, removed, skipped), (0, 0, 1));
                     assert!(warnings.is_empty(), "{warnings:?}");
-                    let refreshed = state
-                        .db
-                        .get_provider_by_id(&id, app.as_str())
-                        .unwrap()
-                        .unwrap();
+                    let refreshed = state.db.get_provider_by_id(&id, &app).unwrap().unwrap();
                     assert_eq!(
                         refreshed.settings_config.pointer(base_path).unwrap(),
                         expected,
@@ -2557,7 +2642,7 @@ mod tests {
             adapter::service_provider_id("workbuddy", 42, "openai", "https://platform.test", 1);
         let provider = state
             .db
-            .get_provider_by_id(&id, "workbuddy")
+            .get_provider_by_id(&id, &crate::app_config::AppType::WorkBuddy)
             .unwrap()
             .expect("WorkBuddy provider");
         assert_eq!(provider.name, "智枢平台 · OpenAI 主力");
@@ -2606,12 +2691,19 @@ mod tests {
             sync_agent_providers(&state, &app, &discovery).unwrap();
         assert_eq!((added, removed, skipped), (0, 0, 0));
         assert_eq!(warnings.len(), 1);
-        assert_eq!(state.db.get_all_providers("workbuddy").unwrap().len(), 1);
+        assert_eq!(
+            state
+                .db
+                .get_all_providers(&crate::app_config::AppType::WorkBuddy)
+                .unwrap()
+                .len(),
+            1
+        );
 
         ProviderService::switch(&state, app.clone(), &id).unwrap();
         let live_provider = state
             .db
-            .get_provider_by_id(&id, "workbuddy")
+            .get_provider_by_id(&id, &crate::app_config::AppType::WorkBuddy)
             .unwrap()
             .unwrap();
         assert!(adapter::workbuddy_provider_is_live(&live_provider.id).unwrap());
@@ -2639,7 +2731,7 @@ mod tests {
         assert!(warnings.is_empty(), "{warnings:?}");
         let refreshed = state
             .db
-            .get_provider_by_id(&id, "workbuddy")
+            .get_provider_by_id(&id, &crate::app_config::AppType::WorkBuddy)
             .unwrap()
             .unwrap();
         assert_eq!(
@@ -2693,7 +2785,7 @@ mod tests {
             adapter::service_provider_id("workbuddy", 77, "anthropic", "https://platform.test", 1);
         let provider = state
             .db
-            .get_provider_by_id(&id, "workbuddy")
+            .get_provider_by_id(&id, &crate::app_config::AppType::WorkBuddy)
             .unwrap()
             .expect("WorkBuddy provider for Anthropic platform");
         assert_eq!(provider.name, "智枢平台 · Claude 主力");
@@ -2731,10 +2823,17 @@ mod tests {
         sync_agent_providers(&state, &app, &discovery).unwrap();
         let id =
             adapter::service_provider_id("claude", 42, "anthropic", "https://platform.test", 1);
-        let mut provider = state.db.get_provider_by_id(&id, "claude").unwrap().unwrap();
+        let mut provider = state
+            .db
+            .get_provider_by_id(&id, &crate::app_config::AppType::Claude)
+            .unwrap()
+            .unwrap();
         provider.settings_config["customSetting"] = json!("keep");
         provider.sort_index = Some(7);
-        state.db.save_provider("claude", &provider).unwrap();
+        state
+            .db
+            .save_provider(&crate::app_config::AppType::Claude, &provider)
+            .unwrap();
 
         for (name, key) in [
             ("Renamed group", "key-42"),
@@ -2747,7 +2846,11 @@ mod tests {
                 sync_agent_providers(&state, &app, &discovery).unwrap();
             assert_eq!((added, removed, skipped), (0, 0, 1));
             assert!(warnings.is_empty());
-            let refreshed = state.db.get_provider_by_id(&id, "claude").unwrap().unwrap();
+            let refreshed = state
+                .db
+                .get_provider_by_id(&id, &crate::app_config::AppType::Claude)
+                .unwrap()
+                .unwrap();
             assert_eq!(refreshed.name, format!("智枢平台 · {name}"));
             assert_eq!(refreshed.settings_config["customSetting"], "keep");
             assert_eq!(refreshed.sort_index, provider.sort_index);
@@ -2793,7 +2896,11 @@ mod tests {
         let result = sync_agent_providers(&state, &app, &discovery).unwrap();
         assert_eq!((result.0, result.1, result.2), (1, 0, 0));
         assert!(result.3.is_empty(), "{:?}", result.3);
-        let provider = state.db.get_provider_by_id(&id, "dsh").unwrap().unwrap();
+        let provider = state
+            .db
+            .get_provider_by_id(&id, &crate::app_config::AppType::Dsh)
+            .unwrap()
+            .unwrap();
         assert_eq!(
             provider.settings_config["models"]
                 .as_object()
@@ -2867,7 +2974,11 @@ mod tests {
         assert!(!crate::dsh_config::get_providers()
             .unwrap()
             .contains_key(&id));
-        assert!(state.db.get_provider_by_id(&id, "dsh").unwrap().is_none());
+        assert!(state
+            .db
+            .get_provider_by_id(&id, &crate::app_config::AppType::Dsh)
+            .unwrap()
+            .is_none());
         assert_eq!(
             crate::dsh_config::get_providers().unwrap()["shoudongtianjia"],
             manual_before
@@ -2896,7 +3007,7 @@ mod tests {
             adapter::service_provider_id("opencode", 42, "composite", "https://platform.test", 1);
         let mut legacy = state
             .db
-            .get_provider_by_id(&id, "opencode")
+            .get_provider_by_id(&id, &crate::app_config::AppType::OpenCode)
             .unwrap()
             .unwrap();
         legacy.settings_config = json!({
@@ -2915,7 +3026,7 @@ mod tests {
         assert!(warnings.is_empty(), "{warnings:?}");
         let upgraded = state
             .db
-            .get_provider_by_id(&id, "opencode")
+            .get_provider_by_id(&id, &crate::app_config::AppType::OpenCode)
             .unwrap()
             .unwrap();
         assert_eq!(
@@ -2938,7 +3049,7 @@ mod tests {
         assert_eq!(
             state
                 .db
-                .get_provider_by_id(&id, "opencode")
+                .get_provider_by_id(&id, &crate::app_config::AppType::OpenCode)
                 .unwrap()
                 .unwrap()
                 .settings_config,
@@ -3000,7 +3111,7 @@ mod tests {
             assert!(first.warnings.is_empty(), "{:?}", first.warnings);
             let id = state
                 .db
-                .get_all_providers(app.as_str())
+                .get_all_providers(&app)
                 .unwrap()
                 .keys()
                 .next()
@@ -3016,11 +3127,7 @@ mod tests {
                 next.warnings
             );
             assert_eq!(next.updated, Some(1), "{}", app.as_str());
-            let mut updated = state
-                .db
-                .get_provider_by_id(&id, app.as_str())
-                .unwrap()
-                .unwrap();
+            let mut updated = state.db.get_provider_by_id(&id, &app).unwrap().unwrap();
             let models = if app == AppType::Codex {
                 &updated.settings_config["modelCatalog"]["models"]
             } else {
@@ -3049,9 +3156,11 @@ mod tests {
             if app == AppType::Codex {
                 state
                     .db
-                    .update_proxy_config(crate::proxy::types::ProxyConfig {
+                    .update_global_proxy_config(crate::proxy::types::GlobalProxyConfig {
+                        proxy_enabled: false,
+                        listen_address: "127.0.0.1".into(),
                         listen_port: 0,
-                        ..Default::default()
+                        enable_logging: true,
                     })
                     .await
                     .unwrap();
@@ -3090,11 +3199,7 @@ mod tests {
                         vec!["kept", replacement.as_str()],
                         "mode={mode:?}"
                     );
-                    updated = state
-                        .db
-                        .get_provider_by_id(&id, app.as_str())
-                        .unwrap()
-                        .unwrap();
+                    updated = state.db.get_provider_by_id(&id, &app).unwrap().unwrap();
                 }
                 crate::mode::controller::exit(&state, &app).await.unwrap();
                 run().await;
@@ -3109,7 +3214,7 @@ mod tests {
             assert_eq!(
                 state
                     .db
-                    .get_provider_by_id(&id, app.as_str())
+                    .get_provider_by_id(&id, &app)
                     .unwrap()
                     .unwrap()
                     .settings_config,
@@ -3150,11 +3255,7 @@ mod tests {
                 "https://platform.test",
                 1,
             );
-            let mut provider = state
-                .db
-                .get_provider_by_id(&id, app.as_str())
-                .unwrap()
-                .unwrap();
+            let mut provider = state.db.get_provider_by_id(&id, &app).unwrap().unwrap();
             provider.meta.as_mut().unwrap().api_format = None;
             provider.settings_config["customSetting"] = json!("keep");
             if app == crate::app_config::AppType::Codex {
@@ -3163,7 +3264,7 @@ mod tests {
                 provider.settings_config["modelCatalog"]["models"][0]["customField"] =
                     json!("keep");
             }
-            state.db.save_provider(app.as_str(), &provider).unwrap();
+            state.db.save_provider(&app, &provider).unwrap();
 
             discovery.catalogs[0].models = vec![json!({
                 "id":"public-alias", "context_window":1000000,
@@ -3175,11 +3276,7 @@ mod tests {
                 sync_agent_providers(&state, &app, &discovery).unwrap();
             assert_eq!((added, removed, skipped), (0, 0, 1));
             assert!(warnings.is_empty(), "{warnings:?}");
-            let refreshed = state
-                .db
-                .get_provider_by_id(&id, app.as_str())
-                .unwrap()
-                .unwrap();
+            let refreshed = state.db.get_provider_by_id(&id, &app).unwrap().unwrap();
             assert_eq!(refreshed.resolve_usage_credentials(&app).1, "key-42");
             assert_eq!(refreshed.settings_config["customSetting"], "keep");
             assert_eq!(
@@ -3215,11 +3312,7 @@ mod tests {
             discovery.catalogs[0].models = vec![json!({"id":"public-alias"})];
             let (_, _, _, warnings) = sync_agent_providers(&state, &app, &discovery).unwrap();
             assert!(warnings.is_empty(), "{warnings:?}");
-            let retained = state
-                .db
-                .get_provider_by_id(&id, app.as_str())
-                .unwrap()
-                .unwrap();
+            let retained = state.db.get_provider_by_id(&id, &app).unwrap().unwrap();
             assert_eq!(retained.settings_config, refreshed.settings_config);
         }
     }
@@ -3254,7 +3347,10 @@ mod tests {
         )
         .unwrap();
         let id = provider.id.clone();
-        state.db.save_provider("claude", &provider).unwrap();
+        state
+            .db
+            .save_provider(&crate::app_config::AppType::Claude, &provider)
+            .unwrap();
 
         let group = crate::zhishu::services::platform_auth::AvailableGroup {
             id: 77,
@@ -3273,7 +3369,7 @@ mod tests {
         assert!(warnings.is_empty());
         assert!(state
             .db
-            .get_provider_by_id(&id, "claude")
+            .get_provider_by_id(&id, &crate::app_config::AppType::Claude)
             .unwrap()
             .is_some());
         let current_id =
@@ -3281,7 +3377,7 @@ mod tests {
         assert_ne!(id, current_id);
         assert!(state
             .db
-            .get_provider_by_id(&current_id, "claude")
+            .get_provider_by_id(&current_id, &crate::app_config::AppType::Claude)
             .unwrap()
             .is_some());
     }
@@ -3315,7 +3411,11 @@ mod tests {
             sync_agent_providers(&state, &app, &discovery).unwrap();
         assert_eq!((added, removed, skipped), (0, 0, 0));
         assert!(!warnings.is_empty());
-        assert!(state.db.get_all_providers("codex").unwrap().is_empty());
+        assert!(state
+            .db
+            .get_all_providers(&crate::app_config::AppType::Codex)
+            .unwrap()
+            .is_empty());
         assert_eq!(
             std::fs::read_to_string(codex_dir.join("config.toml")).unwrap(),
             "model = \"gpt-5.6-sol\"\n"

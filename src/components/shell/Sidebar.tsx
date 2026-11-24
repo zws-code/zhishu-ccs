@@ -14,6 +14,7 @@ import {
   KeyRound,
   Layers,
   LayoutGrid,
+  Puzzle,
   Route,
   Server,
   Settings,
@@ -179,7 +180,8 @@ function MainDirectory({
       icon: Database,
     },
     { page: "mcp", label: "MCP", icon: Server },
-    { page: "skills", label: "Skills", icon: SkillsIcon },
+    { page: "skills", label: t("nav.skills"), icon: SkillsIcon },
+    { page: "plugins", label: t("nav.plugins"), icon: Puzzle },
     { page: "prompts", label: t("nav.prompts"), icon: BookOpen },
     { page: "sessions", label: t("nav.sessions"), icon: History },
     {

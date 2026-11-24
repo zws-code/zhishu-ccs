@@ -1,160 +1,4 @@
 {
-  "platformCatalog": {
-    "accountIsolation": "Kataloge werden getrennt nach Plattformadresse und Benutzer-ID gespeichert. Hier wird nur das aktuell angemeldete Konto angezeigt.",
-    "deleteAllHint": "Löscht die Plattform-Anbieter des aktuellen Kontos in allen Agent-Apps, einschließlich ausgeblendeter Apps. Plattform-Basisdaten und Server-Schlüssel bleiben erhalten.",
-    "deleteAllResult": "Löschergebnisse für alle Agent-Apps",
-    "deleteResultApp": "Agent-App",
-    "deleteResultStatus": "Löschergebnis",
-    "deleteAppFailed": "Löschen fehlgeschlagen: {{message}}",
-    "deleteProviders": "Alle Plattform-Anbieter löschen",
-    "deletingProviders": "Plattform-Anbieter werden gelöscht…",
-    "deleteAction": "Löschen der Plattform-Anbieter",
-    "deleteCompleted": "{{removed}} Plattform-Anbieter gelöscht; {{skipped}} beibehalten",
-    "syncAction": "Synchronisierung der Plattform-Anbieter",
-    "syncResult": "Ergebnis der Anbieter-Synchronisierung",
-    "syncResultDescription": "Ergebnisse dieser Synchronisierung, Änderungen an nativen Dateien und Speicherort der Sicherung anzeigen.",
-    "deleteResultDescription": "Ergebnisse dieses Löschvorgangs, Änderungen an nativen Dateien und Speicherort der Sicherung anzeigen.",
-    "syncStats": "Anbieter: {{added}} hinzugefügt, {{updated}} aktualisiert, {{removed}} entfernt, {{unchanged}} unverändert",
-    "nativeChanges": "Native Agent-Konfigurationsdateien",
-    "noNativeChanges": "Keine native Agent-Konfiguration wurde geändert. Nur die Anbieterliste in CCS wurde synchronisiert.",
-    "syncBackup": "Sicherung vor der Synchronisierung",
-    "openBackup": "Sicherungsordner öffnen",
-    "copyBackupPath": "Sicherungspfad kopieren",
-    "noSyncBackup": "Für diese Synchronisierung wurde kein Sicherungsverzeichnis erstellt.",
-    "openBackupFailed": "Sicherungsordner konnte nicht geöffnet werden",
-    "backupPathCopied": "Sicherungspfad kopiert",
-    "nativeChangedCount": "{{count}} native Konfigurationsdateien geändert",
-    "noNativeChangesShort": "Keine nativen Konfigurationsdateien geändert",
-    "syncCompleted": "Anbieter: {{added}} hinzugefügt, {{updated}} aktualisiert, {{removed}} entfernt; {{fileState}}. Details finden Sie im Konfigurationsverlauf.",
-    "group": "Gruppe",
-    "actions": "Aktionen",
-    "groupStatus": "Gruppenstatus",
-    "userId": "Benutzer-ID",
-    "keyId": "Schlüssel-ID",
-    "keyName": "Schlüsselname",
-    "showKey": "API-Schlüssel anzeigen",
-    "hideKey": "API-Schlüssel ausblenden",
-    "copyKey": "API-Schlüssel kopieren",
-    "keyCopied": "API-Schlüssel kopiert",
-    "copyFailed": "API-Schlüssel konnte nicht kopiert werden. Bitte erneut versuchen.",
-    "noKey": "Für diese Gruppe ist kein API-Schlüssel verfügbar. Synchronisieren Sie die Plattformdaten erneut.",
-    "expandCatalog": "Modellkatalog aufklappen",
-    "collapseCatalog": "Modellkatalog zuklappen",
-    "toggleModel": "Modellparameter für {{name}}",
-    "expand": "Aufklappen",
-    "collapse": "Zuklappen",
-    "viewDetails": "Details anzeigen",
-    "viewDetailsFor": "Details für {{name}} anzeigen",
-    "detailsDescription": "Gruppeninformationen und Modellparameter",
-    "groupId": "Gruppen-ID",
-    "platform": "Plattformtyp",
-    "billing": "Abrechnungsart",
-    "source": "Plattform-URL",
-    "status": "Synchronisierungsstatus",
-    "subscription": "Abonnement",
-    "standard": "Nutzungsbasiert",
-    "modelCatalog": "Modellkatalog",
-    "noModels": "Keine Modelldaten verfügbar",
-    "contextWindow": "Kontextfenster",
-    "maxOutput": "Maximale Ausgabe-Tokens",
-    "endpoints": "API-Protokolle",
-    "inputModalities": "Eingabemodalitäten",
-    "tools": "Tool-Aufrufe",
-    "streaming": "Streaming-Ausgabe",
-    "reasoningLevels": "Reasoning-Stufen",
-    "defaultReasoning": "Standard-Reasoning-Stufe",
-    "notReported": "Nicht angegeben",
-    "supported": "Unterstützt",
-    "unsupported": "Nicht unterstützt",
-    "title": "Plattformdaten",
-    "description": "Ruft Gruppen und Modellkataloge von der Zhishu-Plattform als gemeinsame Daten für alle Apps ab. Wenden Sie sie nach einer Aktualisierung mit „Tools verbinden“ in einem Schritt auf installierte Apps an oder synchronisieren Sie jede App einzeln.",
-    "sync": "Plattformdaten synchronisieren",
-    "syncing": "Plattformdaten werden synchronisiert…",
-    "success": "Plattformdaten aktualisiert. Wenden Sie sie mit „Tools verbinden“ an oder synchronisieren Sie jede App.",
-    "partial": "Einige Gruppen konnten nicht synchronisiert werden. Verfügbare Daten wurden gespeichert; Sie können es erneut versuchen.",
-    "account": "Aktuelles Konto",
-    "lastSync": "Zuletzt synchronisiert",
-    "never": "Noch nie synchronisiert",
-    "counts": "{{groups}} Gruppen · {{models}} Modelle",
-    "loading": "Lokale Plattformdaten werden gelesen…",
-    "empty": "Für dieses Konto liegen noch keine Plattformdaten vor. Synchronisieren Sie über die Schaltfläche oben.",
-    "noGroups": "Für dieses Konto sind keine Gruppen zum Synchronisieren verfügbar.",
-    "models": "Modelle",
-    "failed": "Synchronisierung fehlgeschlagen; erneuter Versuch möglich",
-    "ready": "Synchronisiert",
-    "localHint": "Anbieterkonfigurationen aus den bereits auf diesem Gerät gespeicherten Plattformdaten erzeugen",
-    "changes": "{{added}} hinzugefügt, {{removed}} entfernt, {{skipped}} übersprungen",
-    "providersSuccess": "Plattform-Anbieter synchronisiert: {{added}} hinzugefügt, {{removed}} entfernt, {{skipped}} übersprungen",
-    "providersSyncing": "Plattform-Anbieter werden synchronisiert…",
-    "providersSync": "Plattform-Anbieter synchronisieren",
-    "bulkAdd": "Alle hinzufügen",
-    "bulkRemove": "Alle entfernen",
-    "bulkAddHint": "Alle noch nicht aktivierten Plattform-Anbieter zur Liste der hinzugefügten Anbieter hinzufügen",
-    "bulkRemoveHint": "Aktivierte Plattform-Anbieter aus der Konfiguration entfernen; sie bleiben in der Liste der verfügbaren Anbieter",
-    "bulkAddStackHint": "Alle Plattform-Anbieter zur Mitgliederliste des Stacks hinzufügen",
-    "bulkRemoveStackHint": "Plattform-Anbieter aus der Mitgliederliste des Stacks entfernen",
-    "bulkAddDone": "{{count}} Plattform-Anbieter hinzugefügt",
-    "bulkRemoveDone": "{{count}} Plattform-Anbieter entfernt",
-    "bulkPartial": "{{success}} erfolgreich, {{failed}} fehlgeschlagen"
-  },
-  "platformOnboarding": {
-    "title": "Tools verbinden",
-    "description": "Wählen Sie die Apps und den Zugriffsmodus. Modus-Apps können Direkt, Routing oder Stack verwenden; additive Apps fügen alle Plattform-Anbieter hinzu. Vorhandene Anbieter bleiben in der Liste, sodass Sie jederzeit zurückwechseln können.",
-    "button": "Tools verbinden",
-    "buttonHint": "Apps und Zugriffsmodus wählen und dann ihre Plattform-Anbieter in einem Schritt erstellen und verbinden",
-    "detecting": "Installierte Tools werden erkannt…",
-    "loadingCatalog": "Plattformdaten werden gelesen…",
-    "detectFailed": "Installationen konnten nicht erkannt werden. Wählen Sie die zu verbindenden Apps manuell aus.",
-    "installed": "Installiert",
-    "notInstalled": "Nicht installiert",
-    "noApps": "Keine unterstützten Apps sichtbar. Blenden Sie zuerst auf der Apps-Seite mindestens ein unterstütztes Tool ein.",
-    "noCatalog": "Für dieses Konto gibt es keine Gruppen zum Synchronisieren. Synchronisieren Sie zuerst die Plattformdaten.",
-    "groupsAvailable": "{{count}} Gruppen verfügbar",
-    "selectAll": "Alle auswählen",
-    "clearAll": "Leeren",
-    "confirm": "Ausgewählte Apps verbinden",
-    "later": "Später",
-    "provisioning": "Wird verbunden…",
-    "warning": "Beim Verbinden wird die aktuelle Anbieterkonfiguration der ausgewählten Tools neu geschrieben.",
-    "resultTitle": "Verbindungsergebnisse",
-    "resultSummary": "{{success}} App(s) verbunden; {{failed}} fehlgeschlagen",
-    "resultSuccess": "Verbunden: {{provider}}",
-    "resultFailed": "Fehlgeschlagen: {{message}}",
-    "noProvider": "Für diese App ist kein Plattformmodell verfügbar",
-    "done": "Fertig",
-    "retry": "Fehlgeschlagene erneut versuchen",
-    "modeLabel": "Zugriffsmodus für {{name}}",
-    "mode": {
-      "direct": "Direkt",
-      "route": "Routing",
-      "stack": "Stack"
-    },
-    "additiveMode": "Zur Anbieterliste hinzugefügt",
-    "modeHint": "Modus-Apps können Direkt oder Routing verwenden; Claude, Codex und Claude Desktop unterstützen außerdem Stack. Additive Apps fügen alle Plattform-Anbieter hinzu.",
-    "resultDirect": "Direkte Konfiguration geschrieben: {{provider}}",
-    "resultRoute": "Routing gewechselt: {{provider}}",
-    "resultStack": "Zum Stack hinzugefügt: {{provider}} ({{count}} Plattform-Anbieter)",
-    "resultAdditive": "Zur Anbieterliste hinzugefügt: {{count}} Plattform-Anbieter",
-    "defaultModelHint": "Das Standardmodell wurde nicht automatisch geändert; wählen Sie das Modell dieses Anbieters im Tool aus.",
-    "groupLabel": "Gruppe für {{name}}",
-    "groupOption": "{{name}} ({{count}} Modelle)",
-    "groupLoading": "Gruppen werden gelesen…",
-    "noGroupsForApp": "Für diese App ist keine Gruppe verfügbar",
-    "stackDefaultHint": "Stack fügt alle Plattform-Anbieter dieser App hinzu; die ausgewählte Gruppe ist der Standard."
-  },
-  "simpleMode": {
-    "navApps": "Apps",
-    "title": "Apps",
-    "description": "Wählen Sie für jedes Tool einen Anbieter. Modelle der „Zhishu-Plattform“ werden automatisch mit Ihrem Konto synchronisiert.",
-    "notConnected": "Nicht verbunden",
-    "connected": "Verbunden",
-    "inactiveHint": "Plattformmodelle nicht in Verwendung",
-    "emptyProvidersHint": "Für diese App gibt es noch keine Plattform-Anbieter. Schalten Sie zum Verbinden den Schalter auf der Apps-Seite ein.",
-    "switchOnLabel": "{{name}} mit Plattform-Anbietern verbinden",
-    "switchOffLabel": "Plattform-Anbieter von {{name}} entfernen",
-    "toSimple": "Einfacher Modus",
-    "toAdvanced": "Erweiterter Modus"
-  },
   "app": {
     "title": "CC Switch",
     "description": "Der All-in-One-Assistent für Claude Code, Codex & Gemini CLI"
@@ -181,7 +25,6 @@
     "success": "Erfolg",
     "error": "Fehler",
     "unknown": "Unbekannt",
-    "enterValidValue": "Bitte geben Sie einen gültigen Wert ein",
     "clear": "Leeren",
     "format": "Formatieren",
     "formatSuccess": "Erfolgreich formatiert",
@@ -206,7 +49,8 @@
     "collapse": "Einklappen",
     "more": "Mehr",
     "retry": "Erneut versuchen",
-    "required": "erforderlich"
+    "required": "erforderlich",
+    "enterValidValue": "Please enter a valid value"
   },
   "firstRunNotice": {
     "title": "Willkommen bei CC Switch",
@@ -217,7 +61,9 @@
   "apiKeyInput": {
     "placeholder": "API-Schlüssel eingeben",
     "show": "API-Schlüssel anzeigen",
-    "hide": "API-Schlüssel ausblenden"
+    "hide": "API-Schlüssel ausblenden",
+    "copied": "API-Schlüssel kopiert",
+    "copyFailed": "API-Schlüssel konnte nicht kopiert werden"
   },
   "jsonEditor": {
     "mustBeObject": "Die Konfiguration muss ein JSON-Objekt sein, kein Array oder anderer Typ",
@@ -298,7 +144,6 @@
     "adoptCatalog": "Modellkatalog von CC Switch verwenden",
     "adoptCatalogDone": "Der Modellkatalog von CC Switch wird jetzt verwendet. Starten Sie Codex neu, um die Änderung zu übernehmen",
     "adoptCatalogFailed": "Wechsel zum Modellkatalog von CC Switch fehlgeschlagen: {{error}}",
-    "noRoutingSupport": "Kein Routing-Support",
     "blockedByProxyHint": "Im Routing-Modus ist kein Wechsel zu einem offiziellen Anbieter möglich",
     "editProvider": "Anbieter bearbeiten",
     "editProviderHint": "Die Konfiguration wird nach der Aktualisierung sofort auf den aktuellen Anbieter angewendet.",
@@ -360,6 +205,8 @@
       "extraArgsPlaceholder": "z. B. --debug --append-system-prompt \"Be brief\"",
       "extraArgsHint": "Wird nur für dieses Terminal hinter den Startbefehl gesetzt. Mit Leerzeichen trennen; Werte mit Leerzeichen in Anführungszeichen setzen.",
       "agySwitchTitle": "Dadurch wird die Anmeldung von agy gewechselt",
+      "agyBindingMissing": "Das mit dieser Karte verknüpfte Antigravity-Konto fehlt auf diesem Computer. Füge es unter „Konten“ hinzu oder verwende für diesen Start die aktuelle agy-Anmeldung.",
+      "agyUseCurrentLogin": "Aktuelle agy-Anmeldung für diesen Start verwenden",
       "agySwitchBody": "Vor dem Öffnen wechselt die Anmeldung von agy zu {{account}}; danach gestartete agy-Sitzungen verwenden dieses Konto.",
       "agySwitchRunning": "agy läuft: Geöffnete agy-Sitzungen behalten das vorherige Konto und schreiben es möglicherweise zurück. Beenden Sie sie nach Möglichkeit zuerst.",
       "isolationBodyCopilot": "copilot startet in diesem Terminal mit --model auf das erste Modell von „{{name}}“, nur für diese Sitzung. Endpunkt und Schlüssel stammen aus der providers.json von Copilot, daher können andere Terminals es ebenfalls mit /model auswählen."
@@ -397,17 +244,19 @@
         "oauthHint": "Google Official verwendet die persönliche OAuth-Authentifizierung; ein API-Schlüssel ist nicht nötig. Beim ersten Gebrauch öffnet sich automatisch der Browser zur Anmeldung.",
         "apiKeyPlaceholder": "Gemini-API-Schlüssel eingeben"
       },
-      "claudeAccount": {
+      "managedAccount": {
         "label": "Anmeldemethode",
+        "missing": "Konto nicht auf diesem Computer vorhanden",
+        "reauthBadge": "Erneute Anmeldung erforderlich"
+      },
+      "claudeAccount": {
         "default": "Claude-Code-Anmeldung folgen",
         "defaultDescription": "Das Konto ändert sich mit der aktuellen Claude-Code-Anmeldung",
-        "missing": "Konto nicht auf diesem Computer vorhanden",
         "manage": "Claude-Konten hinzufügen oder verwalten",
         "helpTerminal": "Der Claude-Konfigurationsordner ist in den Optionen überschrieben, daher ändert der Wechsel zu dieser Karte die Anmeldung von Claude Code nicht. Verwenden Sie „Terminal öffnen“ auf der Karte, um das ausgewählte Konto zu nutzen.",
         "helpWsl": "Der Claude-Konfigurationsordner liegt in WSL, wo Claude-Konten noch nicht unterstützt werden. Der Wechsel zu dieser Karte ändert die Anmeldung von Claude Code nicht.",
         "help": "Der Wechsel zu dieser Karte ändert die Anmeldung von Claude Code sofort auf das ausgewählte Konto, auch für bereits laufende Sitzungen. Um mehrere Konten gleichzeitig zu nutzen, verwenden Sie „Terminal öffnen“ auf der Karte.",
         "claudeAccount": "Claude-Konto",
-        "reauthBadge": "Erneute Anmeldung erforderlich",
         "terminalHint": "Über „Terminal öffnen“ nutzen",
         "wslHint": "In WSL nicht unterstützt",
         "plan": {
@@ -419,6 +268,13 @@
           "teamPremium": "Team Premium",
           "enterprise": "Enterprise"
         }
+      },
+      "grokAccount": {
+        "default": "Grok-CLI-Anmeldung folgen",
+        "defaultDescription": "Verwendet das Konto, mit dem Grok CLI angemeldet ist",
+        "manage": "xAI-Konten hinzufügen oder verwalten",
+        "help": "Wenn Sie zu dieser Karte wechseln, wird die Anmeldung von Grok CLI (~/.grok/auth.json) auf das ausgewählte Konto umgestellt. Das zuvor angemeldete Konto wird zuerst in der Kontoverwaltung gespeichert und kehrt zurück, wenn Sie zur Karte „Grok-CLI-Anmeldung folgen“ wechseln.",
+        "xaiAccount": "xAI-Konto"
       }
     },
     "duplicateLiveIdsLoadFailed": "Anbieterkennungen konnten nicht aus der Konfiguration gelesen werden. Bitte beheben Sie die Konfiguration und versuchen Sie es erneut",
@@ -434,15 +290,15 @@
     "formSubtitleStack": "{{app}} (Aggregationsmodus)",
     "editCurrentNoticeFile": "Dies ist der verwendete Anbieter. Beim Speichern wird er sofort geschrieben nach",
     "editCurrentNoticeFileEnd": "; die nächste Anfrage verwendet ihn.",
-    "editCurrentNotice": "Dies ist der verwendete Anbieter. Das Speichern wirkt sofort; die nächste Anfrage verwendet die neuen Einstellungen."
+    "editCurrentNotice": "Dies ist der verwendete Anbieter. Das Speichern wirkt sofort; die nächste Anfrage verwendet die neuen Einstellungen.",
+    "noRoutingSupport": "No Routing Support"
   },
   "claudeCode": {
     "needsRouting": "Routing erforderlich",
-    "noRoutingSupport": "Kein Routing-Support"
+    "noRoutingSupport": "No Routing Support"
   },
   "codex": {
     "needsRouting": "Routing erforderlich",
-    "noRoutingSupport": "Kein Routing-Support",
     "officialRouting": "Routing über offizielles Konto",
     "nativeLogin": "Codex-Anmeldung",
     "followCodexLogin": "Codex-Anmeldung folgen",
@@ -452,7 +308,8 @@
     "chooseAccount": "Konto auswählen",
     "accountStatusUnavailable": "Kontodetails konnten nicht geladen werden",
     "boundAccountUnavailable": "Das verknüpfte Konto ist nicht verfügbar",
-    "accountLoading": "Konto wird geladen …"
+    "accountLoading": "Konto wird geladen …",
+    "noRoutingSupport": "No Routing Support"
   },
   "claudeDesktop": {
     "modelConfigTitle": "Modellkonfiguration",
@@ -478,7 +335,7 @@
     "supports1mShort": "1M",
     "directModelListTitle": "Modellliste",
     "directModelListCollapsedHint": "Anbieter nativer Claude-Modelle benötigen dies in der Regel nicht. Claude Desktop ruft /v1/models automatisch ab.",
-    "directModelListHint": "Konfigurieren Sie die Modelle Sonnet, Opus und Haiku, die Claude Desktop zur Verfügung stehen. Leer lassen, damit Claude Desktop /v1/models automatisch abruft. Mit dem Häkchen bei 1M wird Unterstützung für 1M Kontext angegeben.",
+    "directModelListHint": "Konfigurieren Sie die Modelle Sonnet, Opus und Haiku, die Claude Desktop zur Verfügung stehen. Im Direktmodus leer lassen, damit Claude Desktop /v1/models automatisch abruft; im Routing-Modus bietet eine leere Liste nur die Standard-Modellnamen von Claude an – tragen Sie die Modelle hier ein, um die des Anbieters zu nutzen. Mit dem Häkchen bei 1M wird Unterstützung für 1M Kontext angegeben.",
     "directModelInvalid": "Direkte Modelle müssen von Claude Desktop erkannte Modell-IDs für Sonnet / Opus / Haiku verwenden",
     "addModel": "Modell hinzufügen",
     "addRoute": "Modell hinzufügen",
@@ -495,13 +352,11 @@
         "active": "Das lokale Routing von Claude Desktop läuft – {{address}}:{{port}}",
         "inactive": "Schalten Sie das lokale Routing von Claude Desktop für Anbieter ein, die Modellzuordnung oder Formatkonvertierung benötigen. Konfigurierte Adresse: {{address}}:{{port}}"
       },
-      "stopBlockedByTakeover": "Andere Apps befinden sich noch im Routing-Modus. Stellen Sie sie zurück auf „Direkt“, bevor Sie den Routing-Dienst beenden."
+      "stopBlockedByTakeover": "Other apps are still in Routing mode. Switch them back to Direct before stopping the routing service."
     }
   },
   "notifications": {
     "providerAdded": "Anbieter hinzugefügt",
-    "providerSaved": "Anbieterkonfiguration gespeichert",
-    "providerDeleted": "Anbieter erfolgreich gelöscht",
     "switchSuccess": "Wechsel erfolgreich!",
     "codexRestartRequired": "Wechsel erfolgreich. Starten Sie den Client neu, um die Änderungen zu übernehmen.",
     "geminiRestartRequired": "Wechsel erfolgreich. Starten Sie Gemini CLI neu, um die Änderungen zu übernehmen.",
@@ -512,12 +367,9 @@
     "removeFromConfigFailed": "Anbieter konnte nicht entfernt werden",
     "switchFailedTitle": "Wechsel fehlgeschlagen",
     "switchFailed": "Wechsel fehlgeschlagen: {{error}}",
-    "autoImported": "Standardanbieter aus vorhandener Konfiguration erstellt",
     "addFailed": "Anbieter konnte nicht hinzugefügt werden: {{error}}",
     "saveFailed": "Speichern fehlgeschlagen: {{error}}",
     "saveFailedGeneric": "Speichern fehlgeschlagen, bitte versuchen Sie es erneut",
-    "appliedToClaudePlugin": "Auf Claude-Plugin angewendet",
-    "removedFromClaudePlugin": "Aus Claude-Plugin entfernt",
     "syncClaudePluginFailed": "Synchronisierung des Claude-Plugins fehlgeschlagen",
     "skipClaudeOnboardingFailed": "Die Bestätigung beim ersten Start von Claude Code konnte nicht übersprungen werden",
     "clearClaudeOnboardingSkipFailed": "Die Bestätigung beim ersten Start von Claude Code konnte nicht wiederhergestellt werden",
@@ -536,8 +388,6 @@
     "proxyReasonDesktopMapping": "verwendet Modellzuordnung (Claude Desktop akzeptiert nur Claude-Modellnamen)",
     "proxyReasonManagedOAuth": "verwendet eine verwaltete OAuth-Anmeldung (Token wird vom lokalen Routing eingefügt)",
     "proxyReasonRoutingRequired": "erfordert lokales Routing zur Verarbeitung von Anfragen",
-    "openAIFormatHint": "Dieser Anbieter verwendet ein OpenAI-kompatibles Format und erfordert einen aktivierten Routing-Dienst",
-    "copilotProxyHint": "GitHub Copilot als Claude-Anbieter erfordert immer lokales Routing; das Routing wählt anhand des aktuellen Modells automatisch Chat Completions oder Responses.",
     "openLinkFailed": "Link konnte nicht geöffnet werden",
     "openclawModelsRegistered": "Modelle wurden in der /model-Liste registriert",
     "openclawDefaultModelSet": "Als Standardmodell festgelegt",
@@ -546,6 +396,7 @@
     "openclawModelNotFound": "Das ausgewählte Modell existiert nicht mehr. Aktualisieren Sie die Ansicht und versuchen Sie es erneut.",
     "backfillWarning": "Wechsel erfolgreich, aber die Änderungen konnten nicht im vorherigen Anbieter gespeichert werden",
     "codexAuthCleanupFailed": "Wechsel erfolgreich, aber auth.json konnte nicht entfernt werden – die Zugangsdaten der offiziellen Anmeldung liegen weiterhin auf der Festplatte; löschen Sie auth.json im Codex-Konfigurationsordner, um sie zu entfernen",
+    "omoVariantCleanupFailed": "Erfolgreich gewechselt, aber die Konfigurationsdatei der anderen OMO-Variante (OMO / OMO Slim) konnte nicht entfernt werden, daher lädt OpenCode möglicherweise beide; lösche sie im OpenCode-Konfigurationsverzeichnis",
     "windowControlFailed": "Fenstersteuerung fehlgeschlagen: {{error}}",
     "officialBlockedByProxy": "Bei aktivem lokalem Routing ist kein Wechsel zu einem offiziellen Anbieter möglich. Die Nutzung von Routing mit offiziellen APIs kann zur Sperrung des Kontos führen.",
     "proxyOfficialWarning": "Der aktuelle Anbieter {{name}} ist offiziell. Erwägen Sie den Wechsel zu einem Drittanbieter, bevor Sie das lokale Routing verwenden.",
@@ -556,7 +407,14 @@
       "thirdPartyBucket": "Drittanbietern",
       "migrationFinished": "{{count}} alte Sitzungen migriert. Starten Sie Codex neu, um sie fortzusetzen.",
       "migrationFailed": "Alte Sitzungen konnten nicht migriert werden: {{error}}. CC Switch versucht es beim nächsten Start erneut."
-    }
+    },
+    "providerSaved": "Provider configuration saved",
+    "providerDeleted": "Provider deleted successfully",
+    "autoImported": "Default provider created from existing configuration",
+    "appliedToClaudePlugin": "Applied to Claude plugin",
+    "removedFromClaudePlugin": "Removed from Claude plugin",
+    "openAIFormatHint": "This provider uses OpenAI-compatible format and requires the routing service to be enabled",
+    "copilotProxyHint": "GitHub Copilot as a Claude provider always requires local routing; routing automatically selects Chat Completions or Responses based on the current model."
   },
   "confirm": {
     "deleteProvider": "Anbieter löschen",
@@ -576,7 +434,7 @@
     },
     "unifyCodexHistory": {
       "title": "Einheitlicher Codex-Sitzungsverlauf",
-      "message": "Wenn aktiviert, läuft das offizielle Abonnement unter der gemeinsamen Anbieter-ID „custom“. Offizielle und Drittanbieter-Sitzungen bilden damit eine Gruppe: Neuere Codex-Versionen können beide fortsetzen, und die Fortsetzungsliste der CLI zeigt sie gemeinsam an.\n\nSie können auch Ihre vorhandenen offiziellen Sitzungen migrieren; in diesem Fall verschiebt Zhishu CC Switch bei jedem Start außerdem alle zurückgebliebenen offiziellen Sitzungen (zuvor wird in ~/.zhishu-ccs/backups gesichert; beim Deaktivieren können Sie sie wiederherstellen). Nicht migrierte Sitzungen bleiben in neueren Codex-Versionen schreibgeschützt. Starten Sie Codex nach der Migration neu.\n\nHinweis: Das Fortsetzen einer alten Sitzung über Anbietergrenzen hinweg kann fehlschlagen, weil das andere Backend den verschlüsselten encrypted_content des Reasonings nicht entschlüsseln kann.",
+      "message": "Wenn aktiviert, läuft das offizielle Abonnement unter der gemeinsamen Anbieter-ID „custom“. Offizielle und Drittanbieter-Sitzungen bilden damit eine Gruppe: Neuere Codex-Versionen können beide fortsetzen, und die Fortsetzungsliste der CLI zeigt sie gemeinsam an.\n\nSie können auch Ihre vorhandenen offiziellen Sitzungen migrieren; in diesem Fall verschiebt CC Switch bei jedem Start außerdem alle zurückgebliebenen offiziellen Sitzungen (zuvor wird in ~/.cc-switch/backups gesichert; beim Deaktivieren können Sie sie wiederherstellen). Nicht migrierte Sitzungen bleiben in neueren Codex-Versionen schreibgeschützt. Starten Sie Codex nach der Migration neu.\n\nHinweis: Das Fortsetzen einer alten Sitzung über Anbietergrenzen hinweg kann fehlschlagen, weil das andere Backend den verschlüsselten encrypted_content des Reasonings nicht entschlüsseln kann.",
       "migrateExisting": "Auch vorhandenen offiziellen Sitzungsverlauf migrieren",
       "confirm": "Verstanden, aktivieren"
     },
@@ -632,9 +490,9 @@
     "authCenter": {
       "description": "Nutzen Sie GitHub-Copilot-, ChatGPT- und xAI-Abonnements als Anbieter. Der Routing-Dienst fügt deren Zugangsdaten ein, daher laufen diese Anbieter im Routing-Modus (außer bei der Bindung an die offizielle Codex-Anmeldung). Antigravity-Konten wechseln die offizielle Anmeldung von agy.",
       "beta": "Beta",
-      "copilotDescription": "GitHub-Copilot-Konten verwalten",
-      "codexOauthDescription": "ChatGPT-Konten verwalten",
-      "xaiOauthDescription": "xAI-/Grok-Konten verwalten"
+      "copilotDescription": "Manage GitHub Copilot accounts",
+      "codexOauthDescription": "Manage ChatGPT accounts",
+      "xaiOauthDescription": "Manage xAI / Grok accounts"
     },
     "advanced": {
       "configDir": {
@@ -644,14 +502,14 @@
       "proxy": {
         "title": "Lokales Routing",
         "description": "Routing-Dienst ein- und ausschalten, Status und Portinformationen anzeigen",
-        "enableFeature": "Routing-Schalter auf der Hauptseite anzeigen",
-        "enableFeatureDescription": "Wenn aktiviert, erscheinen die Schalter für Routing und Failover oben auf der Hauptseite",
         "enableStackMode": "Umschalter für den Aggregationsmodus auf der Hauptseite anzeigen",
-        "enableStackModeDescription": "Wenn aktiviert, wird der Schalter auf der Hauptseite für Claude Code und Codex zum Aggregationsmodus: Sie fügen mehrere Anbieter hinzu wie in OpenCode, und alle ihre Modelle erscheinen in der Modellliste des Clients (Codex muss zuvor neu gestartet werden). Kein Failover. Diese Option und der Schalter für das lokale Routing schließen sich gegenseitig aus; beim Umschalten werden Claude Code und Codex zuerst auf Direkt zurückgesetzt",
         "enableFailoverToggle": "Failover-Schalter auf der Hauptseite anzeigen",
-        "enableFailoverToggleDescription": "Wenn aktiviert, erscheint der Failover-Schalter separat oben auf der Hauptseite",
         "running": "Läuft",
-        "stopped": "Gestoppt"
+        "stopped": "Gestoppt",
+        "enableFeature": "Show Routing Toggle on Main Page",
+        "enableFeatureDescription": "When enabled, the routing and failover toggles will appear at the top of the main page",
+        "enableStackModeDescription": "When on, the main-page switch for Claude Code and Codex becomes the Aggregation mode: add several providers like in OpenCode, and all their models appear in the client's model list (Codex needs a restart first). No failover. This and the local routing switch are mutually exclusive; switching sends Claude Code and Codex back to direct first",
+        "enableFailoverToggleDescription": "When enabled, the failover toggle will appear independently at the top of the main page"
       },
       "failover": {
         "title": "Automatisches Failover",
@@ -682,7 +540,6 @@
         "description": "Kompatibilitätsprobleme bei API-Anfragen automatisch beheben",
         "enabled": "Anfragekorrektur aktivieren",
         "requestGroup": "Anfragekorrektur",
-        "responseGroup": "Antwortkorrektur",
         "thinkingSignature": "Korrektur der Thinking-Signatur",
         "thinkingSignatureDescription": "Wenn ein Anbieter vom Typ Anthropic Fehler wegen inkompatibler Thinking-Signatur oder unzulässiger Anfrage zurückgibt, werden inkompatible Thinking-Blöcke automatisch entfernt und die Anfrage einmal beim selben Anbieter wiederholt",
         "thinkingBudget": "Korrektur des Thinking-Budgets",
@@ -690,7 +547,8 @@
         "mediaFallback": "Fallback bei nicht unterstützten Bildern",
         "mediaFallbackDescription": "Wenn ein Anbieter keine Bildeingabe unterstützt (er deklariert reine Textunterstützung oder der Upstream meldet einen Fehler wegen nicht unterstützter Bilder), werden Bildblöcke automatisch durch die Markierung [Unsupported Image] ersetzt, damit die Unterhaltung nicht unterbrochen wird",
         "mediaHeuristic": "Preflight für reine Textmodelle",
-        "mediaHeuristicDescription": "Entfernt vor dem Senden Bilder für Modelle aus dem integrierten Register bestätigter reiner Textmodelle. Das Ausschalten deaktiviert nur den registerbasierten Preflight des Proxys; die Behandlung deklarierter reiner Textmodelle und der Fallback bei Upstream-Fehlern bleiben bestehen, und die Fähigkeitsangaben im Codex-Modellkatalog bleiben unverändert"
+        "mediaHeuristicDescription": "Entfernt vor dem Senden Bilder für Modelle aus dem integrierten Register bestätigter reiner Textmodelle. Das Ausschalten deaktiviert nur den registerbasierten Preflight des Proxys; die Behandlung deklarierter reiner Textmodelle und der Fallback bei Upstream-Fehlern bleiben bestehen, und die Fähigkeitsangaben im Codex-Modellkatalog bleiben unverändert",
+        "responseGroup": "Response Rectification"
       },
       "privacyFilter": {
         "title": "Datenschutzfilter",
@@ -770,6 +628,9 @@
       "safetyBackupId": "ID der Sicherheitskopie",
       "intervalLabel": "Intervall für automatische Sicherung",
       "retainLabel": "Aufbewahrung von Sicherungen",
+      "maxTotalLabel": "Größenlimit für Sicherungen",
+      "maxTotalUnlimited": "Kein Limit",
+      "maxTotalHint": "Standardmäßig deaktiviert. Wenn ein Limit gesetzt ist, werden die ältesten Sicherungen gelöscht, sobald der Sicherungsordner diese Größe überschreitet. Die neueste Sicherung und jede Sicherung, die eine Wiederherstellung verwendet, bleiben immer erhalten. Daher kann der Ordner über dem Limit bleiben, wenn eine einzelne Sicherung größer ist. Gilt ab der nächsten Sicherung oder der täglichen Wartung.",
       "intervalDisabled": "Deaktiviert",
       "intervalHours": "{{hours}} Stunden",
       "intervalDays": "{{days}} Tage",
@@ -992,10 +853,8 @@
       "enabledHint": "Schaltet die S3-Synchronisierung für manuelle und automatische Cloud-Vorgänge ein.",
       "mutualExclusionTitle": "Synchronisierungstyp wechseln",
       "mutualExclusionMessage": "Beim Aktivieren der S3-Synchronisierung wird die aktuelle WebDAV-Synchronisierung deaktiviert. Fortfahren?",
-      "mutualExclusionMessageReverse": "Beim Aktivieren der WebDAV-Synchronisierung wird die aktuelle S3-Synchronisierung deaktiviert. Fortfahren?",
       "mutualExclusionFailed": "Synchronisierungstyp konnte nicht gewechselt werden: {{error}}",
       "testConnection": "Verbindung testen",
-      "connectionOk": "S3-Verbindung erfolgreich",
       "test": "Verbindung testen",
       "testing": "Wird getestet …",
       "testSuccess": "S3-Verbindung erfolgreich",
@@ -1022,6 +881,15 @@
       "incompatibleVersion": "Remote-Daten sind inkompatibel (Version {{version}}). Dieser Client unterstützt Protokoll v2 / db-v6.",
       "unsaved": "Nicht gespeichert",
       "saved": "Gespeichert",
+      "clear": "Konfiguration löschen",
+      "clearing": "Wird gelöscht …",
+      "clearSuccess": "S3-Konfiguration auf diesem Gerät gelöscht",
+      "clearFailed": "Konfiguration konnte nicht gelöscht werden: {{error}}",
+      "clearConfirm": {
+        "title": "S3-Konfiguration löschen",
+        "message": "Dadurch werden die gespeicherte S3-Region, der Bucket, der Access Key, der Secret Key, der Endpunkt und der Remote-Ordner von diesem Gerät entfernt und die automatische Synchronisierung wird beendet. Bereits in den Bucket hochgeladene Daten werden nicht gelöscht.",
+        "confirm": "Löschen"
+      },
       "unsavedChanges": "Bitte speichern Sie zuerst die Konfiguration",
       "saveBeforeSync": "Speichern Sie zuerst die Konfiguration, um Upload/Download zu aktivieren.",
       "fetchingRemote": "Remote-Informationen werden abgerufen …",
@@ -1047,7 +915,9 @@
         "createdAt": "Hochgeladen am",
         "warning": "Dadurch werden vorhandene Synchronisierungsdaten am S3-Pfad überschrieben",
         "confirm": "Upload bestätigen"
-      }
+      },
+      "mutualExclusionMessageReverse": "Enabling WebDAV sync will disable the current S3 sync. Continue?",
+      "connectionOk": "S3 connection successful"
     },
     "autoReload": "Daten aktualisiert",
     "languageOptionChinese": "简体中文",
@@ -1111,19 +981,18 @@
     "appVisibility": {
       "title": "Anzeige auf der Startseite",
       "description": "Wählen Sie, welche Apps auf der Startseite angezeigt werden",
-      "claudeDesc": "Anthropic Claude Code CLI",
-      "codexDesc": "OpenAI Codex CLI",
-      "geminiDesc": "Google Gemini CLI",
-      "opencodeDesc": "OpenCode CLI",
       "showProfileSwitcher": "Projektumschalter anzeigen",
       "showProfileSwitcherDescription": "Den Projektumschalter in der Kopfzeile der Hauptseite anzeigen",
       "showProviderSearch": "Anbietersuche anzeigen",
-      "showProviderSearchDescription": "Zeigt oben auf der Anbieterseite eine Suchschaltfläche, um Anbieter nach Name, Notizen, Website oder API-Adresse zu finden. Wenn ausgeblendet, öffnet ⌘F / Strg+F weiterhin die Suche"
+      "showProviderSearchDescription": "Zeigt oben auf der Anbieterseite eine Suchschaltfläche, um Anbieter nach Name, Notizen, Website oder API-Adresse zu finden. Wenn ausgeblendet, öffnet ⌘F / Strg+F weiterhin die Suche",
+      "claudeDesc": "Anthropic Claude Code CLI",
+      "codexDesc": "OpenAI Codex CLI",
+      "geminiDesc": "Google Gemini CLI",
+      "opencodeDesc": "OpenCode CLI"
     },
     "terminal": {
       "title": "Bevorzugtes Terminal",
       "description": "Wählen Sie, welche Terminal-App beim Klick auf die Terminal-Schaltfläche verwendet wird",
-      "fallbackHint": "Ist das gewählte Terminal nicht verfügbar, wird der Systemstandard verwendet",
       "options": {
         "macos": {
           "terminal": "Terminal.app",
@@ -1149,30 +1018,21 @@
           "kitty": "Kitty",
           "ghostty": "Ghostty"
         }
-      }
+      },
+      "fallbackHint": "If the selected terminal is unavailable, the system default will be used"
     },
-    "configDirectoryOverride": "Überschreiben des Konfigurationsverzeichnisses (erweitert)",
     "configDirectoryDescription": "Wenn Sie Claude Code oder Codex in Umgebungen wie WSL verwenden, können Sie das Konfigurationsverzeichnis manuell auf das in WSL festlegen, damit die Anbieterdaten mit der Hauptumgebung übereinstimmen.",
     "appConfigDir": "CC-Switch-Konfigurationsverzeichnis",
     "appConfigDirDescription": "Speicherort der CC-Switch-Konfiguration anpassen (auf einen Cloud-Sync-Ordner verweisen, um die Konfiguration zu synchronisieren)",
-    "browsePlaceholderApp": "z. B. C:\\Users\\Administrator\\.zhishu-ccs",
-    "claudeConfigDir": "Claude-Code-Konfigurationsverzeichnis",
+    "browsePlaceholderApp": "z. B. C:\\Users\\Administrator\\.cc-switch",
     "claudeConfigDirDescription": "Überschreibt das Claude-Konfigurationsverzeichnis (settings.json). Benutzerdefinierte Verzeichnisse speichern .claude.json (MCP) innerhalb des Verzeichnisses; das Standardverzeichnis ~/.claude behält den getrennten Pfad ~/.claude.json von Claude Code bei.",
-    "codexConfigDir": "Codex-Konfigurationsverzeichnis",
     "codexConfigDirDescription": "Überschreibt das Codex-Konfigurationsverzeichnis.",
-    "geminiConfigDir": "Gemini-Konfigurationsverzeichnis",
     "geminiConfigDirDescription": "Überschreibt das Gemini-Konfigurationsverzeichnis (.env).",
-    "grokConfigDir": "Grok-Build-Konfigurationsverzeichnis",
     "grokConfigDirDescription": "Überschreibt das Grok-Build-Konfigurationsverzeichnis (config.toml).",
-    "opencodeConfigDir": "OpenCode-Konfigurationsverzeichnis",
     "opencodeConfigDirDescription": "Überschreibt das OpenCode-Konfigurationsverzeichnis (opencode.json / opencode.jsonc).",
-    "openclawConfigDir": "OpenClaw-Konfigurationsverzeichnis",
     "openclawConfigDirDescription": "Überschreibt das OpenClaw-Konfigurationsverzeichnis (openclaw.json).",
-    "hermesConfigDir": "Hermes-Konfigurationsverzeichnis",
     "hermesConfigDirDescription": "Überschreibt das Hermes-Konfigurationsverzeichnis (config.yaml).",
-    "piConfigDir": "Pi-Konfigurationsverzeichnis",
     "piConfigDirDescription": "Überschreibt das Pi-Konfigurationsverzeichnis (models.json, Anweisungsdateien, Prompts, Skills und Sitzungen).",
-    "ompConfigDir": "Oh-My-Pi-Konfigurationsverzeichnis",
     "browsePlaceholderClaude": "z. B. /home/<your-username>/.claude",
     "browsePlaceholderCodex": "z. B. /home/<your-username>/.codex",
     "browsePlaceholderGemini": "z. B. /home/<your-username>/.gemini",
@@ -1192,7 +1052,7 @@
     "upToDate": "Auf dem neuesten Stand",
     "aboutHint": "Versionsinformationen und Update-Status anzeigen.",
     "portableMode": "Portabler Modus: Updates müssen manuell heruntergeladen werden.",
-    "portableUpdateHint": "Portabler Modus: Die Schaltfläche oben lädt das neue ZIP herunter. Entpacken Sie es und ersetzen Sie Ihre vorhandene cc-switch.exe. Ihre Einstellungen und Daten liegen in .zhishu-ccs in Ihrem Benutzerordner und sind nicht betroffen.",
+    "portableUpdateHint": "Portabler Modus: Die Schaltfläche oben lädt das neue ZIP herunter. Entpacken Sie es und ersetzen Sie Ihre vorhandene cc-switch.exe. Ihre Einstellungen und Daten liegen in .cc-switch in Ihrem Benutzerordner und sind nicht betroffen.",
     "updateAvailable": "Neue Version verfügbar: {{version}}",
     "updateBadge": "Update verfügbar",
     "updateFailed": "Die Update-Installation ist fehlgeschlagen, es wurde versucht, die Download-Seite zu öffnen.",
@@ -1267,6 +1127,7 @@
     "toolUpgradeUnanchoredHint": "Es lässt sich nicht bestimmen, welche Installation Ihre Kommandozeile verwendet; der Standard-Upgrade-Befehl wird ausgeführt (installiert möglicherweise in das erste npm im PATH).",
     "toolUpgradeUnmanagedTitle": "Upgrade dieser Tools übersprungen",
     "toolUpgradeUnmanagedDetail": "{{tool}} ({{path}}) wurde weder per npm noch mit einem bekannten Installer installiert, daher kann CC Switch nicht erkennen, wie es zu aktualisieren ist. Aktualisieren Sie es auf dem Weg, auf dem Sie es installiert haben (z. B. winget, Scoop oder erneutes Ausführen des offiziellen Installationsskripts).",
+    "toolUpgradeDesktopManagedDetail": "Diese OpenCode-CLI ist in OpenCode Desktop enthalten und wird zusammen mit der Desktop-App aktualisiert.",
     "envBadge": {
       "wsl": "WSL",
       "windows": "Win",
@@ -1301,14 +1162,14 @@
       "testFailed": "Verbindung fehlgeschlagen: {{error}}",
       "pricingDefaultsTitle": "Preis-Standardwerte",
       "pricingDefaultsDescription": "Legen Sie fest, ob jede App die Preise anhand des Anfragemodells oder des Antwortmodells zuordnet. Gilt nur für Anfragen, die über das lokale Routing laufen.",
-      "pricingAppLabel": "App",
       "pricingModelSourceLabel": "Quelle des Preismodells",
       "pricingModelSourceRequest": "Anfragemodell",
       "pricingModelSourceResponse": "Antwortmodell",
-      "pricingSave": "Preis-Standardwerte speichern",
       "pricingSaved": "Preis-Standardwerte gespeichert",
       "pricingSaveFailed": "Preis-Standardwerte konnten nicht gespeichert werden: {{error}}",
-      "pricingLoadFailed": "Preis-Standardwerte konnten nicht geladen werden: {{error}}"
+      "pricingLoadFailed": "Preis-Standardwerte konnten nicht geladen werden: {{error}}",
+      "pricingAppLabel": "App",
+      "pricingSave": "Save Pricing Defaults"
     },
     "saveFailedGeneric": "Speichern fehlgeschlagen, bitte versuchen Sie es erneut",
     "sections": {
@@ -1318,7 +1179,7 @@
       "network": "Netzwerk",
       "data": "Daten",
       "about": "Über",
-      "configHistory": "Konfigurationsverlauf"
+      "configHistory": "Config change history"
     },
     "appConfig": {
       "configDir": "Konfigurationsverzeichnis"
@@ -1328,75 +1189,6 @@
     },
     "data": {
       "location": "Speicherort"
-    },
-    "configHistory": {
-      "title": "Konfigurationsverlauf",
-      "description": "Sehen Sie, wann zhishu-ccs die Konfigurationsdatei einer App schreibt, was es ausgelöst hat und den genauen Inhalt vorher und nachher. Die neuesten 300 Einträge bleiben auf diesem Gerät.",
-      "allApps": "Alle Apps",
-      "refresh": "Aktualisieren",
-      "clear": "Verlauf leeren",
-      "actions": {
-        "switch": "Anbieterwechsel",
-        "apply": "Konfigurationssynchronisierung",
-        "enter": "Routing-Modus aktivieren",
-        "exit": "Routing-Modus verlassen",
-        "detach": "Beim Beenden Direktmodus wiederherstellen",
-        "attach": "Routing beim Start verbinden",
-        "route": "Routing-Wechsel",
-        "stack": "Stack-Modelle ändern",
-        "catalog": "Modellkatalog aktualisieren",
-        "configUpdate": "Automatisches Schreiben",
-        "other": "Konfigurationsaktualisierung",
-        "restore": "Konfiguration wiederherstellen",
-        "addProvider": "Anbieter hinzufügen",
-        "removeProvider": "Anbieter entfernen"
-      },
-      "loadFailed": "Konfigurationsverlauf konnte nicht geladen werden",
-      "detailFailed": "Änderungsdetails konnten nicht geladen werden",
-      "missing": "Dieser Verlaufseintrag existiert nicht mehr",
-      "emptyTitle": "Noch keine Konfigurationsänderungen aufgezeichnet",
-      "emptyDescription": "Wenn zhishu-ccs die Konfiguration von Codex, Claude, Gemini oder einer anderen App schreibt, erscheint hier der Inhalt vorher und nachher.",
-      "fileCreated": "Datei erstellt",
-      "fileDeleted": "Datei gelöscht",
-      "viewChanges": "Vorher und nachher anzeigen",
-      "before": "Vorher",
-      "after": "Nachher",
-      "fileDidNotExist": "Datei existierte nicht",
-      "showSensitive": "Sensible Werte anzeigen",
-      "hideSensitive": "Sensible Werte ausblenden",
-      "cleared": "{{count}} Einträge des Konfigurationsverlaufs gelöscht",
-      "clearFailed": "Konfigurationsverlauf konnte nicht geleert werden",
-      "clearTitle": "Konfigurationsverlauf leeren?",
-      "clearDescription": "Dadurch werden lokale Vorher-/Nachher-Schnappschüsse dauerhaft gelöscht; die beim Wiederherstellen erstellten separaten Sicherungen bleiben erhalten. Die App-Konfiguration selbst wird nicht geändert.",
-      "latest": "Zuletzt geändert: {{time}}",
-      "noChanges": "Keine Änderungen aufgezeichnet",
-      "diff": "Änderungen vergleichen",
-      "snapshots": "Vollständiger Inhalt",
-      "viewMode": "Ansichtsmodus",
-      "changeCount": "{{added}} Zeilen hinzugefügt · {{removed}} Zeilen entfernt",
-      "copyDiff": "Diff kopieren",
-      "copySnapshot": "{{title}} kopieren",
-      "copied": "Kopiert",
-      "copyFailed": "Kopieren fehlgeschlagen",
-      "restore": "Vorherige Version wiederherstellen",
-      "restoreTitle": "Version vor dieser Änderung wiederherstellen?",
-      "restoreDescription": "Stellt alle Konfigurationsdateien wieder her, die dieser Vorgang geändert hat; die Anbieterliste selbst bleibt erhalten. Beim Wiederherstellen eines Anbieterwechsels wird auch die aktuelle Auswahl zurückgesetzt. Aktuelle Dateien werden zuerst gesichert; neuere Änderungen an einer Datei beenden die Wiederherstellung an dieser Stelle, bereits wiederhergestellte Dateien bleiben erhalten.",
-      "restoreDeletesFile": "Einige Dateien existierten vor dieser Änderung nicht; beim Wiederherstellen werden sie gelöscht.",
-      "restored": "Vorherige Version wiederhergestellt; aktuelle Konfiguration gesichert",
-      "alreadyRestored": "Die Datei entspricht bereits der vorherigen Version",
-      "restoreFailed": "Wiederherstellung fehlgeschlagen",
-      "maskedHint": "Sensible Werte sind ausgeblendet. Vergleichen und Kopieren verwenden den angezeigten Inhalt; blenden Sie sensible Werte ein, um den vollständigen Diff zu sehen.",
-      "noVisibleDiff": "Keine Unterschiede im angezeigten Inhalt",
-      "changedFiles": "{{count}} Dateien geändert",
-      "selectFile": "Datei auswählen",
-      "restoredFiles": "{{count}} Dateien wiederhergestellt; aktuelle Konfiguration gesichert",
-      "pointerRestored": "Der aktuelle Anbieter ist wieder der vor diesem Wechsel",
-      "restoreFilesIntro": "{{count}} Dateien werden wiederhergestellt:",
-      "viewSummary": "Details anzeigen",
-      "summaryAdded": "{{names}} hinzugefügt",
-      "summaryRemoved": "{{names}} entfernt",
-      "summaryFiles": "Betroffene Dateien",
-      "summaryNoFiles": "Es wurden keine Konfigurationsdateien geändert."
     },
     "ipDiagnostics": {
       "title": "IP-Diagnose",
@@ -1437,7 +1229,86 @@
         "invalidResponse": "Der Dienst hat ungültige Daten zurückgegeben",
         "unavailable": "Der Dienst konnte keine Daten liefern"
       }
-    }
+    },
+    "configDirectoryOverride": "Configuration Directory Override (Advanced)",
+    "claudeConfigDir": "Claude Code Configuration Directory",
+    "codexConfigDir": "Codex Configuration Directory",
+    "geminiConfigDir": "Gemini Configuration Directory",
+    "grokConfigDir": "Grok Build Configuration Directory",
+    "opencodeConfigDir": "OpenCode Configuration Directory",
+    "openclawConfigDir": "OpenClaw Configuration Directory",
+    "hermesConfigDir": "Hermes Configuration Directory",
+    "piConfigDir": "Pi Configuration Directory",
+    "configHistory": {
+      "title": "Config change history",
+      "description": "See when zhishu-ccs writes each app's config file, what triggered it, and the exact before and after content. The latest 300 records stay on this device.",
+      "allApps": "All apps",
+      "refresh": "Refresh",
+      "clear": "Clear history",
+      "actions": {
+        "switch": "Provider switch",
+        "apply": "Config sync",
+        "enter": "Enter routing mode",
+        "exit": "Exit routing mode",
+        "detach": "Restore direct on exit",
+        "attach": "Attach routing on startup",
+        "route": "Route switch",
+        "stack": "Change stack models",
+        "catalog": "Update model catalog",
+        "configUpdate": "Automatic write",
+        "other": "Config update",
+        "restore": "Restore configuration",
+        "addProvider": "Add provider",
+        "removeProvider": "Remove provider"
+      },
+      "loadFailed": "Unable to load config change history",
+      "detailFailed": "Unable to load change details",
+      "missing": "This history record no longer exists",
+      "emptyTitle": "No config changes recorded yet",
+      "emptyDescription": "When zhishu-ccs writes Codex, Claude, Gemini, or another app's config, the before and after content will appear here.",
+      "fileCreated": "File created",
+      "fileDeleted": "File deleted",
+      "viewChanges": "View before and after",
+      "before": "Before",
+      "after": "After",
+      "fileDidNotExist": "File did not exist",
+      "showSensitive": "Show sensitive values",
+      "hideSensitive": "Hide sensitive values",
+      "cleared": "Cleared {{count}} config change records",
+      "clearFailed": "Failed to clear config change history",
+      "clearTitle": "Clear config change history?",
+      "clearDescription": "This permanently deletes local before and after snapshots; the independent backups created when restoring are kept. The app configuration itself is not changed.",
+      "latest": "Last modified: {{time}}",
+      "noChanges": "No changes recorded",
+      "diff": "Compare changes",
+      "snapshots": "Full contents",
+      "viewMode": "View mode",
+      "changeCount": "{{added}} lines added · {{removed}} lines removed",
+      "copyDiff": "Copy diff",
+      "copySnapshot": "Copy {{title}}",
+      "copied": "Copied",
+      "copyFailed": "Copy failed",
+      "restore": "Restore previous version",
+      "restoreTitle": "Restore the version before this change?",
+      "restoreDescription": "Restores every configuration file this operation changed; the provider list itself is kept. Restoring a provider switch also moves the current selection back. Current files are backed up first; newer changes on any file stop the restore there and keep the files already restored.",
+      "restoreDeletesFile": "Some files did not exist before this change; restoring will delete them.",
+      "restored": "Previous version restored; current configuration backed up",
+      "alreadyRestored": "The file already matches the previous version",
+      "restoreFailed": "Restore failed",
+      "maskedHint": "Sensitive values are hidden. Compare and copy use the displayed contents; reveal sensitive values to see the full diff.",
+      "noVisibleDiff": "No differences in the displayed contents",
+      "changedFiles": "Modified {{count}} files",
+      "selectFile": "Select file",
+      "restoredFiles": "Restored {{count}} files; current configuration backed up",
+      "pointerRestored": "The current provider is back to what it was before this switch",
+      "restoreFilesIntro": "{{count}} files will be restored:",
+      "viewSummary": "View details",
+      "summaryAdded": "Added {{names}}",
+      "summaryRemoved": "Removed {{names}}",
+      "summaryFiles": "Affected files",
+      "summaryNoFiles": "No configuration files were changed."
+    },
+    "ompConfigDir": "Oh My Pi Configuration Directory"
   },
   "apps": {
     "claude": "Claude",
@@ -1479,6 +1350,9 @@
       "modelsHint": "Fügen Sie mindestens ein Modell hinzu. Die Modell-ID wird unverändert an die API gesendet. WorkBuddy unterstützt es noch nicht, dasselbe Modell mehrfach hinzuzufügen, daher kann eine Modell-ID nur in einer Karte vorkommen. Bleibt der Name leer, zeigt das Menü von WorkBuddy „Hersteller-Label:Modell-ID“ an.",
       "maxInputTokens": "Max. Eingabe-Token",
       "maxOutputTokens": "Max. Ausgabe-Token",
+      "thinkingEfforts": "Denkaufwand",
+      "thinkingEffortsHint": "Ausgewählte Stufen erscheinen im Modellmenü von WorkBuddy; die gewählte wird als reasoning_effort an die API gesendet. Ohne Auswahl gibt es nur einen Ein/Aus-Schalter für das Denken.",
+      "canDisableThinking": "Denken kann ausgeschaltet werden",
       "modelIdTaken": "WorkBuddy unterstützt es noch nicht, dasselbe Modell mehrfach hinzuzufügen, und dieses Modell befindet sich bereits in „{{owner}}“. Um es in diese Karte zu verschieben, entfernen Sie es zuerst dort.",
       "modelOwnerUser": "ein Modell, das in WorkBuddy selbst hinzugefügt wurde",
       "presetModelsSkipped": "WorkBuddy unterstützt es noch nicht, dasselbe Modell mehrfach hinzuzufügen, daher wurden Modelle übersprungen, die bereits in anderen Karten vorhanden sind: {{models}}. Um eines in diese Karte zu verschieben, entfernen Sie es zuerst aus seiner aktuellen Karte und fügen Sie es dann hier wieder hinzu."
@@ -1511,6 +1385,8 @@
       "credits": "Credits",
       "leftOf": "{{remaining}} / {{total}} übrig",
       "usedOf": "{{used}} / {{total}} verbraucht",
+      "unlimited": "Unbegrenzt",
+      "unlimitedUsed": "Unbegrenzt, {{used}} verbraucht",
       "usedUp": "Aufgebraucht (von {{total}})",
       "detail": "{{remaining}} von {{total}} Credits übrig, {{used}} verbraucht",
       "staleNotRunning": "WorkBuddy läuft nicht; letztes Ergebnis wird angezeigt",
@@ -1694,7 +1570,7 @@
     "keyFieldsHint": "Das Standardmodell (models.default) und die Modelltabelle, auf die es verweist, folgen dem Anbieter; alles andere sind globale Grok-Build-Einstellungen und gilt nach dem Speichern für jeden Anbieter.",
     "inactiveFieldsHint": "Von einer älteren Version in diesem Anbieter gespeichert; beim Wechsel werden sie nicht mehr angewendet. Klicken Sie auf einen Eintrag, um sein TOML zu kopieren und oben einzufügen, falls Sie es benötigen.",
     "inactiveFieldCopied": "Kopiert",
-    "routeOnlySettingsHint": "Die beiden folgenden Einstellungen gelten nur im Routing-Modus."
+    "routeOnlySettingsHint": "Die folgenden Einstellungen gelten nur im Routing-Modus."
   },
   "sessionManager": {
     "searchPlaceholder": "Titel, Ordner, erste/letzte Nachrichten oder Sitzungs-IDs suchen",
@@ -1703,6 +1579,7 @@
     "contentSearchToggle": "Nachrichtentext durchsuchen",
     "contentSearchToggleFailed": "Die Einstellung für die Nachrichtentextsuche konnte nicht geändert werden: {{error}}",
     "contentIndexing": "Nachrichtentext wird indiziert ({{processed}}/{{total}}). Texttreffer sind möglicherweise unvollständig",
+    "contentSearchFailed": "Textsuche fehlgeschlagen; derzeit kann nur in Titeln, Ordnern und der ersten/letzten Nachricht gesucht werden",
     "contentHitPrefix": "Text: ",
     "contentHitMore": " ({{count}} Nachrichten passen)",
     "moreContentHits": "Weitere Texttreffer",
@@ -1909,7 +1786,17 @@
         "prLink": "PR #{{number}} verknüpft",
         "prLinkPlain": "Einen PR verknüpft",
         "slashCommand": "{{command}} ausgeführt",
-        "subAgent": "Subagent {{name}}"
+        "subAgent": "Subagent {{name}}",
+        "goal": "Ziel · {{status}}",
+        "goalPlain": "Ziel",
+        "goalStatus": {
+          "active": "Aktiv",
+          "paused": "Pausiert",
+          "blocked": "Blockiert",
+          "usageLimited": "Nutzungslimit erreicht",
+          "budgetLimited": "Budget erreicht",
+          "complete": "Abgeschlossen"
+        }
       },
       "injectedToggle": "Eingefügten Kontext anzeigen",
       "injectedRow": "Kontext · {{label}} · {{chars}} Zeichen",
@@ -1976,6 +1863,7 @@
       "outlineFailed": "Enthält fehlgeschlagene Schritte",
       "outlineAborted": "Unterbrochen",
       "outlineNoReply": "Keine Antwort",
+      "chapter": "Kapitel",
       "viewOptions": "Anzeigeoptionen",
       "noChanges": "Keine Dateiänderungen in dieser Sitzung",
       "rawMatch": "Treffer in der Quelle",
@@ -1985,25 +1873,28 @@
     "copilotDeleteHint": "Löschen Sie diese Sitzung in GitHub Copilot CLI, damit dessen Sitzungsspeicher konsistent bleibt"
   },
   "console": {
-    "providerSwitchReceived": "Ereignis zum Anbieterwechsel empfangen:",
-    "setupListenerFailed": "Listener für Anbieterwechsel konnte nicht eingerichtet werden:",
-    "updateProviderFailed": "Aktualisieren des Anbieters fehlgeschlagen:",
-    "autoImportFailed": "Automatischer Import der Standardkonfiguration fehlgeschlagen:",
     "openLinkFailed": "Link konnte nicht geöffnet werden:",
-    "getVersionFailed": "Versionsinformationen konnten nicht abgerufen werden:",
-    "loadSettingsFailed": "Einstellungen konnten nicht geladen werden:",
-    "getConfigPathFailed": "Konfigurationspfad konnte nicht abgerufen werden:",
-    "getConfigDirFailed": "Konfigurationsverzeichnis konnte nicht abgerufen werden:",
-    "detectPortableFailed": "Portable-Modus konnte nicht erkannt werden:",
-    "saveSettingsFailed": "Einstellungen konnten nicht gespeichert werden:",
     "updateFailed": "Update fehlgeschlagen:",
     "checkUpdateFailed": "Suche nach Updates fehlgeschlagen:",
-    "openConfigFolderFailed": "Konfigurationsordner konnte nicht geöffnet werden:",
-    "selectConfigDirFailed": "Konfigurationsverzeichnis konnte nicht ausgewählt werden:",
-    "getDefaultConfigDirFailed": "Standard-Konfigurationsverzeichnis konnte nicht abgerufen werden:",
-    "openReleaseNotesFailed": "Versionshinweise konnten nicht geöffnet werden:"
+    "openReleaseNotesFailed": "Versionshinweise konnten nicht geöffnet werden:",
+    "providerSwitchReceived": "Received provider switch event:",
+    "setupListenerFailed": "Failed to setup provider switch listener:",
+    "updateProviderFailed": "Update provider failed:",
+    "autoImportFailed": "Auto import default configuration failed:",
+    "getVersionFailed": "Failed to get version info:",
+    "loadSettingsFailed": "Failed to load settings:",
+    "getConfigPathFailed": "Failed to get config path:",
+    "getConfigDirFailed": "Failed to get config directory:",
+    "detectPortableFailed": "Failed to detect portable mode:",
+    "saveSettingsFailed": "Failed to save settings:",
+    "openConfigFolderFailed": "Failed to open config folder:",
+    "selectConfigDirFailed": "Failed to select config directory:",
+    "getDefaultConfigDirFailed": "Failed to get default config directory:"
   },
   "providerForm": {
+    "billingMultiplier": "Kostenfaktor des Anbieters",
+    "billingMultiplierHelp": "Der Referenzpreis jedes Modells dieses Anbieters wird mit diesem Wert multipliziert, um die Kosten von Anfragen über das lokale Routing zu schätzen. 0,5 bedeutet halber Preis; leer lassen für 1×. Gilt nur für künftige Anfragen; im Direktmodus (Routing aus) wird aus Sitzungsprotokollen importierte Nutzung weiter mit 1× gezählt.",
+    "billingMultiplierInvalid": "Gib eine Zahl von 0 bis 1000 ein oder lass das Feld für 1× leer.",
     "nativeConfig": {
       "title": "Konfigurationsdatei {{path}} (nur dieser Anbieter)",
       "hint": "Zeigt den Teil der Datei, der zu diesem Anbieter gehört, im eigenen Format der App und schreibt ihn beim Speichern dorthin. Globale Einstellungen wie das Standardmodell sind hier nicht enthalten. Hier eingegebene Kommentare werden nicht gespeichert.",
@@ -2064,6 +1955,7 @@
       "subrouter": "SubRouter ist ein KI-Relay-Aggregator, der mit einem Schlüssel Zugriff auf mehrere Modelle und Anbieter ermöglicht.",
       "qiniu": "Qiniu Cloud ist ein Multiprotokoll-KI-Relay: ein Schlüssel für native Claude-, GPT- und Gemini-Modelle, mit Unterstützung der Anthropic-, OpenAI- und Gemini-APIs.",
       "haoai": "hao.ai ist ein schnelles, stabiles, einheitliches LLM-API-Gateway für Entwickler und Teams: Mit einem Schlüssel erreichen Sie GPT, Claude, Grok und weitere führende Modelle über OpenAI- und Anthropic-kompatible APIs, mit Modell-Routing, Failover und vollständigen Anfrageprotokollen, zu Preisen ab 15 % der offiziellen Referenzpreise. CC-Switch-Nutzer, die sich über diesen Link registrieren, erhalten 5 % Bonusguthaben auf ihre erste Bestellung!",
+      "stringai": "StringAI ist eine preiswerte, schnelle und stabile Modell-API-Plattform mit Zugang zu KI-Coding, Bildgenerierung, Sprachsynthese und Videogenerierung aus einer Hand. Exklusives Angebot für CC-Switch-Nutzer: Registrieren Sie sich über diesen Link und erhalten Sie bei Ihrer ersten Aufladung von 3,74 $ zusätzlich 3,74 $ Bonusguthaben!",
       "fenno": "Fenno.ai ist ein stabiler, effizienter API-Relay mit Zugang zu zahlreichen gängigen Modellen. Exklusives Angebot für CC-Switch-Nutzer: Abonnieren Sie über diesen Link den Testtarif für 1,99 $ mit 50 $ Guthaben, gültig für 7 Tage!",
       "teamorouter": "TeamoRouter bietet Claude Code einen Schlüssel für Opus 5.5, Sonnet 5.5 und Fable 5.1, mit Opus 5.5 für etwa 28 % des offiziellen Preises, nutzungsbasiert abgerechnet, über das native Anthropic-Protokoll. CC-Switch-Nutzer, die sich über diesen Link registrieren, erhalten 10 % zusätzliches Guthaben auf eine erste Aufladung von 10 $, 20 $ oder 50 $!",
       "ppio": "PPIO ist ein führender unabhängiger Agentic-Cloud-Anbieter in China und stellt alle führenden Open-Source-Modelle über einen einzigen API-Schlüssel bereit. Registrieren Sie sich über diesen Link und schließen Sie die Identitätsprüfung ab, um einen Gutschein über ¥10 zu erhalten.",
@@ -2079,7 +1971,8 @@
       "grooroute": "GrooRoute Pro ist ein zuverlässiger KI-API-Relay mit Zugang zu OpenAI, Claude, DeepSeek und weiteren gängigen Modellen, mit nutzungsbasierten Tarifen und Abonnements. CC-Switch-Nutzer erhalten bei der Registrierung über diesen Link ¥5 Testguthaben gratis!",
       "buytoken": "BuyToken bietet Relay-Zugang für Claude Code, Codex, DeepSeek und mehr, mit Nebenläufigkeit auf Unternehmensniveau und schneller Rechnungsstellung – gebaut als stabiler Dauerdienst. CC-Switch-Nutzer, die sich über diesen Link registrieren, erhalten ¥3 Testguthaben und 10 % Rabatt auf ihre erste Aufladung!",
       "vapi": "V-API ist eine drei Jahre alte Marke, die Einzelpersonen, Entwicklern und Unternehmen stabile, schnelle und sichere hochwertige LLM-API-Dienste bietet, mit formellen Verträgen und offiziellen Rechnungen (allgemein / Spezial-MwSt.). CC-Switch-Nutzer, die sich über diesen Link registrieren, erhalten ¥2 Nachlass und 10 % Rabatt auf ihre erste Bestellung!",
-      "ospreyai": "ACS OspreyAI ist eine Multimodell-API-Plattform aus einer Hand für Entwickler und Unternehmen. Mit einem einzigen API-Schlüssel greifen Sie auf führende chinesische und internationale Modelle zu, darunter Claude, Gemini, GPT, GLM, Kimi, Qwen, DeepSeek und Tencent Hunyuan. Die Plattform ist kompatibel mit OpenAI, Anthropic und weiteren gängigen API-Protokollen und funktioniert mit beliebten KI-Tools wie Claude Code, Codex, OpenCode, Pi und Hermes. Internationale Modelle kosten 20–40 % weniger als die offiziellen Preise, chinesische Modelle 30–50 % weniger. Einheitliche Aufladung, einheitliche Abrechnung, Nutzungsverfolgung und flexibles Modellwechseln eignen sich für die Entwicklung von KI-Anwendungen, Content-Produktion und automatisierte Workflows. Erstellen Sie über diesen Link ein Konto, um einen Rabatt zu erhalten und schnell Zugang zu führenden Modellen aus China und dem Ausland zu bekommen."
+      "ospreyai": "ACS OspreyAI ist eine Multimodell-API-Plattform aus einer Hand für Entwickler und Unternehmen. Mit einem einzigen API-Schlüssel greifen Sie auf führende chinesische und internationale Modelle zu, darunter Claude, Gemini, GPT, GLM, Kimi, Qwen, DeepSeek und Tencent Hunyuan. Die Plattform ist kompatibel mit OpenAI, Anthropic und weiteren gängigen API-Protokollen und funktioniert mit beliebten KI-Tools wie Claude Code, Codex, OpenCode, Pi und Hermes. Internationale Modelle kosten 20–40 % weniger als die offiziellen Preise, chinesische Modelle 30–50 % weniger. Einheitliche Aufladung, einheitliche Abrechnung, Nutzungsverfolgung und flexibles Modellwechseln eignen sich für die Entwicklung von KI-Anwendungen, Content-Produktion und automatisierte Workflows. Erstellen Sie über diesen Link ein Konto, um einen Rabatt zu erhalten und schnell Zugang zu führenden Modellen aus China und dem Ausland zu bekommen.",
+      "ccsub": "CCSub is a stable, affordable AI API relay — a drop-in replacement for Claude.ai & OpenAI subscriptions, with one key for all models at ~30% of direct API cost."
     },
     "presets": {
       "ucloud": "Compshare",
@@ -2178,6 +2071,8 @@
     "requestModelLabel": "Angefordertes Modell",
     "modelOneMHeader": "1M angeben",
     "modelOneMLabel": "1M",
+    "copilotOneMUnavailable": "Copilot bietet für dieses Modell keine 1M-Version an",
+    "copilotOneMMismatch": "Copilot bietet für {{models}} keine 1M-Version an: Anfragen fallen auf das normale Modell zurück, Claude Code plant aber weiter mit 1M Kontext, sodass lange Sitzungen das Limit überschreiten können. Deaktiviere 1M.",
     "fallbackModelLabel": "Standard-Fallback-Modell",
     "fallbackModelHelpDirect": "In ANTHROPIC_MODEL geschrieben: das Hauptmodell, mit dem Claude Code startet. Hintergrundaufgaben nutzen stattdessen die Haiku-Stufe.",
     "fallbackModelHelp": "Anfragen, die keiner Sonnet-, Opus-, Fable- oder Haiku-Stufe zugeordnet werden, werden mit diesem Modell an den Upstream gesendet.",
@@ -2261,12 +2156,10 @@
     "selectAccount": "Konto auswählen",
     "selectAccountPlaceholder": "GitHub-Konto auswählen",
     "useDefaultAccount": "Standardkonto verwenden",
-    "loggedInAccounts": "Angemeldete Konten",
     "defaultAccount": "Standard",
     "selected": "Ausgewählt",
     "removeAccount": "Konto entfernen",
     "setAsDefault": "Als Standard festlegen",
-    "addAnotherAccount": "Weiteres Konto hinzufügen",
     "retry": "Erneut versuchen",
     "copyCode": "Code kopieren",
     "migrationFailed": "Migration der alten Authentifizierung fehlgeschlagen: {{error}}",
@@ -2307,7 +2200,14 @@
       "notSignedIn": "Die Copilot CLI ist nicht angemeldet. Führen Sie copilot aus und verwenden Sie /login, oder verknüpfen Sie ein Konto aus der Kontoverwaltung auf dieser Karte."
     },
     "defaultCannotRemove": "Das Standardmodell von Copilot gehört zu diesem Anbieter und kann daher nicht entfernt oder gelöscht werden. Wählen Sie zuerst mit /model in copilot das Modell eines anderen Anbieters.",
-    "terminalNeedsAdd": "Fügen Sie diesen Anbieter zuerst zu Copilot hinzu, damit das Terminal sein Modell auswählen kann."
+    "terminalNeedsAdd": "Fügen Sie diesen Anbieter zuerst zu Copilot hinzu, damit das Terminal sein Modell auswählen kann.",
+    "loggedInAccounts": "Logged in accounts",
+    "addAnotherAccount": "Add another account",
+    "section": {
+      "official": "Official sign-in · {{count}}",
+      "officialHelpTitle": "Official sign-in",
+      "officialHelp": "Uses Copilot CLI's own GitHub sign-in and writes no files. Open Terminal starts copilot with the card's model and bound account."
+    }
   },
   "codexOauth": {
     "authStatus": "Anmeldestatus",
@@ -2320,7 +2220,6 @@
     "enterCode": "Geben Sie den Code in Ihrem Browser ein:",
     "accountCount": "{{count}} Konto/Konten",
     "selectAccount": "Konto auswählen",
-    "chatgptAccount": "ChatGPT-Konto",
     "accountToUse": "Zu verwendendes Konto",
     "signInMethod": "Anmeldemethode",
     "manageAccounts": "Konten verwalten",
@@ -2330,18 +2229,14 @@
     "explicitSelectionRequired": "Anmeldemethode auswählen",
     "useDefaultAccount": "Standardkonto verwenden",
     "noneOptionLabel": "Codex-Anmeldung folgen",
-    "reauthDescription": "Damit das Verhalten der Browser-Anmeldung erreicht wird, müssen sich diese Konten erneut anmelden, um das erforderliche Anmeldezertifikat (id_token) wiederherzustellen. Nach der erneuten Authentifizierung können sie für die verwaltete Bindung verwendet werden.",
     "reauthBadge": "Erneute Anmeldung erforderlich",
-    "reauthLogin": "Erneut anmelden",
     "reauthSelectHint": "Dieses Konto muss sich erneut anmelden, um die verwaltete Bindung zu ermöglichen.",
     "reauthNow": "Jetzt erneut anmelden",
     "duplicateAccount": "Dieses ChatGPT-Konto wurde bereits hinzugefügt. Verwenden Sie das vorhandene Konto.",
-    "loggedInAccounts": "Angemeldete Konten",
     "defaultAccount": "Standard",
     "selected": "Ausgewählt",
     "removeAccount": "Konto entfernen",
     "setAsDefault": "Als Standard festlegen",
-    "addAnotherAccount": "Weiteres Konto hinzufügen",
     "logoutAll": "Alle Konten abmelden",
     "retry": "Erneut versuchen",
     "copyCode": "Code kopieren",
@@ -2350,8 +2245,13 @@
     "loginMethod": "Anmeldemethode",
     "browserLogin": "Browser-Anmeldung",
     "deviceCodeLogin": "Anmeldung per Gerätecode",
-    "openBrowserLogin": "Browser-Anmeldung öffnen",
-    "loginExpired": "Anmeldung abgelaufen. Bitte erneut versuchen."
+    "loginExpired": "Anmeldung abgelaufen. Bitte erneut versuchen.",
+    "chatgptAccount": "ChatGPT account",
+    "reauthDescription": "To match the browser-login behavior, these accounts must sign in again to restore the required login credential (id_token). Once re-authenticated they can be used for managed binding.",
+    "reauthLogin": "Re-login",
+    "loggedInAccounts": "Logged in accounts",
+    "addAnotherAccount": "Add another account",
+    "openBrowserLogin": "Open browser login"
   },
   "xaiOauth": {
     "authStatus": "xAI-OAuth-Authentifizierung",
@@ -2361,6 +2261,7 @@
     "selectAccount": "Konto auswählen",
     "selectAccountPlaceholder": "xAI-Konto auswählen",
     "useDefaultAccount": "Standardkonto verwenden",
+    "account": "xAI-Konto",
     "accounts": "xAI-Konten",
     "defaultAccount": "Standard",
     "expired": "Anmeldedaten abgelaufen",
@@ -2404,7 +2305,6 @@
     "testing": "Wird getestet",
     "addEndpointPlaceholder": "https://api.example.com",
     "done": "Fertig",
-    "noEndpoints": "Keine Endpunkte",
     "failed": "Fehlgeschlagen",
     "enterValidUrl": "Bitte geben Sie eine gültige URL ein",
     "invalidUrlFormat": "Ungültiges URL-Format",
@@ -2412,15 +2312,16 @@
     "urlExists": "Diese URL existiert bereits",
     "saveFailed": "Speichern fehlgeschlagen, bitte versuchen Sie es erneut",
     "loadEndpointsFailed": "Benutzerdefinierte Endpunkte konnten nicht geladen werden:",
-    "addEndpointFailed": "Benutzerdefinierter Endpunkt konnte nicht hinzugefügt werden:",
-    "removeEndpointFailed": "Benutzerdefinierter Endpunkt konnte nicht entfernt werden:",
-    "removeFailed": "Entfernen fehlgeschlagen: {{error}}",
-    "updateLastUsedFailed": "Zeitpunkt der letzten Nutzung des Endpunkts konnte nicht aktualisiert werden",
     "pleaseAddEndpoint": "Fügen Sie zuerst einen Endpunkt hinzu",
-    "testUnavailable": "Geschwindigkeitstest nicht verfügbar",
     "noResult": "Kein Ergebnis zurückgegeben",
     "testFailed": "Geschwindigkeitstest fehlgeschlagen: {{error}}",
-    "empty": "Keine Endpunkte"
+    "empty": "Keine Endpunkte",
+    "noEndpoints": "No endpoints",
+    "addEndpointFailed": "Failed to add custom endpoint:",
+    "removeEndpointFailed": "Failed to remove custom endpoint:",
+    "removeFailed": "Remove failed: {{error}}",
+    "updateLastUsedFailed": "Failed to update endpoint last used time",
+    "testUnavailable": "Speed test unavailable"
   },
   "codexConfig": {
     "authJson": "auth.json (JSON) *",
@@ -2511,7 +2412,7 @@
     "inactiveFieldCopied": "Kopiert",
     "upstreamFormatCopilotRouteHint": "Jeder Modus erfordert Routing, das die Zugangsdaten des Copilot-Kontos einfügt. Ein ausdrücklich gewähltes Protokoll schlägt bei Modellen fehl, die es nicht unterstützen.",
     "maxOutputTokensWarning": "Überschreiten Sie nicht das tatsächliche Ausgabelimit des Modells oder Gateways, sonst geben Anfragen 400 zurück.",
-    "routeOnlySettingsHint": "Die beiden Einstellungen unten gelten nur im Routing- und im Aggregationsmodus."
+    "routeOnlySettingsHint": "Die Einstellungen unten gelten nur im Routing- und im Aggregationsmodus."
   },
   "geminiConfig": {
     "envFile": "Umgebungsvariablen (.env)",
@@ -2570,9 +2471,9 @@
     "sdkOptions": "SDK-Optionen",
     "modelOptionKeyPlaceholder": "provider",
     "modelOptionValuePlaceholder": "{\"order\": [\"baseten\"]}",
-    "modelLimits": "Token-Limits",
-    "limitContext": "Kontext",
-    "limitOutput": "Ausgabe"
+    "modelLimits": "Token Limits",
+    "limitContext": "Context",
+    "limitOutput": "Output"
   },
   "providerPreset": {
     "label": "Anbieter-Vorlage",
@@ -2799,8 +2700,8 @@
     "input": "Eingabe",
     "output": "Ausgabe",
     "cacheWrite": "Erstellung",
-    "cacheWriteNotReported": "Das OpenAI-Protokoll unterscheidet die Cache-Erstellung nicht; nur Cache-Treffer werden gemeldet",
-    "cacheWritePartial": "Einige Protokolle (z. B. OpenAI) melden die Cache-Erstellung nicht; der Wert kann unvollständig sein",
+    "cacheWriteNotReported": "Gemini und Grok Build melden die Cache-Erstellung nicht; nur Cache-Treffer werden gemeldet",
+    "cacheWritePartial": "Einige Protokolle (z. B. Gemini) melden die Cache-Erstellung nicht; der Wert kann unvollständig sein",
     "cacheRead": "Treffer",
     "baseCost": "Basis",
     "costMultiplier": "Kostenmultiplikator",
@@ -2872,7 +2773,6 @@
       "configLoadFailed": "Lokale Preiskonfiguration konnte nicht geladen werden: {{error}}",
       "neverSynced": "Nie",
       "lastSync": "Letzte Synchronisierung",
-      "commonStatus": "Gängige Modelle",
       "lastError": "Letzte automatische Synchronisierung fehlgeschlagen: {{error}}",
       "localFile": "Lokale Preisdatei",
       "openFolder": "Ordner öffnen",
@@ -2880,7 +2780,8 @@
       "reloadLocalFile": "Datei neu laden",
       "localFileReloaded": "Lokale Preisdatei neu geladen",
       "localFileReloadFailed": "Lokale Preisdatei konnte nicht neu geladen werden: {{error}}",
-      "syncNow": "Jetzt synchronisieren"
+      "syncNow": "Jetzt synchronisieren",
+      "commonStatus": "Common models"
     },
     "cacheReadCostPerMillion": "Cache-Lesekosten (pro Million Token, USD)",
     "cacheCreationCostPerMillion": "Cache-Schreibkosten (pro Million Token, USD)",
@@ -2942,7 +2843,7 @@
       "label": "Kennzahlen",
       "more": "Weitere Kennzahlen",
       "realTotalHelpTitle": "Wie die Token-Gesamtzahl berechnet wird",
-      "realTotalHelp": "Neue Eingabe + Ausgabe + Cache-Schreibvorgänge + Cache-Treffer. Die neue Eingabe schließt den Cache aus; einige Protokolle (etwa OpenAI) melden keine Cache-Schreibvorgänge, daher kann dieser Anteil zu niedrig ausfallen.",
+      "realTotalHelp": "Neue Eingabe + Ausgabe + Cache-Schreibvorgänge + Cache-Treffer. Die neue Eingabe schließt den Cache aus; einige Protokolle (etwa Gemini) melden keine Cache-Schreibvorgänge, daher kann dieser Anteil zu niedrig ausfallen.",
       "hitRateHelpTitle": "Wie die Cache-Trefferquote berechnet wird",
       "hitRateHelp": "Cache-Treffer ÷ (neue Eingabe + Cache-Schreibvorgänge + Cache-Treffer)."
     },
@@ -3017,7 +2918,9 @@
       "speedEstimateTooFew": "Unter 200 Ausgabe-Token, daher keine Schätzung",
       "noTimingSession": "Sitzungsprotokolle enthalten keine Zeitdaten",
       "noFirstToken": "Keine Zeit bis zum ersten Token, daher keine Geschwindigkeit",
-      "providerId": "Anbieter-ID"
+      "providerId": "Anbieter-ID",
+      "copyRequestId": "Anfrage-ID kopieren",
+      "requestIdCopied": "Anfrage-ID kopiert"
     },
     "sources": {
       "scanTitle": "Sitzungsprotokolle automatisch scannen",
@@ -3189,9 +3092,9 @@
   "presetSelector": {
     "title": "Konfigurationstyp auswählen",
     "custom": "Benutzerdefiniert",
-    "customDescription": "Anbieter manuell konfigurieren, erfordert eine vollständige Konfiguration",
-    "officialDescription": "Offizielle Anmeldung, kein API-Schlüssel erforderlich",
-    "presetDescription": "Preset-Konfiguration verwenden, nur ein API-Schlüssel erforderlich"
+    "presetDescription": "Preset-Konfiguration verwenden, nur ein API-Schlüssel erforderlich",
+    "customDescription": "Manually configure provider, requires complete configuration",
+    "officialDescription": "Official login, no API Key required"
   },
   "mcp": {
     "title": "MCP-Verwaltung",
@@ -3203,13 +3106,8 @@
     "geminiTitle": "Gemini MCP-Verwaltung",
     "unifiedPanel": {
       "title": "MCP-Server-Verwaltung",
-      "addServer": "Server hinzufügen",
-      "editServer": "Server bearbeiten",
-      "deleteServer": "Server löschen",
       "deleteConfirm": "Möchten Sie den Server „{{id}}“ wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
-      "noServers": "Noch keine Server",
       "enabledApps": "Aktivierte Apps",
-      "noImportFound": "Keine MCP-Server zum Importieren gefunden. Alle Server werden bereits von CC Switch verwaltet.",
       "importSuccess": "{{count}} MCP-Server erfolgreich importiert",
       "searchPlaceholder": "MCP-Name, Beschreibung, Tag oder Befehl suchen …",
       "searchAriaLabel": "Verwaltete MCP-Server durchsuchen",
@@ -3223,7 +3121,12 @@
         "openclaw": "OpenClaw",
         "hermes": "Hermes",
         "mcode": "MiniMax Code"
-      }
+      },
+      "addServer": "Add Server",
+      "editServer": "Edit Server",
+      "deleteServer": "Delete Server",
+      "noServers": "No servers yet",
+      "noImportFound": "No MCP servers to import found. All servers are already managed by CC Switch."
     },
     "userLevelPath": "Pfad der MCP-Konfiguration auf Benutzerebene",
     "serverList": "Server",
@@ -3245,51 +3148,51 @@
     },
     "form": {
       "title": "MCP-Titel (eindeutig)",
-      "titlePlaceholder": "my-mcp-server",
       "name": "Anzeigename",
       "namePlaceholder": "z. B. mcp-server-time",
       "enabledApps": "Für Apps aktivieren",
-      "noAppsWarning": "Es muss mindestens eine App ausgewählt sein",
       "description": "Beschreibung",
       "descriptionPlaceholder": "Optionale Beschreibung",
       "tags": "Tags (durch Komma getrennt)",
       "tagsPlaceholder": "stdio, time, utility",
       "homepage": "Startseite",
-      "homepagePlaceholder": "https://example.com",
       "docs": "Doku",
-      "docsPlaceholder": "https://example.com/docs",
-      "additionalInfo": "Zusätzliche Informationen",
-      "jsonConfig": "Vollständige JSON-Konfiguration",
-      "jsonConfigOrPrefix": "Vollständige JSON-Konfiguration oder verwenden Sie",
-      "tomlConfigOrPrefix": "Vollständige TOML-Konfiguration oder verwenden Sie",
-      "jsonPlaceholder": "{\n  \"type\": \"stdio\",\n  \"command\": \"uvx\",\n  \"args\": [\"mcp-server-fetch\"]\n}",
       "tomlConfig": "Vollständige TOML-Konfiguration",
+      "titlePlaceholder": "my-mcp-server",
+      "noAppsWarning": "At least one app must be selected",
+      "homepagePlaceholder": "https://example.com",
+      "docsPlaceholder": "https://example.com/docs",
+      "additionalInfo": "Additional Info",
+      "jsonConfig": "Full JSON Configuration",
+      "jsonConfigOrPrefix": "Full JSON configuration or use",
+      "tomlConfigOrPrefix": "Full TOML configuration or use",
+      "jsonPlaceholder": "{\n  \"type\": \"stdio\",\n  \"command\": \"uvx\",\n  \"args\": [\"mcp-server-fetch\"]\n}",
       "tomlPlaceholder": "type = \"stdio\"\ncommand = \"uvx\"\nargs = [\"mcp-server-fetch\"]",
-      "useWizard": "Konfigurationsassistent",
-      "syncOtherSide": "Nach {{target}} spiegeln",
-      "syncOtherSideHint": "Wendet dieselben Einstellungen auf {{target}} an; vorhandene Einträge mit derselben ID werden überschrieben.",
-      "willOverwriteWarning": "Überschreibt die Konfiguration mit demselben Namen in {{target}}"
+      "useWizard": "Config Wizard",
+      "syncOtherSide": "Mirror to {{target}}",
+      "syncOtherSideHint": "Apply the same settings to {{target}}; existing entries with the same id will be overwritten.",
+      "willOverwriteWarning": "Will overwrite config with the same name in {{target}}"
     },
     "wizard": {
       "title": "MCP-Konfigurationsassistent",
       "hint": "MCP-Server schnell konfigurieren und die JSON-Konfiguration automatisch erzeugen",
       "type": "Typ",
-      "typeStdio": "stdio",
-      "typeHttp": "http",
-      "typeSse": "sse",
       "command": "Befehl",
       "commandPlaceholder": "npx oder uvx",
       "args": "Argumente",
-      "argsPlaceholder": "arg1\narg2",
       "env": "Umgebungsvariablen",
-      "envPlaceholder": "KEY1=value1\nKEY2=value2",
       "url": "URL",
       "urlPlaceholder": "https://api.example.com/mcp",
       "urlRequired": "Bitte URL eingeben",
       "headers": "Header (optional)",
-      "headersPlaceholder": "Authorization: Bearer your_token_here\nContent-Type: application/json",
       "preview": "Konfigurationsvorschau",
-      "apply": "Konfiguration anwenden"
+      "apply": "Konfiguration anwenden",
+      "typeStdio": "stdio",
+      "typeHttp": "http",
+      "typeSse": "sse",
+      "argsPlaceholder": "arg1\narg2",
+      "envPlaceholder": "KEY1=value1\nKEY2=value2",
+      "headersPlaceholder": "Authorization: Bearer your_token_here\nContent-Type: application/json"
     },
     "id": "Kennung (eindeutig)",
     "type": "Typ",
@@ -3305,20 +3208,20 @@
       "deleted": "Gelöscht",
       "enabled": "Aktiviert",
       "disabled": "Deaktiviert",
-      "templateAdded": "Vorlage hinzugefügt"
+      "templateAdded": "Template added"
     },
     "error": {
       "idRequired": "Bitte Kennung eingeben",
-      "idExists": "Die Kennung existiert bereits. Bitte wählen Sie eine andere.",
       "jsonInvalid": "Ungültiges JSON-Format",
       "tomlInvalid": "Ungültiges TOML-Format",
       "commandRequired": "Bitte Befehl eingeben",
-      "singleServerObjectRequired": "Bitte ein einzelnes MCP-Server-Objekt einfügen (ohne das äußere mcpServers)",
       "piSseUnsupported": "Pi unterstützt keine SSE-MCP-Server. Verwenden Sie stattdessen HTTP (Streamable HTTP)",
       "piInvalidName": "Pi-MCP-Servernamen dürfen nur Buchstaben, Ziffern, _ und - enthalten: {{id}}",
       "piNameConflict": "Pi behandelt Servernamen, die sich nur durch - und _ unterscheiden, als denselben Server: {{id}} steht im Konflikt mit dem vorhandenen {{other}}",
       "saveFailed": "Speichern fehlgeschlagen",
-      "deleteFailed": "Löschen fehlgeschlagen"
+      "deleteFailed": "Löschen fehlgeschlagen",
+      "idExists": "Identifier already exists. Please choose another.",
+      "singleServerObjectRequired": "Please paste a single MCP server object (do not include top-level mcpServers)"
     },
     "validation": {
       "ok": "Befehl verfügbar",
@@ -3334,7 +3237,6 @@
       "enabled": "Aktiviert",
       "installed": "Installiert",
       "docs": "Doku",
-      "requiresEnv": "Benötigt Umgebungsvariablen",
       "fetch": {
         "name": "mcp-server-fetch",
         "description": "Universelles HTTP-Anfragewerkzeug, unterstützt GET/POST und weitere HTTP-Methoden, geeignet für schnelle API-Anfragen und das Abrufen von Webdaten"
@@ -3354,7 +3256,8 @@
       "context7": {
         "name": "@upstash/context7-mcp",
         "description": "Context7-Dokumentationssuche mit aktuellen Bibliotheksdokumenten und Codebeispielen, mit höheren Limits bei konfiguriertem Schlüssel"
-      }
+      },
+      "requiresEnv": "Requires env"
     }
   },
   "prompts": {
@@ -3536,7 +3439,6 @@
     "openDirectory": "Im Dateimanager öffnen",
     "dailyMemory": {
       "title": "Tägliches Gedächtnis",
-      "sectionTitle": "Tägliches Gedächtnis",
       "cardTitle": "Dateien des täglichen Gedächtnisses",
       "createToday": "Gedächtnis hinzufügen",
       "empty": "Noch keine Dateien des täglichen Gedächtnisses",
@@ -3552,7 +3454,8 @@
       "noSearchResults": "Keine täglichen Gedächtnisse entsprechen Ihrer Suche.",
       "searching": "Suche läuft …",
       "searchFailed": "Suche fehlgeschlagen",
-      "matchCount": "{{count}} Treffer"
+      "matchCount": "{{count}} Treffer",
+      "sectionTitle": "Daily Memory"
     }
   },
   "openclaw": {
@@ -3601,7 +3504,7 @@
       "saveSuccess": "Umgebungsvariablen gespeichert",
       "saveFailed": "Umgebungsvariablen konnten nicht gespeichert werden",
       "loadFailed": "Umgebungsvariablen konnten nicht geladen werden",
-      "duplicateKey": "Doppelter Variablenname erkannt: {{key}}"
+      "duplicateKey": "Duplicate variable name detected: {{key}}"
     },
     "tools": {
       "title": "Tool-Berechtigungen",
@@ -3808,56 +3711,79 @@
       "skillNotFound": "Skill nicht gefunden: {{directory}}",
       "missingRepoInfo": "Repository-Angaben fehlen (Eigentümer oder Name)",
       "downloadTimeout": "Zeitüberschreitung beim Herunterladen des Repositorys {{owner}}/{{name}} ({{timeout}} s)",
-      "downloadTimeoutHint": "Bitte Netzwerkverbindung prüfen oder später erneut versuchen",
-      "skillPathNotFound": "Skill-Pfad „{{path}}“ im Repository {{owner}}/{{name}} nicht gefunden",
+      "downloadStalled": "Download des Repositorys {{owner}}/{{name}} abgebrochen: {{timeout}} s lang keine Daten empfangen",
       "skillDirNotFound": "Skill-Verzeichnis nicht gefunden: {{path}}",
       "directoryConflict": "Das Skill-Verzeichnis „{{directory}}“ ist bereits von {{existing_repo}} belegt und kann nicht aus {{new_repo}} installiert werden",
       "emptyArchive": "Das heruntergeladene Archiv ist leer",
+      "archiveInvalid": "Der Download ist kein ZIP-Archiv: Diese Seite ist möglicherweise kein GitHub-/GitLab-/Gitea-Repository und wird noch nicht unterstützt",
       "invalidRepoRef": "Ungültiger Repository-Verweis: {{owner}}/{{name}}",
       "archiveTooLarge": "Das Archiv überschreitet das Entpacklimit von {{limit_mb}} MB; abgebrochen",
       "archiveDownloadTooLarge": "Der Download des Repository-Archivs überschreitet das Limit von {{limit_mb}} MB; abgebrochen",
       "archiveTooManyEntries": "Das Archiv hat zu viele Einträge ({{count}}); das Limit beträgt {{limit}}",
       "downloadFailed": "Download fehlgeschlagen: HTTP {{status}}",
-      "allBranchesFailed": "Alle Branches fehlgeschlagen, versucht: {{branches}}",
-      "httpError": "HTTP-Fehler {{status}}",
       "http403": "GitHub-Zugriff eingeschränkt, möglicherweise durch Ratenbegrenzung",
-      "http404": "Repository oder Branch nicht gefunden, bitte URL prüfen",
+      "http404": "Repository oder Branch nicht gefunden, bitte URL prüfen. Private Repositories benötigen zuerst ein Zugriffstoken unter „Skill-Repositories verwalten“",
       "http429": "Zu viele Anfragen, bitte warten und erneut versuchen",
-      "parseMetadataFailed": "Skill-Metadaten konnten nicht geparst werden",
+      "http401Token": "Das Zugriffstoken ist ungültig oder abgelaufen. Legen Sie es unter „Skill-Repositories verwalten“ neu fest",
+      "http403Token": "Das Zugriffstoken darf dieses Repository nicht lesen, oder es gab zu viele Anfragen",
+      "http404Token": "Repository oder Branch nicht gefunden, oder das Zugriffstoken darf dieses Repository nicht lesen",
+      "httpAuthRequired": "Diese Seite erfordert eine Anmeldung. Legen Sie unter „Skill-Repositories verwalten“ ein Zugriffstoken dafür fest",
+      "invalidTokenHost": "Ungültige Seite: {{host}}. Geben Sie nur den Hostnamen ein, z. B. gitlab.example.com",
+      "invalidRepoToken": "Ungültiges Token: nur Buchstaben, Ziffern und - _ . ~ + / =, höchstens {{limit}} Zeichen",
+      "repoTokenStorageFailed": "Das Zugriffstoken für {{host}} konnte nicht gelesen oder geschrieben werden. Prüfen Sie, ob der Anmeldedatenspeicher des Systems verfügbar ist",
       "getHomeDirFailed": "Benutzerverzeichnis konnte nicht ermittelt werden",
       "noSkillsInZip": "Keine Skills in der ZIP-Datei gefunden (erfordert eine SKILL.md-Datei)",
-      "networkError": "Netzwerkfehler",
-      "fsError": "Dateisystemfehler",
       "unknownError": "Unbekannter Fehler",
       "suggestion": {
         "checkNetwork": "Bitte Netzwerkverbindung prüfen",
         "checkProxy": "Erwägen Sie, einen HTTP-Proxy zu konfigurieren",
         "retryLater": "Bitte später erneut versuchen",
         "checkRepoUrl": "Bitte Repository-URL und Branch-Namen prüfen",
-        "checkDiskSpace": "Bitte Speicherplatz prüfen",
         "checkPermission": "Bitte Verzeichnisberechtigungen prüfen",
         "uninstallFirst": "Bitte zuerst den vorhandenen Skill mit demselben Namen deinstallieren",
-        "checkZipContent": "Bitte prüfen, ob die ZIP-Datei gültige Skill-Verzeichnisse (mit SKILL.md-Dateien) enthält"
-      }
+        "checkZipContent": "Bitte prüfen, ob die ZIP-Datei gültige Skill-Verzeichnisse (mit SKILL.md-Dateien) enthält",
+        "checkDiskSpace": "Please check disk space"
+      },
+      "downloadTimeoutHint": "Please check network connection or retry later",
+      "skillPathNotFound": "Skill path '{{path}}' not found in repository {{owner}}/{{name}}",
+      "allBranchesFailed": "All branches failed, tried: {{branches}}",
+      "httpError": "HTTP error {{status}}",
+      "parseMetadataFailed": "Failed to parse skill metadata",
+      "networkError": "Network error",
+      "fsError": "File system error"
     },
     "repo": {
       "title": "Skill-Repositories verwalten",
-      "description": "GitHub-Skill-Repository-Quellen hinzufügen oder entfernen",
+      "description": "GitHub-, GitLab- und Gitea-Skill-Repository-Quellen hinzufügen oder entfernen",
       "url": "Repository-URL",
-      "urlPlaceholder": "owner/name oder https://github.com/owner/name",
+      "urlPlaceholder": "owner/name, https://github.com/owner/name oder https://gitlab.com/group/project",
       "branch": "Branch",
       "branchPlaceholder": "main",
       "path": "Skills-Pfad",
-      "pathPlaceholder": "skills (optional, für das Stammverzeichnis leer lassen)",
       "add": "Repository hinzufügen",
       "list": "Hinzugefügte Repositories",
       "empty": "Keine Repositories",
       "invalidUrl": "Ungültiges Format der Repository-URL",
+      "httpsOnly": "GitLab- und Gitea-Repositories müssen eine https-Adresse verwenden",
+      "token": {
+        "title": "Zugriffstokens",
+        "description": "Werden zum Lesen privater Repositories verwendet. Tokens werden pro Seite im Anmeldedatenspeicher des Systems gespeichert (macOS-Schlüsselbund, Windows-Anmeldeinformationsverwaltung) und nie synchronisiert. Lesezugriff genügt.",
+        "descriptionFile": "Werden zum Lesen privater Repositories verwendet. Tokens werden pro Seite in einer Datei auf diesem Computer gespeichert, die nur Sie lesen können, und nie synchronisiert. Lesezugriff genügt.",
+        "host": "Seite",
+        "hostPlaceholder": "github.com oder gitlab.example.com",
+        "value": "Token",
+        "valuePlaceholder": "Zugriffstoken einfügen",
+        "save": "Token speichern",
+        "empty": "Noch keine Zugriffstokens",
+        "removeAria": "Zugriffstoken für {{host}} entfernen",
+        "missingFields": "Bitte Seite und Token angeben"
+      },
       "addSuccess": "Repository {{owner}}/{{name}} hinzugefügt, {{count}} Skills erkannt",
       "addFailed": "Hinzufügen fehlgeschlagen",
       "removeSuccess": "Repository {{owner}}/{{name}} entfernt",
-      "removeFailed": "Entfernen fehlgeschlagen",
-      "skillCount": "{{count}} Skills erkannt"
+      "skillCount": "{{count}} Skills erkannt",
+      "pathPlaceholder": "skills (optional, leave empty for root)",
+      "removeFailed": "Failed to remove"
     },
     "search": "Skills suchen",
     "searchPlaceholder": "Skill-Name oder Repository suchen …",
@@ -3883,7 +3809,7 @@
       "installed": "Installiert",
       "uninstalled": "Nicht installiert",
       "repo": "Nach Repository filtern",
-      "allRepos": "Alle Repositories"
+      "allRepos": "All repos"
     },
     "noResults": "Keine passenden Skills gefunden",
     "noInstalled": "Keine Skills installiert",
@@ -3931,13 +3857,13 @@
     "installFromZip": {
       "button": "Aus ZIP installieren",
       "installing": "Wird installiert …",
-      "successSingle": "Skill {{name}} installiert",
-      "successMultiple": "{{count}} Skills erfolgreich installiert",
       "noSkillsFound": "Keine Skills in der ZIP-Datei gefunden (erfordert eine SKILL.md-Datei)",
       "skippedTitle": "{{count}} Skills übersprungen: Ordnername bereits vergeben",
       "allSkipped": "Nichts installiert: Alle {{count}} Skills in der ZIP verwenden bereits vergebene Ordnernamen",
       "skippedItem": "{{directory}} (belegt von {{name}})",
-      "skippedBody": "{{list}}. Um die Version aus der ZIP zu verwenden, deinstallieren Sie zuerst den gleichnamigen Skill."
+      "skippedBody": "{{list}}. Um die Version aus der ZIP zu verwenden, deinstallieren Sie zuerst den gleichnamigen Skill.",
+      "successSingle": "Skill {{name}} installed",
+      "successMultiple": "Successfully installed {{count}} skills"
     },
     "backToInstalled": "Zurück zu Installiert",
     "moreActions": "Weitere Skills-Aktionen",
@@ -4031,7 +3957,10 @@
       "command": "Befehl",
       "args": "Argumente",
       "env": "Umgebung",
-      "url": "URL"
+      "url": "URL",
+      "type": "Typ",
+      "cwd": "Arbeitsverzeichnis",
+      "headers": "Header"
     },
     "prompt": {
       "title": "System-Prompt importieren",
@@ -4047,9 +3976,9 @@
       "repo": "GitHub-Repository",
       "directory": "Zielverzeichnis",
       "branch": "Branch",
-      "skillsPath": "Skills-Pfad",
       "hint": "Dadurch wird das Skill-Repository zur Liste hinzugefügt.",
-      "hintDetail": "Nach dem Hinzufügen können Sie bestimmte Skills auf der Skills-Verwaltungsseite installieren."
+      "hintDetail": "Nach dem Hinzufügen können Sie bestimmte Skills auf der Skills-Verwaltungsseite installieren.",
+      "skillsPath": "Skills Path"
     },
     "usageScript": "Nutzungsabfrage",
     "usageScriptEnabled": "Aktiviert",
@@ -4066,7 +3995,8 @@
     "risk": {
       "envHijack": "Diese Konfiguration setzt Umgebungsvariablen, die verändern, wie Prozesse Code laden (z. B. Bibliotheken einschleusen oder CA-Zertifikate ersetzen). Importieren Sie nur aus einer Quelle, der Sie vertrauen.",
       "privateEndpoint": "Diese Adresse zeigt auf localhost oder ein privates Netzwerk. Nur importieren, wenn es Ihr eigener lokaler Dienst ist.",
-      "shellCommand": "Diese Konfiguration führt eine vollständige Befehlszeile über eine Shell aus – was tatsächlich läuft, steht in den Argumenten. Prüfen Sie jede Zeile."
+      "shellCommand": "Diese Konfiguration führt eine vollständige Befehlszeile über eine Shell aus – was tatsächlich läuft, steht in den Argumenten. Prüfen Sie jede Zeile.",
+      "mcpDangerousField": "Diese MCP-Konfiguration enthält risikoreiche Felder, die Host-Umgebungsvariablen auslesen (z. B. bearer_token_env_var, env_http_headers, env_vars), Hilfsbefehle ausführen (http_headers_helper) oder das Arbeitsverzeichnis ändern (cwd) können. Nur aus vollständig vertrauenswürdigen Quellen importieren."
     }
   },
   "iconPicker": {
@@ -4100,20 +4030,20 @@
       "dimensions": "Das Bild ist zu groß (Breite und Höhe dürfen 4096 px nicht überschreiten)"
     },
     "category": {
-      "aiProvider": "KI-Anbieter",
       "cloud": "Cloud-Plattformen",
       "tool": "Entwicklertools",
-      "other": "Sonstige"
+      "other": "Sonstige",
+      "aiProvider": "AI Providers"
     }
   },
   "providerIcon": {
     "label": "Symbol",
-    "colorLabel": "Symbolfarbe",
     "selectIcon": "Symbol auswählen",
     "preview": "Vorschau",
     "clickToChange": "Klicken, um das Symbol zu ändern",
     "clickToSelect": "Klicken, um ein Symbol auszuwählen",
-    "change": "Symbol ändern"
+    "change": "Symbol ändern",
+    "colorLabel": "Icon Color"
   },
   "migration": {
     "success": "Konfiguration erfolgreich migriert",
@@ -4142,31 +4072,28 @@
     "tooltip": {
       "enabled": "{{app}}-Failover aktiviert\nAnfragen folgen der Priorität der Warteschlange (P1→P2→...)",
       "disabled": "{{app}}-Failover aktivieren\nWechselt sofort zu P1 der Warteschlange und weicht bei Fehlern aus",
-      "takeoverRequired": "Übernehmen Sie zuerst {{app}} und aktivieren Sie dann das Failover"
+      "takeoverRequired": "Take over {{app}} first, then enable failover"
     }
   },
   "proxy": {
     "panel": {
-      "serviceAddress": "Dienstadresse",
-      "addressCopied": "Adresse kopiert",
-      "currentProvider": "Aktueller Anbieter:",
-      "waitingFirstRequest": "Aktueller Anbieter: Warten auf die erste Anfrage …",
-      "stoppedTitle": "Routing-Dienst angehalten",
-      "stoppedDescription": "Starten Sie den Dienst mit dem Schalter oben",
       "openSettings": "Routing-Dienst konfigurieren",
       "stats": {
         "activeConnections": "Aktive Verbindungen",
         "totalRequests": "Anfragen gesamt",
         "successRate": "Erfolgsquote",
         "uptime": "Laufzeit"
-      }
+      },
+      "serviceAddress": "Service Address",
+      "addressCopied": "Address copied",
+      "currentProvider": "Current Provider:",
+      "waitingFirstRequest": "Current Provider: Waiting for first request...",
+      "stoppedTitle": "Routing Service Stopped",
+      "stoppedDescription": "Use the toggle above to start the service"
     },
     "settings": {
       "title": "Einstellungen des Routing-Dienstes",
       "description": "Konfigurieren Sie Abhöradresse, Port und Laufzeitparameter des lokalen Routing-Servers. Änderungen werden nach dem Speichern sofort wirksam.",
-      "alert": {
-        "autoApply": "Änderungen werden automatisch mit dem laufenden Routing-Dienst synchronisiert, ein manueller Neustart ist nicht nötig."
-      },
       "basic": {
         "title": "Grundeinstellungen",
         "description": "Abhöradresse und Port des Routing-Dienstes konfigurieren."
@@ -4187,7 +4114,7 @@
         },
         "listenPort": {
           "label": "Abhörport",
-          "placeholder": "25721",
+          "placeholder": "15721",
           "description": "Portnummer, auf der der Routing-Server lauscht (1024 ~ 65535)"
         },
         "maxRetries": {
@@ -4217,18 +4144,6 @@
           "description": "Gesamt-Timeout für Nicht-Streaming-Anfragen"
         }
       },
-      "validation": {
-        "addressInvalid": "Bitte geben Sie eine gültige IP-Adresse ein",
-        "portMin": "Der Port muss größer als 1024 sein",
-        "portMax": "Der Port muss kleiner als 65535 sein",
-        "retryMin": "Die Anzahl der Wiederholungen darf nicht negativ sein",
-        "retryMax": "Die Anzahl der Wiederholungen darf 10 nicht überschreiten",
-        "timeoutNonNegative": "Der Timeout darf nicht negativ sein",
-        "timeoutMax": "Der Timeout darf 600 Sekunden nicht überschreiten",
-        "timeoutRange": "Bitte geben Sie 0 oder einen Wert zwischen 10 und 600 ein",
-        "streamingTimeoutMin": "Der Timeout muss mindestens 5 Sekunden betragen",
-        "streamingTimeoutMax": "Der Timeout darf 300 Sekunden nicht überschreiten"
-      },
       "actions": {
         "save": "Konfiguration speichern"
       },
@@ -4240,7 +4155,22 @@
       "invalidAddress": "Ungültige Adresse. Geben Sie eine IPv4- (z. B. 127.0.0.1), eine IPv6-Adresse (z. B. ::1) oder localhost ein",
       "configSaved": "Routing-Konfiguration gespeichert",
       "configSaveFailed": "Konfiguration konnte nicht gespeichert werden",
-      "restartRequired": "Starten Sie den Routing-Dienst neu, damit Änderungen an Adresse oder Port wirksam werden"
+      "restartRequired": "Starten Sie den Routing-Dienst neu, damit Änderungen an Adresse oder Port wirksam werden",
+      "alert": {
+        "autoApply": "Changes will be automatically synced to the running routing service without manual restart."
+      },
+      "validation": {
+        "addressInvalid": "Please enter a valid IP address",
+        "portMin": "Port must be greater than 1024",
+        "portMax": "Port must be less than 65535",
+        "retryMin": "Retry count cannot be negative",
+        "retryMax": "Retry count cannot exceed 10",
+        "timeoutNonNegative": "Timeout cannot be negative",
+        "timeoutMax": "Timeout cannot exceed 600 seconds",
+        "timeoutRange": "Please enter 0 or a value between 10-600",
+        "streamingTimeoutMin": "Timeout must be at least 5 seconds",
+        "streamingTimeoutMax": "Timeout cannot exceed 300 seconds"
+      }
     },
     "switchFailed": "Wechsel fehlgeschlagen: {{error}}",
     "takeover": {
@@ -4259,7 +4189,6 @@
       "enabled": "{{app}} befindet sich jetzt im Aggregationsmodus",
       "exitedToDirect": "{{apps}} wieder auf Direkt umgestellt",
       "ariaLabel": "Aggregationsmodus für {{appLabel}}",
-      "failoverUnavailable": "{{appLabel}} befindet sich im Aggregationsmodus, der kein Failover bietet. Warteschlange und Einstellungen bleiben erhalten und gelten im Routing-Modus wieder",
       "codexStale": {
         "authTitle": "Codex hat möglicherweise noch das vorherige Konto im Cache; starten Sie dessen Hintergrundserver neu, um die neue Anmeldung zu laden",
         "title": "Codex verwendet noch eine alte Modellliste, daher werden die aktuellen Modelle nicht angezeigt",
@@ -4274,30 +4203,31 @@
         "restarted": "Codex-Daemon neu gestartet. Öffnen Sie Codex erneut, um das aktuelle Konto und die Modellliste zu laden",
         "notRunning": "Der Codex-Daemon läuft nicht. Er lädt die aktuelle Anmeldung und Modellliste beim nächsten Start",
         "failed": "Der Codex-Daemon konnte nicht neu gestartet werden: {{error}}"
-      }
+      },
+      "failoverUnavailable": "{{appLabel}} is in Aggregation mode, which has no failover. The queue and settings are kept and apply again in routing mode"
     },
     "failover": {
       "proxyRequired": "Der Routing-Dienst muss gestartet sein, um Failover zu konfigurieren",
-      "autoSwitch": "Automatisches Failover",
-      "autoSwitchDescription": "Wenn aktiviert, wird sofort zu P1 der Warteschlange gewechselt und bei Fehlern automatisch der nächste Anbieter der Warteschlange versucht"
+      "autoSwitch": "Auto Failover",
+      "autoSwitchDescription": "When enabled, switches to queue P1 immediately and automatically tries the next provider in the queue on failures"
     },
     "failoverQueue": {
       "title": "Failover-Warteschlange",
       "description": "Failover-Reihenfolge der Anbieter jeder App verwalten",
       "info": "Wenn das automatische Failover aktiviert ist, folgen Anfragen der Prioritätsreihenfolge der Warteschlange (P1 zuerst). Bei Fehlern versucht das System den nächsten Anbieter in der Warteschlange.",
-      "selectProvider": "Anbieter zum Hinzufügen zur Warteschlange auswählen",
-      "noAvailableProviders": "Keine Anbieter zum Hinzufügen verfügbar",
       "empty": "Die Failover-Warteschlange ist leer. Fügen Sie Anbieter hinzu, um das automatische Failover zu aktivieren.",
-      "orderHint": "Die Reihenfolge der Warteschlange entspricht der Anbieterliste auf der Startseite. Ändern Sie die Reihenfolge der Anbieter auf der Startseite, um die Priorität zu ändern.",
-      "dragHint": "Ziehen Sie Anbieter, um die Failover-Reihenfolge anzupassen. Niedrigere Nummern haben höhere Priorität.",
       "toggleEnabled": "Aktivieren/Deaktivieren",
       "addSuccess": "Zur Failover-Warteschlange hinzugefügt",
       "addFailed": "Hinzufügen fehlgeschlagen",
       "removeSuccess": "Aus der Failover-Warteschlange entfernt",
-      "removeFailed": "Entfernen fehlgeschlagen",
-      "reorderSuccess": "Reihenfolge der Warteschlange aktualisiert",
-      "reorderFailed": "Reihenfolge konnte nicht aktualisiert werden",
-      "toggleFailed": "Status konnte nicht aktualisiert werden"
+      "toggleFailed": "Status konnte nicht aktualisiert werden",
+      "selectProvider": "Select a provider to add to queue",
+      "noAvailableProviders": "No providers available to add",
+      "orderHint": "Queue order matches the provider list order on the Home page. Reorder providers on the Home page to change priority.",
+      "dragHint": "Drag providers to adjust failover order. Lower numbers have higher priority.",
+      "removeFailed": "Failed to remove",
+      "reorderSuccess": "Queue order updated",
+      "reorderFailed": "Failed to update order"
     },
     "autoFailover": {
       "info": "Enthält die Failover-Warteschlange mehrere Anbieter, versucht das System sie bei fehlgeschlagenen Anfragen in Prioritätsreihenfolge. Erreicht ein Anbieter den Schwellenwert aufeinanderfolgender Fehler, öffnet sich der Circuit Breaker und überspringt ihn vorübergehend.",
@@ -4316,15 +4246,6 @@
       "errorRateHint": "Circuit Breaker öffnen, wenn die Fehlerrate diesen Wert übersteigt",
       "minRequests": "Mindestanzahl an Anfragen",
       "minRequestsHint": "Mindestanzahl an Anfragen, bevor die Fehlerrate berechnet wird",
-      "explanationTitle": "Funktionsweise",
-      "failureThresholdLabel": "Fehlerschwelle",
-      "failureThresholdExplain": "Der Circuit Breaker öffnet sich nach so vielen aufeinanderfolgenden Fehlern und macht den Anbieter vorübergehend nicht verfügbar",
-      "timeoutLabel": "Wartezeit bis zur Erholung",
-      "timeoutExplain": "Nach dem Öffnen des Circuit Breakers wird so lange gewartet, bevor der halb offene Zustand versucht wird",
-      "successThresholdLabel": "Erfolgsschwelle zur Erholung",
-      "successThresholdExplain": "Im halb offenen Zustand wird der Circuit Breaker nach so vielen Erfolgen geschlossen und der Anbieter ist wieder verfügbar",
-      "errorRateLabel": "Fehlerratenschwelle",
-      "errorRateExplain": "Circuit Breaker öffnen, wenn die Fehlerrate diesen Wert übersteigt, auch wenn die Fehlerschwelle nicht erreicht ist",
       "maxRetries": "Max. Wiederholungen",
       "timeoutSettings": "Timeout-Einstellungen",
       "streamingFirstByte": "Streaming-Timeout für das erste Byte",
@@ -4333,7 +4254,16 @@
       "maxRetriesHint": "Anzahl der Wiederholungen bei fehlgeschlagener Anfrage (0–10)",
       "streamingFirstByteHint": "Maximale Wartezeit auf den ersten Datenblock, Bereich 1–120 s, Standard 60 s",
       "streamingIdleHint": "Maximales Intervall zwischen Datenblöcken, Bereich 60–600 s, 0 zum Deaktivieren (verhindert Stillstand mitten im Stream)",
-      "nonStreamingHint": "Gesamt-Timeout für Nicht-Streaming-Anfragen, Bereich 60–1200 s, Standard 600 s (10 Min.)"
+      "nonStreamingHint": "Gesamt-Timeout für Nicht-Streaming-Anfragen, Bereich 60–1200 s, Standard 600 s (10 Min.)",
+      "explanationTitle": "How It Works",
+      "failureThresholdLabel": "Failure Threshold",
+      "failureThresholdExplain": "Circuit breaker opens after this many consecutive failures, making the provider temporarily unavailable",
+      "timeoutLabel": "Recovery Wait Time",
+      "timeoutExplain": "After circuit opens, wait this long before trying half-open state",
+      "successThresholdLabel": "Recovery Success Threshold",
+      "successThresholdExplain": "In half-open state, close circuit breaker after this many successes, making provider available again",
+      "errorRateLabel": "Error Rate Threshold",
+      "errorRateExplain": "Open circuit breaker when error rate exceeds this value, even if failure threshold not reached"
     },
     "logging": {
       "enabled": "Protokollierung aktiviert",
@@ -4358,19 +4288,19 @@
   },
   "proxyConfig": {
     "proxyEnabled": "Routing-Hauptschalter",
-    "appTakeover": "Routing aktiviert",
-    "perAppConfig": "Konfiguration pro App",
     "circuitBreaker": "Circuit Breaker",
     "circuitBreakerSettings": "Circuit-Breaker-Einstellungen",
     "failureThreshold": "Fehlerschwelle",
     "successThreshold": "Erfolgsschwelle",
-    "recoveryTimeout": "Wiederherstellungs-Timeout",
     "errorRateThreshold": "Fehlerratenschwelle",
     "minRequests": "Min. Anfragen",
     "timeoutConfig": "Timeout-Konfiguration",
     "streamingFirstByte": "Timeout für erstes Byte (Streaming)",
     "streamingIdle": "Leerlauf-Timeout (Streaming)",
-    "nonStreaming": "Timeout (ohne Streaming)"
+    "nonStreaming": "Timeout (ohne Streaming)",
+    "appTakeover": "Routing Enabled",
+    "perAppConfig": "Per-App Config",
+    "recoveryTimeout": "Recovery Timeout"
   },
   "universalProvider": {
     "duplicate": "Duplizieren",
@@ -4586,12 +4516,12 @@
       "title": "Standardmodell",
       "description": "Primäres Standardmodell und Fallback-Modelle für OpenClaw konfigurieren",
       "primary": "Primäres Modell",
-      "primaryPlaceholder": "z. B. deepseek/deepseek-chat",
       "fallbacks": "Fallback-Modelle",
-      "fallbacksPlaceholder": "z. B. openrouter/anthropic/claude-sonnet-4.5",
       "addFallback": "Fallback-Modell hinzufügen",
       "saved": "Standardmodell-Konfiguration gespeichert",
-      "saveFailed": "Standardmodell konnte nicht gespeichert werden"
+      "saveFailed": "Standardmodell konnte nicht gespeichert werden",
+      "primaryPlaceholder": "e.g., deepseek/deepseek-chat",
+      "fallbacksPlaceholder": "e.g., openrouter/anthropic/claude-sonnet-4.5"
     },
     "modelCatalog": {
       "title": "Modellkatalog",
@@ -4599,13 +4529,13 @@
       "modelId": "Modell-ID",
       "modelIdPlaceholder": "z. B. deepseek/deepseek-chat",
       "alias": "Alias",
-      "aliasPlaceholder": "z. B. DeepSeek",
-      "addEntry": "Modell hinzufügen",
-      "removeEntry": "Entfernen",
       "saved": "Modellkatalog gespeichert",
       "saveFailed": "Modellkatalog konnte nicht gespeichert werden",
       "empty": "Keine Einträge im Modellkatalog",
-      "emptyHint": "Fügen Sie dem Katalog Modelle hinzu, um Aliasse zu konfigurieren"
+      "emptyHint": "Fügen Sie dem Katalog Modelle hinzu, um Aliasse zu konfigurieren",
+      "aliasPlaceholder": "e.g., DeepSeek",
+      "addEntry": "Add Model",
+      "removeEntry": "Remove"
     },
     "suggestedDefaults": "Empfohlene Standardwerte anwenden",
     "suggestedDefaultsHint": "Empfohlene Standardmodell-Konfiguration dieser Vorlage verwenden"
@@ -4614,7 +4544,6 @@
     "title": "Abonnement-Kontingent",
     "short": {
       "fiveHour": "5 Std.",
-      "daily": "Tag",
       "sevenDay": "Wo.",
       "sevenDayFable": "Fable",
       "sevenDayOpus": "Opus",
@@ -4630,10 +4559,10 @@
       "agyThirdPartyWeekly": "Claude Wo.",
       "monthly": "Mon.",
       "credits": "Credits",
-      "copilotPremium": "Credits"
+      "copilotPremium": "Credits",
+      "daily": "Day"
     },
     "fiveHour": "5 Stunden",
-    "daily": "Täglich",
     "sevenDay": "Woche",
     "sevenDayFable": "Fable",
     "sevenDayOpus": "Opus wöchentlich",
@@ -4664,9 +4593,11 @@
     "expiredHint": "Führen Sie den Befehl {{tool}} aus, um Ihre Anmeldung zu erneuern",
     "expiredHintAccounts": "Melden Sie sich in den Konten erneut bei diesem Konto an",
     "queryFailed": "Abfrage fehlgeschlagen",
-    "refresh": "Aktualisieren"
+    "refresh": "Aktualisieren",
+    "daily": "Daily"
   },
   "nav": {
+    "skills": "Skills",
     "mainLabel": "Hauptnavigation",
     "skipToContent": "Zum Hauptinhalt springen",
     "expandSidebar": "Seitenleiste ausklappen",
@@ -4690,7 +4621,8 @@
       "stack": "Aggregation"
     },
     "needsAttention": "Erfordert Aufmerksamkeit",
-    "back": "Zurück"
+    "back": "Zurück",
+    "plugins": "Plugins"
   },
   "appsPage": {
     "showInSidebar": "{{name}} in der Seitenleiste anzeigen",
@@ -4735,7 +4667,8 @@
       "agy": "Installiert mit dem offiziellen Skript",
       "copilot": "Installiert mit npm",
       "omp": "Installiert mit dem offiziellen Skript"
-    }
+    },
+    "manuallyManaged": "Install and update manually"
   },
   "appPage": {
     "moreActions": "Weitere Aktionen für {{name}}",
@@ -4749,8 +4682,8 @@
     "memory": "Memory",
     "webUi": "Web UI",
     "viewUsage": "Nutzung dieser App ansehen",
-    "browseDirectory": "Verzeichnis durchsuchen",
-    "openDirectoryFailed": "Verzeichnis konnte nicht geöffnet werden"
+    "browseDirectory": "Browse directory",
+    "openDirectoryFailed": "Failed to open directory"
   },
   "mode": {
     "tabsLabel": "Verbindungsmodus",
@@ -4819,9 +4752,9 @@
       "routeSwitched": "Routing auf {{provider}} umgestellt. Neue Anfragen verwenden diesen Anbieter.",
       "stackDefaultChanged": "Aggregations-Standard auf {{provider}} gesetzt. Ausgewählte aggregierte Modelle nutzen weiterhin ihre jeweiligen Anbieter.",
       "clientConfigChanged": " Auch die Client-Konfiguration wurde geändert. Starten Sie {{app}} neu, um die aktualisierte Konfiguration zu laden.",
-      "defaultRemembered": "{{provider}} wird der Standardanbieter, sobald Sie zu Aggregation wechseln.",
       "restartHint": " Starten Sie {{app}} neu, um die Änderung anzuwenden.",
-      "failed": "Wechsel nicht möglich: {{detail}}"
+      "failed": "Wechsel nicht möglich: {{detail}}",
+      "defaultRemembered": "{{provider}} will be the default provider once you switch to Aggregation."
     },
     "dialog": {
       "routeTitle": "Routing für {{app}} verwenden?",
@@ -4902,8 +4835,8 @@
       "direct": "Direkt",
       "hermesManaged": "Von Hermes verwaltet",
       "defaultModel": "Standardmodell {{model}}",
-      "platform": "Plattform",
-      "platformHint": "Aus den Plattform-Basisdaten synchronisiert; der API-Schlüssel wird von der Plattform verwaltet."
+      "platform": "Platform",
+      "platformHint": "Synced from platform base data; the API key is managed by the platform."
     },
     "reason": {
       "noRoute": "Offizielle Abonnements laufen nicht über das Routing; im Direktmodus wieder verfügbar.",
@@ -5115,7 +5048,7 @@
       "failedTitle": "Einige Apps konnten nicht gelesen werden",
       "filesTitle": "Welche Dateien gelesen wurden",
       "claudeNote": " (mcpServers auf oberster Ebene)",
-      "dshNote": " (in jedes initialisierte Profil geschrieben: web, desktop, headless, acp)",
+      "dshNote": " (in jedes initialisierte Profil geschrieben: web, desktop, headless, acp. Die Datei auf Home-Ebene ~/.dsh/cordis.patch.yml wird weder gelesen noch geschrieben; MCP-Server darin bitte dort verwalten)",
       "ok": "Verstanden"
     },
     "templateLabels": {
@@ -5313,7 +5246,7 @@
       "selectionAlreadyOn": "Die {{count}} ausgewählten Skills sind in {{app}} bereits aktiviert",
       "selectionAlreadyOff": "Keiner der {{count}} ausgewählten Skills ist in {{app}} aktiviert",
       "disabledSelection": "{{count}} {{noun}} in {{app}} ausgeschaltet",
-      "copiedDir": "Ordnername {{dir}} kopiert"
+      "copiedDir": "Copied folder name {{dir}}"
     },
     "installTo": {
       "prefix": "Installieren für: ",
@@ -5358,7 +5291,7 @@
       "disabledShort": "Aus",
       "disabled": "Ausgeschaltet, wird von „Entdecken“ nicht verwendet",
       "manage": "Repositories hinzufügen oder verwalten",
-      "openAria": "{{repo}} auf GitHub öffnen",
+      "openAria": "{{repo}} im Browser öffnen",
       "removeAria": "Repository {{repo}} entfernen",
       "readFailed": "Lesen fehlgeschlagen"
     },
@@ -5389,7 +5322,92 @@
     },
     "updateAllCount": "Alle aktualisieren ({{count}})",
     "updatingProgress": "Aktualisierung {{done}}/{{total}} …",
-    "copyDir": "Ordnernamen kopieren"
+    "copyDir": "Copy folder name"
+  },
+  "pluginsPage": {
+    "title": "Plugins",
+    "helpTitle": "Plugins",
+    "help": "Plugins für Claude Code, Codex, Grok Build, MiniMax Code, OpenClaw, Pi und Antigravity CLI installieren, aktivieren und entfernen. CC Switch führt die jeweilige CLI der App aus, das Ergebnis ist also dasselbe wie beim Plugin-Befehl im Terminal. Bei Pi sind Plugins Pi-Pakete, und der Katalog stammt von npm.",
+    "appAria": "App",
+    "viewAria": "Plugin-Ansichten",
+    "viewInstalled": "Installiert",
+    "viewInstalledCount": "Installiert · {{count}}",
+    "viewDiscover": "Entdecken",
+    "viewDiscoverCount": "Entdecken · {{count}}",
+    "viewMarketplaces": "Marketplaces",
+    "searchPlaceholder": "Plugins durchsuchen",
+    "searchAria": "Plugins durchsuchen",
+    "count": "{{count}} Plugins",
+    "countFiltered": "{{shown}} von {{count}}",
+    "noMatches": "Keine Plugins passen zu „{{query}}“",
+    "loading": "Plugins von {{app}} werden gelesen …",
+    "loadFailed": "Plugins von {{app}} konnten nicht gelesen werden",
+    "catalogLoadFailed": "Der Marketplace-Katalog konnte nicht gelesen werden",
+    "loadingCatalog": "Marketplace-Katalog von {{app}} wird gelesen …",
+    "refreshing": "Wird aktualisiert …",
+    "marketsLoadFailed": "Marketplaces konnten nicht gelesen werden",
+    "cliMissingTitle": "{{app}} ist nicht installiert",
+    "cliMissingBody": "Plugins werden über die CLI von {{app}} verwaltet. Installieren Sie sie auf der Apps-Seite und kehren Sie dann hierher zurück.",
+    "emptyInstalledTitle": "Keine Plugins installiert",
+    "emptyInstalledBody": "Durchsuchen Sie die Marketplaces, um {{app}} Skills, Befehle, Agents und MCP-Server hinzuzufügen.",
+    "browse": "Plugins durchsuchen",
+    "emptyDiscoverTitle": "Nichts Neues zu installieren",
+    "emptyDiscoverBody": "Alle Plugins aus Ihren Marketplaces sind installiert. Fügen Sie einen Marketplace hinzu, um mehr zu sehen.",
+    "emptyCatalogBody": "Alle Plugins im Katalog sind installiert.",
+    "emptyMarketsTitle": "Keine Marketplaces hinzugefügt",
+    "emptyMarketsBody": "{{app}} zeigt weiterhin den integrierten Katalog. Fügen Sie ein GitHub-Repository oder eine Git-URL hinzu, um weitere Plugins aufzulisten.",
+    "builtIn": "Integriert",
+    "builtInPlugin": "Wird mit der App ausgeliefert. Sie können es ein- oder ausschalten, aber nicht deinstallieren.",
+    "scope": "Bereich {{scope}}",
+    "scopeReadOnly": "Im Bereich {{scope}} installiert. Verwalten Sie es mit der CLI aus diesem Projekt heraus.",
+    "enableAria": "{{name}} aktivieren",
+    "moreActions": "Weitere Aktionen für {{name}}",
+    "working": "Wird ausgeführt …",
+    "install": "Installieren",
+    "installing": "Wird installiert …",
+    "notInstallable": "Nicht verfügbar",
+    "update": "Aktualisieren",
+    "uninstall": "Deinstallieren",
+    "restartNote": "Änderungen gelten für neue {{app}}-Sitzungen.",
+    "restartNoteGateway": "Änderungen gelten nach einem Neustart des {{app}}-Gateways.",
+    "refreshMarketplaces": "Marketplaces aktualisieren",
+    "refreshCatalog": "Katalog aktualisieren",
+    "addMarketplace": "Marketplace hinzufügen",
+    "addMarketplaceTitle": "Marketplace für {{app}} hinzufügen",
+    "addMarketplaceBody": "Ein GitHub-owner/repo, eine Git-URL oder ein lokaler Ordner (Schrägstriche verwenden, keine Leerzeichen).",
+    "addMarketplaceWaiting": "Das Marketplace-Repository wird heruntergeladen. Große Repositorys können einige Minuten dauern (höchstens 5). Sie können dieses Fenster schließen; Sie werden benachrichtigt, sobald es fertig ist.",
+    "sourceLabel": "Quelle",
+    "removeMarketplace": "Entfernen",
+    "confirmUninstallTitle": "{{name}} deinstallieren?",
+    "confirmUninstallBody": "Entfernt das Plugin und seine zwischengespeicherten Dateien aus {{app}}. Sie können es unter „Entdecken“ erneut installieren.",
+    "confirmUninstallClaudeBody": "Deinstalliert das Plugin aus {{app}} und behält sein Datenverzeichnis. Ist dies die letzte Installation, werden gespeicherte Optionen und Anmeldedaten gelöscht und bei einer Neuinstallation nicht wiederhergestellt.",
+    "confirmInstallTitle": "{{name}} installieren?",
+    "confirmInstallBody": "Plugins laufen mit Ihren Berechtigungen: {{app}} lädt ihre Skills, Hooks und MCP-Server und gewährt die deklarierten Fähigkeiten. Installieren Sie nur Plugins aus vertrauenswürdigen Quellen.",
+    "confirmRemoveMarketTitle": "Marketplace {{name}} entfernen?",
+    "confirmRemoveMarketBody": "{{app}} listet keine Plugins aus diesem Marketplace mehr auf und deinstalliert möglicherweise die daraus installierten Plugins. Sie können ihn später erneut hinzufügen.",
+    "toast": {
+      "installed": "{{name}} installiert",
+      "installedNeedsConfig": "Deaktiviert installiert. Führen Sie in {{app}} /plugin aus, um die MCP-Server zu konfigurieren und es zu aktivieren.",
+      "installFailed": "{{name}} konnte nicht installiert werden",
+      "installNeedsTerminal": "Dieses Plugin führt bei der Installation einen vom Marketplace deklarierten Befehl auf Ihrem Rechner aus, und CC Switch bestätigt das nicht für Sie. Führen Sie {{command}} in einem Terminal aus, bestätigen Sie dort und aktualisieren Sie dann hier.",
+      "authRequired": "{{app}} erfordert zuerst eine Anmeldung. Führen Sie {{command}} in einem Terminal aus und versuchen Sie es dann erneut.",
+      "pluginInUse": "Dieses Plugin wird derzeit von einem anderen {{app}}- / {{cli}}-Prozess verwendet (z. B. einer laufenden Sitzung, dem Hub oder einem Hintergrunddienst). Schließen Sie ihn und versuchen Sie es erneut.",
+      "uninstalled": "{{name}} deinstalliert",
+      "uninstallFailed": "{{name}} konnte nicht deinstalliert werden",
+      "enabled": "{{name}} aktiviert",
+      "disabled": "{{name}} deaktiviert",
+      "toggleFailed": "{{name}} konnte nicht geändert werden",
+      "updated": "{{name}} aktualisiert",
+      "upToDate": "{{name}} ist bereits auf dem neuesten Stand",
+      "updateFailed": "{{name}} konnte nicht aktualisiert werden",
+      "updateNeedsReinstall": "Dieses Plugin liegt in einem Ordner älterer Antigravity-Versionen, daher kann CC Switch es nicht aktualisieren. Deinstallieren Sie es und installieren Sie es unter „Entdecken“ erneut, um die neueste Version zu erhalten.",
+      "refreshed": "Marketplaces aktualisiert",
+      "refreshFailed": "Marketplaces konnten nicht aktualisiert werden",
+      "marketAdded": "Marketplace {{source}} hinzugefügt",
+      "marketAddFailed": "Der Marketplace konnte nicht hinzugefügt werden",
+      "marketRemoved": "Marketplace {{name}} entfernt",
+      "marketRemoveFailed": "{{name}} konnte nicht entfernt werden"
+    }
   },
   "newLayoutNotice": {
     "title": "CC Switch hat ein neues Aussehen",
@@ -5478,7 +5496,9 @@
       "empty": "Noch keine Antigravity-Konten. Das Konto, mit dem agy angemeldet ist, erscheint hier automatisch.",
       "removeNote": "agy bleibt angemeldet: Wenn agy dieses Konto verwendet, funktioniert es nach dem Entfernen weiter.",
       "switched": "Gewechselt. Neue agy-Sitzungen verwenden dieses Konto.",
-      "switchedWhileRunning": "Gewechselt. agy läuft: Geöffnete agy-Sitzungen verwenden weiter das vorherige Konto und schreiben es möglicherweise zurück. Beenden Sie agy und öffnen Sie es erneut."
+      "switchedWhileRunning": "Gewechselt. agy läuft: Geöffnete agy-Sitzungen verwenden weiter das vorherige Konto und schreiben es möglicherweise zurück. Beenden Sie agy und öffnen Sie es erneut.",
+      "current": "In use by agy",
+      "switchTo": "Switch agy to this account"
     },
     "workbuddy": {
       "addedOn": "Hinzugefügt am {{date}}",
@@ -5560,7 +5580,9 @@
       "connectionManaged": "Verbindung und Anmeldung werden in der Kontoverwaltung verwaltet; bearbeiten Sie hier nur die Modelle. „Modelle abrufen“ liest die offiziellen Modelle, die diesem Konto derzeit zur Verfügung stehen.",
       "primaryShort": "Eigene Anmeldung von Kimi Code",
       "empty": "Noch keine Kimi-Konten. Das in Kimi Code angemeldete Konto erscheint hier automatisch.",
-      "help": "Fügen Sie mehrere Kimi-Coding-Plan-Konten hinzu; jedes erhält in Kimi Code einen eigenen Anbieter samt Modellen. „Dieses Konto verwenden“ stellt das Standardmodell von Kimi Code auf dieses Konto um, und neue Sitzungen nutzen es ab dann. Das Konto, mit dem Kimi Code selbst angemeldet ist, erscheint hier automatisch und wird immer für Websuche und Abruf verwendet; es hier zu entfernen blendet es nur aus der Liste aus und meldet Kimi Code nie ab."
+      "help": "Fügen Sie mehrere Kimi-Coding-Plan-Konten hinzu; jedes erhält in Kimi Code einen eigenen Anbieter samt Modellen. „Dieses Konto verwenden“ stellt das Standardmodell von Kimi Code auf dieses Konto um, und neue Sitzungen nutzen es ab dann. Das Konto, mit dem Kimi Code selbst angemeldet ist, erscheint hier automatisch und wird immer für Websuche und Abruf verwendet; es hier zu entfernen blendet es nur aus der Liste aus und meldet Kimi Code nie ab.",
+      "useAccount": "Use this account",
+      "current": "In use by Kimi"
     },
     "modelSelectionHint": "Verwenden Sie die Wechsel-Schaltfläche auf einer Anbieterkarte, um sie auszuwählen. Ein anderes Modell wählen Sie mit /model in Kimi Code.",
     "contextSize": "Kontextgröße",
@@ -5585,41 +5607,6 @@
       "defaultModelInUse": "Kimi Code verwendet ein Modell dieses Anbieters. Wechseln Sie zuerst in Kimi Code mit /model zu einem anderen Modell.",
       "secondaryModelInUse": "Das Subagent-Modell von Kimi Code verwendet ein Modell dieses Anbieters. Ändern Sie es zuerst in Kimi Code mit /secondary-model."
     }
-  },
-  "platformAuth": {
-    "title": "Bei 智枢router anmelden",
-    "subtitle": "Melden Sie sich mit Ihrem Plattformkonto an, um KI-Coding-Tools zu verwalten.",
-    "address": "Plattform-API-Adresse",
-    "loading": "Sitzung wird geprüft…",
-    "back": "Zurück zur Anmeldung",
-    "logout": "Von der Plattform abmelden",
-    "account": "Plattformkonto",
-    "balance": "Guthaben",
-    "refreshBalance": "Klicken, um das Guthaben zu aktualisieren",
-    "sessionHint": "Bleiben Sie über Neustarts hinweg angemeldet. Nach mehr als 7 Tagen ohne Nutzung ist eine erneute Anmeldung nötig.",
-    "restoreFailed": "Sitzung konnte nicht wiederhergestellt werden",
-    "restoreHint": "Prüfen Sie Ihre Verbindung oder entsperren Sie den Anmeldedatenspeicher des Systems und versuchen Sie es erneut. Ihre gespeicherte Sitzung bleibt erhalten.",
-    "retryRestore": "Wiederherstellung der Sitzung erneut versuchen",
-    "oauthLogin": "Bei Zhishu anmelden",
-    "oauthHint": "In Ihrem Browser wird eine Zhishu-Autorisierungsseite geöffnet. Die Anmeldung wird nach Ihrer Zustimmung automatisch abgeschlossen.",
-    "oauthWaiting": "Warten auf Autorisierung im Browser…",
-    "oauthCancel": "Autorisierung abbrechen",
-    "advanced": "Erweiterte Einstellungen",
-    "oauthUnavailable": "OAuth2-Autorisierung im Browser ist nicht verfügbar. Prüfen Sie die Serveradresse oder wenden Sie sich an Ihren Administrator.",
-    "retryConfig": "Anmeldeeinstellungen erneut prüfen"
-  },
-  "platformUsage": {
-    "accountBalance": "Kontoguthaben",
-    "sharedBalance": "Von allen nutzungsbasierten Gruppen gemeinsam genutzt",
-    "sharedQuota": "Von allen Tools gemeinsam genutzt",
-    "expiresInDays": "Noch {{count}} Tage",
-    "unlimited": "Unbegrenzt",
-    "subscriptionUnavailable": "Abonnementkontingent nicht verfügbar: {{reason}}",
-    "manageSubscription": "Abonnement verwalten",
-    "renewSubscription": "Abonnement verlängern",
-    "subscriptionInactive": "Abonnement nicht verfügbar",
-    "subscriptionLoading": "Abonnementdetails werden geladen",
-    "openSubscriptionFailed": "Die Abonnementseite konnte nicht geöffnet werden. Bitte erneut versuchen."
   },
   "omp": {
     "empty": {
@@ -5663,67 +5650,6 @@
       "legacyModelsJson": "Oh My Pi hat noch eine alte models.json, die omp beim nächsten Start nach models.yml migriert. Führen Sie omp einmal aus und fügen Sie den Anbieter dann erneut hinzu."
     }
   },
-  "clientQuota": {
-    "noLimit": "Kein Zeitfensterlimit festgelegt",
-    "title": "Kontingentstatus",
-    "available": "Verfügbar",
-    "unavailable": "Nicht verfügbar",
-    "key_missing": "Dedizierter Schlüssel fehlt",
-    "key_expired": "Schlüssel abgelaufen",
-    "key_quota_exhausted": "Schlüsselkontingent erschöpft",
-    "key_disabled": "Schlüssel deaktiviert",
-    "key_rate_limit_exhausted": "Zeitfensterkontingent des Schlüssels erschöpft",
-    "balance_insufficient": "Unzureichendes Guthaben",
-    "subscription_expired": "Abonnement abgelaufen",
-    "subscription_suspended": "Abonnement ausgesetzt",
-    "subscription_quota_exhausted": "Abonnementkontingent erschöpft",
-    "daily": "Täglich",
-    "weekly": "Wöchentlich",
-    "monthly": "Monatlich"
-  },
-  "platformCleanup": {
-    "working": "Lokale Kontodaten werden gelöscht und Sie werden abgemeldet…",
-    "signingOut": "Abmeldung läuft…",
-    "action": "Abmelden und lokale Daten dieses Kontos löschen",
-    "title": "Daten löschen und abmelden?",
-    "scope": "Entfernt den Plattformkatalog und die verwalteten Anbieter dieses Kontos in allen Apps und meldet Sie dann ab.",
-    "retained": "Andere Konten, eigene lokale Anbieter, Konten im Autorisierungscenter, der Konfigurationsverlauf und Wiederherstellungssicherungen bleiben erhalten.",
-    "partialHint": "Anbieter, die nicht sicher entfernt werden können, bleiben erhalten und werden in den Ergebnissen aufgeführt.",
-    "confirm": "Löschen und abmelden",
-    "result": "Ergebnisse der Kontobereinigung",
-    "complete": "Abgemeldet. Lokale Plattformdaten wurden gelöscht.",
-    "partial": "Abgemeldet. Einige Punkte erfordern noch Aufmerksamkeit.",
-    "providers": "Plattform-Anbieter",
-    "catalog": "Plattformkatalog",
-    "session": "Lokale Anmeldung",
-    "serverLogout": "Abmeldung bei der Plattform",
-    "done": "Abgeschlossen",
-    "failed": "Unvollständig",
-    "retryHint": "Prüfen Sie die unvollständigen Punkte. Für einen erneuten Versuch melden Sie sich wieder bei diesem Konto an, beheben die gemeldeten Probleme und führen die Bereinigung erneut aus.",
-    "scopeDetails": "Was sonst erhalten bleibt",
-    "dismiss": "Dialog schließen",
-    "providerCounts": "{{removed}} entfernt · {{skipped}} beibehalten",
-    "retainedDetails": "Serveradressen, andere Konten, eigene Anbieter, Konten im Autorisierungscenter, der Konfigurationsverlauf und Wiederherstellungssicherungen bleiben erhalten. Gemeinsam genutzte Server-API-Schlüssel werden nicht widerrufen. Beibehaltene Elemente können weiterhin Anmeldedaten enthalten."
-  },
-  "platformDeletion": {
-    "result": "Ergebnisse der Anbieterentfernung",
-    "failed": "Die Entfernung wurde nicht abgeschlossen. Schließen Sie diesen Dialog, um es erneut zu versuchen.",
-    "partial": "Einige Anbieter konnten nicht entfernt werden. Klappen Sie die Details zur Prüfung auf.",
-    "retained": "Der Plattformkatalog und die Server-API-Schlüssel bleiben erhalten. Sie können die Anbieter später erneut synchronisieren."
-  },
-  "platformDetails": {
-    "description": "Gespeicherte Gruppeninformationen und Modellfähigkeiten",
-    "tabs": "Gruppendetails",
-    "overview": "Übersicht",
-    "groupInfo": "Gruppeninformationen",
-    "expires": "Läuft ab",
-    "period": "Zeitraum",
-    "used": "Verbraucht / USD",
-    "limit": "Limit / USD",
-    "search": "Modelle nach Name oder ID suchen",
-    "modelCount": "{{shown}} von {{total}} Modellen werden angezeigt",
-    "noMatches": "Keine passenden Modelle. Versuchen Sie einen anderen Namen oder eine andere ID."
-  },
   "dsh": {
     "empty": {
       "title": "DeepSeek-Harness-Anbieter hinzufügen",
@@ -5765,6 +5691,266 @@
     "readyBodyRouting": "Jetzt installieren? CC Switch wird neu gestartet, laufende Anfragen über das lokale Routing werden abgebrochen.",
     "later": "Später",
     "installNow": "Installieren und neu starten",
-    "installFailed": "Update-Installation fehlgeschlagen"
+    "installFailed": "Update-Installation fehlgeschlagen",
+    "downloadingInline": "Neue Version wird im Hintergrund heruntergeladen…",
+    "downloadedInline": "Heruntergeladen"
+  },
+  "unreadableEntry": {
+    "title": "„{{name}}“ kann nicht gelesen werden",
+    "hint": "Möglicherweise von einer neueren CC-Switch-Version gespeichert. Die Daten bleiben unverändert erhalten und können nicht bearbeitet oder aktiviert werden; ein Update stellt sie wieder her, oder du löschst den Eintrag.",
+    "confirmTitle": "Unlesbaren Eintrag löschen",
+    "confirmMessage": "„{{name}}“ löschen? Nur dieser CC-Switch-Eintrag wird entfernt; die Konfigurationsdateien der Apps bleiben unverändert."
+  },
+  "platformCatalog": {
+    "accountIsolation": "Catalogs are stored separately by platform address and user ID. Only the currently signed-in account is shown here.",
+    "deleteAllHint": "Delete the current account’s platform providers across all Agent apps, including hidden apps. Keep platform base data and server keys.",
+    "deleteAllResult": "Deletion results for all Agent apps",
+    "deleteResultApp": "Agent app",
+    "deleteResultStatus": "Deletion result",
+    "deleteAppFailed": "Deletion failed: {{message}}",
+    "deleteProviders": "Delete all platform providers",
+    "deletingProviders": "Deleting platform providers…",
+    "deleteAction": "Platform provider deletion",
+    "deleteCompleted": "Deleted {{removed}} platform providers; kept {{skipped}}",
+    "syncAction": "Platform provider sync",
+    "syncResult": "Provider sync result",
+    "syncResultDescription": "View this sync's results, native file changes, and backup location.",
+    "deleteResultDescription": "View this deletion's results, native file changes, and backup location.",
+    "syncStats": "Providers: {{added}} added, {{updated}} updated, {{removed}} removed, {{unchanged}} unchanged",
+    "nativeChanges": "Native Agent configuration files",
+    "noNativeChanges": "No native Agent configuration was changed. Only the provider list in CCS was synchronized.",
+    "syncBackup": "Backup before sync",
+    "openBackup": "Open backup folder",
+    "copyBackupPath": "Copy backup path",
+    "noSyncBackup": "No backup directory was created for this sync.",
+    "openBackupFailed": "Unable to open backup folder",
+    "backupPathCopied": "Backup path copied",
+    "nativeChangedCount": "{{count}} native configuration files changed",
+    "noNativeChangesShort": "No native configuration files changed",
+    "syncCompleted": "Providers: {{added}} added, {{updated}} updated, {{removed}} removed; {{fileState}}. See configuration history for details.",
+    "group": "Group",
+    "actions": "Actions",
+    "groupStatus": "Group status",
+    "userId": "User ID",
+    "keyId": "Key ID",
+    "keyName": "Key name",
+    "showKey": "Show API Key",
+    "hideKey": "Hide API Key",
+    "copyKey": "Copy API Key",
+    "keyCopied": "API Key copied",
+    "copyFailed": "Unable to copy API Key. Please retry.",
+    "noKey": "No API Key is available for this group. Sync platform data again.",
+    "expandCatalog": "Expand model catalog",
+    "collapseCatalog": "Collapse model catalog",
+    "toggleModel": "Model parameters for {{name}}",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "viewDetails": "View details",
+    "viewDetailsFor": "View details for {{name}}",
+    "detailsDescription": "Group information and model parameters",
+    "groupId": "Group ID",
+    "platform": "Platform type",
+    "billing": "Billing type",
+    "source": "Platform URL",
+    "status": "Sync status",
+    "subscription": "Subscription",
+    "standard": "Pay as you go",
+    "modelCatalog": "Model catalog",
+    "noModels": "No model data available",
+    "contextWindow": "Context window",
+    "maxOutput": "Maximum output tokens",
+    "endpoints": "API protocols",
+    "inputModalities": "Input modalities",
+    "tools": "Tool calling",
+    "streaming": "Streaming output",
+    "reasoningLevels": "Reasoning levels",
+    "defaultReasoning": "Default reasoning level",
+    "notReported": "Not provided",
+    "supported": "Supported",
+    "unsupported": "Not supported",
+    "title": "Platform data",
+    "description": "Fetch groups and model catalogs from the Zhishu platform as shared data for all apps. After an update, use Connect tools to apply it to installed apps in one step, or sync each app individually.",
+    "sync": "Sync platform data",
+    "syncing": "Syncing platform data…",
+    "success": "Platform data updated. Use Connect tools to apply it, or sync each app.",
+    "partial": "Some groups could not be synced. Available data was saved; you can retry.",
+    "account": "Current account",
+    "lastSync": "Last synced",
+    "never": "Never synced",
+    "counts": "{{groups}} groups · {{models}} models",
+    "loading": "Reading local platform data…",
+    "empty": "No platform data for this account yet. Use the button above to sync.",
+    "noGroups": "This account has no groups available to sync.",
+    "models": "models",
+    "failed": "Sync failed; retry available",
+    "ready": "Synced",
+    "localHint": "Generate provider configurations using platform data already saved on this device",
+    "changes": "Added {{added}}, removed {{removed}}, skipped {{skipped}}",
+    "providersSuccess": "Platform providers synced: added {{added}}, removed {{removed}}, skipped {{skipped}}",
+    "providersSyncing": "Syncing platform providers…",
+    "providersSync": "Sync platform providers",
+    "bulkAdd": "Add all",
+    "bulkRemove": "Remove all",
+    "bulkAddHint": "Add every platform provider that is not enabled yet to the added list",
+    "bulkRemoveHint": "Remove enabled platform providers from the configuration; they stay in the available list",
+    "bulkAddStackHint": "Add all platform providers to the stack member list",
+    "bulkRemoveStackHint": "Remove platform providers from the stack member list",
+    "bulkAddDone": "Added {{count}} platform providers",
+    "bulkRemoveDone": "Removed {{count}} platform providers",
+    "bulkPartial": "{{success}} succeeded, {{failed}} failed"
+  },
+  "platformOnboarding": {
+    "title": "Connect tools",
+    "description": "Choose the apps and access mode. Mode apps can use direct, route, or stack; additive apps add every platform provider. Existing providers stay in the list so you can switch back at any time.",
+    "button": "Connect tools",
+    "buttonHint": "Pick apps and access mode, then create and connect their platform providers in one step",
+    "detecting": "Detecting installed tools…",
+    "loadingCatalog": "Reading platform data…",
+    "detectFailed": "Could not detect installations. Select the apps to connect manually.",
+    "installed": "Installed",
+    "notInstalled": "Not installed",
+    "noApps": "No supported apps are visible. Show at least one supported tool on the Apps page first.",
+    "noCatalog": "This account has no groups to sync. Sync platform data first.",
+    "groupsAvailable": "{{count}} groups available",
+    "selectAll": "Select all",
+    "clearAll": "Clear",
+    "confirm": "Connect selected apps",
+    "later": "Later",
+    "provisioning": "Connecting…",
+    "warning": "Connecting rewrites the current provider configuration of the selected tools.",
+    "resultTitle": "Connection results",
+    "resultSummary": "Connected {{success}} app(s); {{failed}} failed",
+    "resultSuccess": "Connected: {{provider}}",
+    "resultFailed": "Failed: {{message}}",
+    "noProvider": "No platform model is available for this app",
+    "done": "Done",
+    "retry": "Retry failed",
+    "modeLabel": "Access mode for {{name}}",
+    "mode": {
+      "direct": "Direct",
+      "route": "Route",
+      "stack": "Stack"
+    },
+    "additiveMode": "Added to provider list",
+    "modeHint": "Mode apps can use direct or route; Claude, Codex, and Claude Desktop also support stack. Additive apps add every platform provider.",
+    "resultDirect": "Direct configuration written: {{provider}}",
+    "resultRoute": "Route switched: {{provider}}",
+    "resultStack": "Added to stack: {{provider}} ({{count}} platform providers)",
+    "resultAdditive": "Added to provider list: {{count}} platform providers",
+    "defaultModelHint": "The default model was not changed automatically; select this provider's model in the tool.",
+    "groupLabel": "Group for {{name}}",
+    "groupOption": "{{name}} ({{count}} models)",
+    "groupLoading": "Reading groups…",
+    "noGroupsForApp": "No group is available for this app",
+    "stackDefaultHint": "Stack adds every platform provider for this app; the selected group is the default."
+  },
+  "simpleMode": {
+    "navApps": "Apps",
+    "title": "Apps",
+    "description": "Pick a provider for each tool. \"Zhishu Platform\" models sync with your account automatically.",
+    "notConnected": "Not connected",
+    "connected": "Connected",
+    "inactiveHint": "Platform models not in use",
+    "emptyProvidersHint": "No platform providers for this app yet. Turn on the switch on the Apps page to connect.",
+    "switchOnLabel": "Connect {{name}} to platform providers",
+    "switchOffLabel": "Remove platform providers of {{name}}",
+    "toSimple": "Simple mode",
+    "toAdvanced": "Advanced mode"
+  },
+  "platformAuth": {
+    "title": "Sign in to 智枢router",
+    "subtitle": "Sign in with your platform account to manage AI coding tools.",
+    "address": "Platform API address",
+    "loading": "Checking your session…",
+    "back": "Back to sign in",
+    "logout": "Sign out of platform",
+    "account": "Platform account",
+    "balance": "Balance",
+    "refreshBalance": "Click to refresh balance",
+    "sessionHint": "Stay signed in across restarts. Sign in again after more than 7 days without use.",
+    "restoreFailed": "Unable to restore your session",
+    "restoreHint": "Check your connection or unlock your system credential store, then retry. Your saved session is kept.",
+    "retryRestore": "Retry restoring session",
+    "oauthLogin": "Sign in to Zhishu",
+    "oauthHint": "A Zhishu authorization page will open in your browser. Sign-in completes automatically after you approve.",
+    "oauthWaiting": "Waiting for browser authorization…",
+    "oauthCancel": "Cancel authorization",
+    "advanced": "Advanced settings",
+    "oauthUnavailable": "OAuth2 browser authorization is unavailable. Check the server address or contact your administrator.",
+    "retryConfig": "Check sign-in settings again"
+  },
+  "platformUsage": {
+    "accountBalance": "Account balance",
+    "sharedBalance": "Shared by all usage-based groups",
+    "sharedQuota": "Shared across tools",
+    "expiresInDays": "{{count}} days left",
+    "unlimited": "Unlimited",
+    "subscriptionUnavailable": "Subscription quota unavailable: {{reason}}",
+    "manageSubscription": "Manage subscription",
+    "renewSubscription": "Renew subscription",
+    "subscriptionInactive": "Subscription unavailable",
+    "subscriptionLoading": "Loading subscription details",
+    "openSubscriptionFailed": "Unable to open the subscription page. Please try again."
+  },
+  "clientQuota": {
+    "noLimit": "No window limit set",
+    "title": "Quota status",
+    "available": "Available",
+    "unavailable": "Unavailable",
+    "key_missing": "Dedicated key missing",
+    "key_expired": "Key expired",
+    "key_quota_exhausted": "Key quota exhausted",
+    "key_disabled": "Key disabled",
+    "key_rate_limit_exhausted": "Key window quota exhausted",
+    "balance_insufficient": "Insufficient balance",
+    "subscription_expired": "Subscription expired",
+    "subscription_suspended": "Subscription suspended",
+    "subscription_quota_exhausted": "Subscription quota exhausted",
+    "daily": "Daily",
+    "weekly": "Weekly",
+    "monthly": "Monthly"
+  },
+  "platformCleanup": {
+    "working": "Clearing local account data and signing out…",
+    "signingOut": "Signing out…",
+    "action": "Sign out and clear this account’s local data",
+    "title": "Clear data and sign out?",
+    "scope": "Remove this account’s platform catalog and managed providers across all apps, then sign out.",
+    "retained": "Other accounts, custom local providers, Authorization Center accounts, configuration history and restore backups are kept.",
+    "partialHint": "Providers that cannot be safely removed are kept and listed in the results.",
+    "confirm": "Clear and sign out",
+    "result": "Account cleanup results",
+    "complete": "Signed out. Local platform data has been cleared.",
+    "partial": "Signed out. Some items still need attention.",
+    "providers": "Platform providers",
+    "catalog": "Platform catalog",
+    "session": "Local sign-in",
+    "serverLogout": "Platform sign-out",
+    "done": "Completed",
+    "failed": "Incomplete",
+    "retryHint": "Review the incomplete items. To retry, sign in to this account again, address the reported issues, then run cleanup again.",
+    "scopeDetails": "What else is kept",
+    "dismiss": "Dismiss dialog",
+    "providerCounts": "{{removed}} removed · {{skipped}} kept",
+    "retainedDetails": "Server addresses, other accounts, custom providers, Auth Center accounts, configuration history and recovery backups are kept. Shared server API keys are not revoked. Retained items may still contain credentials."
+  },
+  "platformDeletion": {
+    "result": "Provider removal results",
+    "failed": "Removal did not finish. Close this dialog to retry.",
+    "partial": "Some providers could not be removed. Expand the details to review.",
+    "retained": "The platform catalog and server API keys are kept. You can sync providers again later."
+  },
+  "platformDetails": {
+    "description": "Saved group information and model capabilities",
+    "tabs": "Group details",
+    "overview": "Overview",
+    "groupInfo": "Group information",
+    "expires": "Expires",
+    "period": "Period",
+    "used": "Used / USD",
+    "limit": "Limit / USD",
+    "search": "Search models by name or ID",
+    "modelCount": "Showing {{shown}} of {{total}} models",
+    "noMatches": "No matching models. Try another name or ID."
   }
 }

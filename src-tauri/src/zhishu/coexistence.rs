@@ -264,7 +264,7 @@ mod tests {
         let native = tmp.path().join("config.toml");
         std::fs::write(&native, "model = 'ours'").unwrap();
         assert!(!unchanged(&store, "fixture"));
-        record(&store, "fixture", &[native.clone()]).unwrap();
+        record(&store, "fixture", std::slice::from_ref(&native)).unwrap();
         assert!(unchanged(&store, "fixture"));
         std::fs::write(&native, "model = 'external'").unwrap();
         assert!(!unchanged(&store, "fixture"));

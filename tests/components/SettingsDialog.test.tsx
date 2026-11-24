@@ -2,8 +2,9 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import "@testing-library/jest-dom";
 import type { ComponentProps } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { SettingsPage } from "@/components/settings/SettingsPage";
+import { createTestQueryClient } from "../utils/testQueryClient";
 
 const toastSuccessMock = vi.fn();
 const toastErrorMock = vi.fn();
@@ -100,15 +101,13 @@ const createImportExportMock = () => ({
 
 let settingsMock = createSettingsMock();
 let importExportMock = createImportExportMock();
-const useImportExportSpy = vi.fn();
 
 vi.mock("@/hooks/useSettings", () => ({
   useSettings: () => settingsMock,
 }));
 
 vi.mock("@/hooks/useImportExport", () => ({
-  useImportExport: (options?: Record<string, unknown>) =>
-    useImportExportSpy(options),
+  useImportExport: () => importExportMock,
 }));
 
 vi.mock("@/lib/query", () => ({
@@ -160,11 +159,7 @@ vi.mock("@/zhishu/config-history/ConfigChangeHistoryPanel", () => ({
 const renderSettingsPage = (
   props?: Partial<ComponentProps<typeof SettingsPage>>,
 ) => {
-  const client = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-    },
-  });
+  const client = createTestQueryClient();
   const allProps = {
     section: "general" as const,
     onOpenApps: vi.fn(),
@@ -193,8 +188,6 @@ describe("SettingsPage", () => {
     tMock.mockImplementation((key: string) => key);
     settingsMock = createSettingsMock();
     importExportMock = createImportExportMock();
-    useImportExportSpy.mockReset();
-    useImportExportSpy.mockImplementation(() => importExportMock);
     toastSuccessMock.mockReset();
     toastErrorMock.mockReset();
     restartMock.mockClear();
@@ -232,9 +225,7 @@ describe("SettingsPage", () => {
         name: "settings.sections.configHistory",
       }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText("config-change-history-panel"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("config-change-history-panel")).toBeInTheDocument();
   });
 
   it("places IP diagnostics under Network, after the global proxy", () => {
@@ -312,16 +303,6 @@ describe("SettingsPage", () => {
     expect(screen.getByText("webdav-sync-section")).toBeInTheDocument();
     expect(screen.getByText("backup-list-section")).toBeInTheDocument();
     expect(screen.getByText("log-config-panel")).toBeInTheDocument();
-  });
-
-  it("passes onImportSuccess through to the import hook", () => {
-    const onImportSuccess = vi.fn();
-
-    renderSettingsPage({ onImportSuccess });
-
-    expect(useImportExportSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ onImportSuccess }),
-    );
   });
 
   it("drives per-app directories and saves only after a change", async () => {

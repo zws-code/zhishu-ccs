@@ -110,7 +110,7 @@ pub(crate) fn delete_account_providers(
     origin: &str,
     user_id: i64,
 ) -> Result<PlatformDeleteSummary, PlatformAuthError> {
-    let providers = local_error(state.db.get_all_providers(app.as_str()))?;
+    let providers = local_error(state.db.get_all_providers(app))?;
     let targets: Vec<_> = providers
         .values()
         .filter(|provider| {

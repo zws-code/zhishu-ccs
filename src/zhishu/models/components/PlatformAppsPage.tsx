@@ -41,8 +41,12 @@ import {
   type PlatformGroupSelectionData,
   type PlatformProvisionOutcome,
 } from "@/zhishu/models/platformProvision";
-import { DEFAULT_VISIBLE_APPS, orderAppIds } from "@/config/appConfig";
-import { appHas } from "@/config/appSpecs";
+import {
+  DEFAULT_VISIBLE_APPS,
+  isModeAppId,
+  isStackAppId,
+  orderAppIds,
+} from "@/config/appConfig";
 import type { AppMode, AppModeView } from "@/types/proxy";
 
 const APP_CONNECTION_STATUS = {
@@ -185,7 +189,7 @@ function PlatformAppRow({
   const connected = Object.keys(managed).length > 0;
 
   // 行内选择；用户没动过就按推荐默认值（当前模式 / 当前生效托管分组）。
-  const isModeApp = appHas(app, "routeMode");
+  const isModeApp = isModeAppId(app);
   const [selectedMode, setSelectedMode] = useState<AppMode>();
   const [selectedGroup, setSelectedGroup] = useState<number>();
   const modeQuery = useQuery({
@@ -214,7 +218,7 @@ function PlatformAppRow({
   const groupId = pickPlatformGroupId(selectedGroup, groupQuery.data, modeView);
   const groupOptions: PlatformGroupSelectionData["options"] =
     groupQuery.data?.options ?? [];
-  const appModes: AppMode[] = appHas(app, "stack")
+  const appModes: AppMode[] = isStackAppId(app)
     ? ["direct", "route", "stack"]
     : ["direct", "route"];
   // 模式应用要等分组选项可用；累加式应用没有分组概念

@@ -84,7 +84,7 @@ fn capture(
         files.insert(path, digest(bytes.as_deref()));
     }
     let mut providers = BTreeMap::new();
-    for provider in local_error(state.db.get_all_providers(app.as_str()))?.into_values() {
+    for provider in local_error(state.db.get_all_providers(app))?.into_values() {
         if !provider
             .meta
             .as_ref()

@@ -1,7 +1,10 @@
 import React from "react";
 import type { AppId } from "@/lib/api/types";
 import type { VisibleApps } from "@/types";
-import { APP_IDS } from "./appSpecs";
+import { APP_IDS, APP_IDS_WITH, ROUTE_MODE_APP_IDS, appHas } from "./appSpecs";
+export { APP_IDS } from "./appSpecs";
+import type { AppIdWith } from "./appSpecs";
+type PiFamilyAppId = AppIdWith<"piFamily">;
 import {
   ClaudeIcon,
   CodexIcon,
@@ -43,6 +46,33 @@ export function orderAppIds(saved: readonly string[] | undefined): AppId[] {
   });
   return ordered;
 }
+
+/** Compatibility exports for Zhishu adapters, derived from upstream's capability table. */
+export const SKILLS_APP_IDS = APP_IDS_WITH.skills;
+export type ProxyAppId = AppIdWith<"localProxy">;
+export const PROXY_APP_IDS = APP_IDS_WITH.localProxy;
+export const isProxyAppId = (app: string): app is ProxyAppId =>
+  appHas(app, "localProxy");
+export type ModeAppId = AppIdWith<"routeMode">;
+export const MODE_APP_IDS = ROUTE_MODE_APP_IDS;
+export const isModeAppId = (app: string): app is ModeAppId =>
+  appHas(app, "routeMode");
+export type StackAppId = AppIdWith<"stack">;
+export const STACK_APP_IDS = APP_IDS_WITH.stack;
+export const isStackAppId = (app: string): app is StackAppId =>
+  appHas(app, "stack");
+export type AdditiveAppId = AppIdWith<"additive">;
+export const ADDITIVE_APP_IDS = APP_IDS_WITH.additive;
+export const isAdditiveAppId = (app: string): app is AdditiveAppId =>
+  appHas(app, "additive");
+export const PI_FAMILY_APP_IDS = APP_IDS_WITH.piFamily;
+export const isPiFamilyApp = (app: string): app is PiFamilyAppId =>
+  appHas(app, "piFamily");
+export const EDITOR_VIEW_APP_IDS = APP_IDS_WITH.editorView;
+export const usesEditorView = (app: AppId) => appHas(app, "editorView");
+export type McpAppId = AppIdWith<"mcp">;
+export const MCP_APP_IDS = APP_IDS_WITH.mcp;
+export const isMcpAppId = (app: string): app is McpAppId => appHas(app, "mcp");
 
 export function usesGeminiStyleForm(appId: string): boolean {
   return appId === "gemini" || appId === "agy";
@@ -163,14 +193,6 @@ export const APP_ICON_MAP: Record<AppId, AppConfig> = {
     badgeClass:
       "bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300 hover:bg-fuchsia-500/20 border-0 gap-1.5",
   },
-  workbuddy: {
-    label: "WorkBuddy",
-    icon: <ProviderIcon icon="workbuddy" name="WorkBuddy" size={14} />,
-    activeClass:
-      "bg-teal-500/10 ring-1 ring-teal-500/20 hover:bg-teal-500/20 text-teal-600 dark:text-teal-400",
-    badgeClass:
-      "bg-teal-500/10 text-teal-700 dark:text-teal-300 hover:bg-teal-500/20 border-0 gap-1.5",
-  },
   agy: {
     label: "Antigravity",
     icon: (
@@ -185,6 +207,21 @@ export const APP_ICON_MAP: Record<AppId, AppConfig> = {
       "bg-sky-500/10 ring-1 ring-sky-500/20 hover:bg-sky-500/20 text-sky-700 dark:text-sky-300",
     badgeClass:
       "bg-sky-500/10 text-sky-700 dark:text-sky-300 hover:bg-sky-500/20 border-0 gap-1.5",
+  },
+  workbuddy: {
+    label: "WorkBuddy",
+    icon: (
+      <ProviderIcon
+        icon="tencent"
+        name="WorkBuddy"
+        size={14}
+        showFallback={false}
+      />
+    ),
+    activeClass:
+      "bg-blue-500/10 ring-1 ring-blue-500/20 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400",
+    badgeClass:
+      "bg-blue-500/10 text-blue-700 dark:text-blue-300 hover:bg-blue-500/20 border-0 gap-1.5",
   },
   omp: {
     label: "Oh My Pi",

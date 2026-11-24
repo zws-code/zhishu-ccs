@@ -19,7 +19,7 @@ import {
   type ConfigOperationSummary,
 } from "@/zhishu/config-history/api/configHistory";
 import { APP_DISPLAY_NAME, AppGlyph } from "@/components/shell/AppGlyph";
-import { APP_IDS } from "@/config/appSpecs";
+import { APP_IDS } from "@/config/appConfig";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

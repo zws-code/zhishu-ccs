@@ -6,7 +6,7 @@ import i18n from "i18next";
 import { http, HttpResponse } from "msw";
 import { server } from "../../msw/server";
 import { emitTauriEvent } from "../../msw/tauriMocks";
-import { APP_IDS } from "@/config/appSpecs";
+import { APP_IDS } from "@/config/appConfig";
 import { AppConfigHistoryButton } from "@/zhishu/config-history/AppConfigHistoryButton";
 import {
   ConfigChangeHistoryPanel,

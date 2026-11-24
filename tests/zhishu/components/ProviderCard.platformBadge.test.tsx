@@ -26,7 +26,9 @@ vi.mock("@/zhishu/models/query/platformCatalog", () => ({
   usePlatformCatalog: () => ({ data: catalogState.value }),
 }));
 
-function platformCatalog(overrides?: Partial<PlatformCatalog>): PlatformCatalog {
+function platformCatalog(
+  overrides?: Partial<PlatformCatalog>,
+): PlatformCatalog {
   return {
     baseUrl: "https://platform.example.com",
     userId: 1,
@@ -126,7 +128,10 @@ describe("ProviderCard platform model count", () => {
 
   it("does not show a count when the group failed to sync", () => {
     catalogState.value = platformCatalog({
-      groups: [platformCatalog().groups[0]!, { ...platformCatalog().groups[0]!, id: 8, failed: true, models: [] }],
+      groups: [
+        platformCatalog().groups[0]!,
+        { ...platformCatalog().groups[0]!, id: 8, failed: true, models: [] },
+      ],
     });
     renderCard({ ...managed, groupId: 8 });
 

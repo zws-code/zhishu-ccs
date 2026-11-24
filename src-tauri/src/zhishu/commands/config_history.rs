@@ -74,9 +74,9 @@ fn restore_group(
                     // The provider the switch started from may have been
                     // deleted since (e.g. 一键删除平台供应商); selecting a
                     // missing row would leave files and selection inconsistent.
-                    if state.db.get_provider_by_id(from, &plan.app)?.is_some() {
+                    if state.db.get_provider_by_id(from, &app_type)?.is_some() {
                         crate::settings::set_current_provider(&app_type, Some(from))?;
-                        state.db.set_current_provider(&plan.app, from)?;
+                        state.db.set_current_provider(&app_type, from)?;
                         pointer_restored = true;
                     }
                 }
@@ -86,7 +86,7 @@ fn restore_group(
                     // clear form, and an empty id matches no provider row, so
                     // this only zeroes `is_current` for the app.
                     crate::settings::set_current_provider(&app_type, None)?;
-                    state.db.set_current_provider(&plan.app, "")?;
+                    state.db.set_current_provider(&app_type, "")?;
                     pointer_restored = true;
                 }
             }

@@ -57,8 +57,12 @@ import {
   usePlatformAppInstalls,
   type PlatformProvisionOutcome,
 } from "@/zhishu/models/platformProvision";
-import { DEFAULT_VISIBLE_APPS, orderAppIds } from "@/config/appConfig";
-import { appHas } from "@/config/appSpecs";
+import {
+  DEFAULT_VISIBLE_APPS,
+  isModeAppId,
+  isStackAppId,
+  orderAppIds,
+} from "@/config/appConfig";
 import type { Settings, VisibleApps } from "@/types";
 import type { AppMode } from "@/types/proxy";
 
@@ -188,7 +192,7 @@ function PlatformOnboardingDialog({
 
   // 模式应用先读当前模式作为默认值；累加式应用没有直连/路由/聚合的概念。
   const modeApps = useMemo<AppId[]>(
-    () => apps.filter((app) => appHas(app, "routeMode")),
+    () => apps.filter((app) => isModeAppId(app)),
     [apps],
   );
   const modeQueries = useQueries({
@@ -350,13 +354,13 @@ function PlatformOnboardingDialog({
   // 当前模式还没读回来时先不让确认，避免把路由/聚合中的应用误按直连接入。
   const modesLoading = selectedApps.some(
     (app) =>
-      appHas(app, "routeMode") &&
+      isModeAppId(app) &&
       modeQueries[modeApps.indexOf(app)]?.isLoading === true,
   );
   // 模式应用都要有可用的分组选项；累加式应用不选分组，直接加入全部平台供应商。
   const groupsReady = selectedApps.every(
     (app) =>
-      !appHas(app, "routeMode") ||
+      !isModeAppId(app) ||
       (groupQueryFor(app)?.isLoading !== true &&
         groupOptionsFor(app).length > 0),
   );
@@ -542,7 +546,7 @@ function PlatformOnboardingDialog({
                       const installed = detection.isSuccess
                         ? (detection.data?.has(app) ?? false)
                         : null;
-                      const appModes: AppMode[] = appHas(app, "stack")
+                      const appModes: AppMode[] = isStackAppId(app)
                         ? ["direct", "route", "stack"]
                         : ["direct", "route"];
                       const groupOptions = groupOptionsFor(app);
@@ -573,7 +577,7 @@ function PlatformOnboardingDialog({
                               </span>
                             )}
                           </div>
-                          {appHas(app, "routeMode") ? (
+                          {isModeAppId(app) ? (
                             <div className="flex flex-wrap items-center gap-2">
                               <Select
                                 value={

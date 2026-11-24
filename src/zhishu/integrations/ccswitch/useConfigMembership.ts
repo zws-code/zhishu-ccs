@@ -6,7 +6,7 @@ import { providersApi } from "@/lib/api/providers";
 import { useOpenClawLiveProviderIds } from "@/hooks/useOpenClaw";
 import { useHermesLiveProviderIds } from "@/hooks/useHermes";
 import { usePiCurrentState } from "@/lib/query/pi";
-import { appHas } from "@/config/appSpecs";
+import { isPiFamilyApp } from "@/config/appConfig";
 
 /**
  * 共存式应用里「这家在不在已添加列表」的统一判断：OpenCode / OpenClaw / Hermes 读各自的
@@ -39,7 +39,7 @@ export function useConfigMembership(appId: AppId, enabled = true) {
     isSuccess: isPiCurrentStateSuccess,
     isPending: isPiCurrentStatePending,
   } = usePiCurrentState(
-    enabled && appHas(appId, "piFamily"),
+    enabled && isPiFamilyApp(appId),
     appId === "omp" ? "omp" : "pi",
   );
   // 列表和批量按钮会反复判断成员；原生状态变化时建立索引，避免每张卡片都线性扫描 ID 数组。
@@ -90,7 +90,7 @@ export function useConfigMembership(appId: AppId, enabled = true) {
     ((appId === "opencode" && isOpencodeLiveIdsPending) ||
       (appId === "openclaw" && isOpenclawLiveIdsPending) ||
       (appId === "hermes" && isHermesLiveIdsPending) ||
-      (appHas(appId, "piFamily") && isPiCurrentStatePending));
+      (isPiFamilyApp(appId) && isPiCurrentStatePending));
 
   // A failed read is not an empty membership list: bulk writes require a successful snapshot.
   const isReady =

@@ -325,10 +325,7 @@ describe("platform apps page", () => {
       expect(platformModelsApi.sync).toHaveBeenCalledWith("claude"),
     );
     await waitFor(() =>
-      expect(providersApi.switch).toHaveBeenCalledWith(
-        "platform-42",
-        "claude",
-      ),
+      expect(providersApi.switch).toHaveBeenCalledWith("platform-42", "claude"),
     );
     expect(proxyApi.setProxyTakeoverForApp).toHaveBeenCalledWith(
       "claude",

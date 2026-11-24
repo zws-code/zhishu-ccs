@@ -9,7 +9,7 @@ import { providersApi } from "@/lib/api/providers";
 import { proxyApi } from "@/lib/api/proxy";
 import { usePlatformAuth } from "@/zhishu/auth/PlatformAuthContext";
 import { usePlatformOperationScope } from "@/zhishu/auth/usePlatformOperationScope";
-import { appHas } from "@/config/appSpecs";
+import { isAdditiveAppId, isStackAppId } from "@/config/appConfig";
 import { useConfigMembership } from "@/zhishu/integrations/ccswitch/useConfigMembership";
 import { refreshPlatformProviders } from "@/zhishu/integrations/ccswitch/platformProviders";
 import { useProxyStack } from "@/lib/query/proxy";
@@ -38,11 +38,11 @@ export function PlatformBulkSyncButtons({
   const auth = usePlatformAuth();
   const account = auth?.account;
   const captureScope = usePlatformOperationScope(account, `${app}:${modeView}`);
-  const inStackView = modeView === "stack" && appHas(app, "stack");
+  const inStackView = modeView === "stack" && isStackAppId(app);
   const applies =
     Boolean(account) &&
     PLATFORM_SYNC_APPS.has(app) &&
-    (appHas(app, "additive") || inStackView);
+    (isAdditiveAppId(app) || inStackView);
 
   // 跨账号残留的托管行不属于当前账户，不参与批量添加 / 移除
   const platformProviders = useMemo(
@@ -62,7 +62,7 @@ export function PlatformBulkSyncButtons({
 
   const { isInConfig, isReady: membershipReady } = useConfigMembership(
     app,
-    active && appHas(app, "additive"),
+    active && isAdditiveAppId(app),
   );
   const { data: stack, isSuccess: stackSuccess } = useProxyStack(
     app,
@@ -78,7 +78,7 @@ export function PlatformBulkSyncButtons({
   const { addTargets, removeTargets } = useMemo(() => {
     const addTargets: Provider[] = [];
     const removeTargets: Provider[] = [];
-    if ((!appHas(app, "additive") || membershipReady) && stackReady) {
+    if ((!isAdditiveAppId(app) || membershipReady) && stackReady) {
       for (const provider of platformProviders) {
         const included = inStackView
           ? memberIds.has(provider.id)
@@ -110,7 +110,7 @@ export function PlatformBulkSyncButtons({
       for (const provider of targets) {
         if (!isCurrent()) return null;
         try {
-          if (appHas(app, "additive")) {
+          if (isAdditiveAppId(app)) {
             if (action === "add") {
               // Kimi 的「添加」只写 config.toml、不动默认模型，和「切换」是两条路
               if (app === "kimi") {
