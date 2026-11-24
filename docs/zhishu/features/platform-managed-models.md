@@ -97,7 +97,7 @@ DeepSeek Harness (`dsh`) 复用上游的增量 Provider 和原生 profile 适配
 
 当前平台同步白名单为 `claude`、`claude-desktop`、`codex`、`gemini`、`grokbuild`、`opencode`、`openclaw`、`hermes`、`pi`、`workbuddy`、`mcode`、`kimi`、`dsh`；`agy` 未接入平台同步。白名单不代表 MCP、Skills、路由和聚合模式全部支持。
 
-WorkBuddy 自 v4.0.33 起使用上游实现（`src-tauri/src/workbuddy_config.rs`）。平台适配器只生成上游格式的供应商配置：`vendor` 为“智枢平台”，`url` 为 `<连接根>/v1/chat/completions`，`apiKey` 为分组 Key，`models` 只含 OpenAI Chat Completions 模型及其能力字段；写入、删除、启用都经上游 `ProviderService` → `workbuddy_config`，条目以 `ccSwitchProviderId` 标记归属，数据目录遵循 `WORKBUDDY_CONFIG_DIR` → `~/.workbuddy`，无归属条目与 `availableModels` 白名单按上游规则保留。同一模型 ID 只能属于一张 WorkBuddy 卡，含同名模型的第二个平台分组在启用时会被上游拒绝。
+WorkBuddy 自 v4.0.33 起使用上游实现（`src-tauri/src/workbuddy_config.rs`）。平台适配器只生成上游格式的供应商配置：`vendor` 为“智枢平台”，`url` 为 `<连接根>/v1/chat/completions`，`apiKey` 为分组 Key，`models` 只含 OpenAI Chat Completions 模型及其能力字段；写入、删除、启用都经上游 `ProviderService` → `workbuddy_config`，条目以 `zhishuCcsProviderId` 标记归属（智枢共存补丁，原版 CC Switch 的 `ccSwitchProviderId` 条目不接管），数据目录遵循设置页目录覆盖 → `WORKBUDDY_CONFIG_DIR` → `~/.workbuddy`，无归属条目与 `availableModels` 白名单按上游规则保留。同步时会把旧版智枢（0.0.x）写入、无归属标记但 `url`/`apiKey` 与当前账号平台供应商一致的条目认领为智枢条目（`workbuddy_migration.rs`），用户自建条目不动。同一模型 ID 只能属于一张 WorkBuddy 卡，含同名模型的第二个平台分组在启用时会被上游拒绝。
 
 | 范围 | 当前代码 |
 | --- | --- |

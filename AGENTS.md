@@ -27,7 +27,7 @@
 - 技术栈：Tauri 2、React 18、TypeScript、Vite 7、Tailwind CSS、TanStack Query 5；后端使用 Rust、Tokio、Serde、SQLite/rusqlite。
 - 上游继承能力包括供应商管理、CLI 配置适配、MCP、Skills、提示词、会话及本地代理；这些主干在本分支也有修改，不能直接用上游文件覆盖。
 - 本项目新增的平台 OAuth2 登录、会话恢复、平台基础数据、供应商同步和订阅额度，主要位于前后端的 `platform*` 模块；它们与授权中心的 Codex/Copilot/xAI OAuth 是不同链路。
-- WorkBuddy 自 v4.0.33 起使用上游原生实现（默认显示），二开 WorkBuddy 代码已整体删除；平台供应商同步经上游 `workbuddy_config` 写入，有回归用例。上游 4.0.22 的 DeepSeek Harness 原生适配已接入平台供应商同步；代码支持不等于目标工具的真实运行验收。
+- WorkBuddy 使用上游原生实现（默认显示），二开 WorkBuddy 代码已整体删除，上游实现带归属字段与目录覆盖两处共存补丁；平台供应商同步经上游 `workbuddy_config` 写入，并认领旧版智枢写入的未标记平台条目，有回归用例。上游 4.0.22 的 DeepSeek Harness 原生适配已接入平台供应商同步；代码支持不等于目标工具的真实运行验收。
 - 登录或会话恢复成功后只自动拉取一次「平台基础数据」快照，不改写供应商列表；接入由用户在「接入到工具」向导中确认：模式应用可选直连、路由或聚合（聚合仅 Claude、Codex、Claude Desktop），累加式应用加入供应商列表。也可在各应用手动同步供应商列表。本地同步不检测外部修改，也不做覆盖确认。
 - 应用可见性、MCP、Skills、增量供应商、路由和 Stack 模式使用不同白名单，见 `src/config/appSpecs.ts` 的 `APP_SPECS`/`appHas()`（上游 v4.0.33 起统一能力表）、`src/config/appConfig.tsx` 及后端 `AppType::spec()`；不要以出现在应用列表中推断所有功能均支持。
 - README、CONTRIBUTING 和部分功能文档可能滞后；登录后只刷新平台基础数据快照，接入由用户确认的向导或手动同步完成。当前切换式应用采用关键字段投影，不应照旧说明恢复整份配置回填。
@@ -49,7 +49,7 @@
 - `src-tauri/src/zhishu/services/platform_auth.rs`：平台认证与刷新；`src-tauri/src/zhishu/storage/` 中的 `platform_session.rs`、`platform_storage.rs` 负责七天闲置、系统凭据库和设备路径；`src-tauri/src/zhishu/services/platform_http_log.rs` 负责 HTTP 脱敏诊断。
 - `src-tauri/src/zhishu/services/platform_models/mod.rs`：平台/本地两阶段同步；同目录 `base_data.rs` 存取账号快照，`catalog.rs` 解析模型能力，`connection.rs` 调和模型目录，`sync_report.rs` 生成同步报告。工具格式适配位于 `src-tauri/src/zhishu/integrations/ccswitch/platform_models.rs`；清理退出编排位于 `src-tauri/src/zhishu/services/platform_cleanup.rs`。
 - `src-tauri/src/zhishu/storage/config_history.rs`、`src-tauri/src/zhishu/commands/config_history.rs`：配置修改记录、内部写入指纹、同步操作报告、备份定位及文件还原；前端入口见 `src/zhishu/config-history/ConfigChangeHistoryPanel.tsx`。
-- `src-tauri/src/workbuddy_config.rs`（上游）：WorkBuddy `models.json` 读写与归属；账号与额度见上游 `services/workbuddy_account/`、前端 `src/components/providers/forms/WorkBuddyProviderForm.tsx`。平台同步的 WorkBuddy 格式在 `src-tauri/src/zhishu/integrations/ccswitch/platform_models.rs`。
+- `src-tauri/src/workbuddy_config.rs`（上游）：WorkBuddy `models.json` 读写与归属，带两处智枢共存补丁（归属字段 `zhishuCcsProviderId`、`data_dir()` 先读设置页目录覆盖）；账号与额度见上游 `services/workbuddy_account/`、前端 `src/components/providers/forms/WorkBuddyProviderForm.tsx`。二开 `workbuddy.rs`、`workbuddy_config.rs` 与 `src/zhishu/tools/workbuddy/` 已删除。平台同步的 WorkBuddy 格式在 `src-tauri/src/zhishu/integrations/ccswitch/platform_models.rs`，旧版智枢未标记平台条目的认领在同目录 `workbuddy_migration.rs`。
 - `tests/`、`src-tauri/tests/`：前端测试及 Rust 集成/金标测试；Rust 单元测试也与源码同文件。
 
 ## 3. 常用命令
@@ -57,7 +57,7 @@
 命令定义已核对 `package.json`、`CONTRIBUTING.md`、[打包发布文档](docs/zhishu/releases/README.md)和 `.github/workflows/ci.yml`；入口存在不代表每次执行均已通过。
 
 - pnpm 版本以 `package.json` 的 `packageManager` 为准；Rust 工具链以 `rust-toolchain.toml` 为准，当前为 1.95。
-- 仓库没有 `lint`/ESLint 脚本；前端检查使用 TypeScript 和 Prettier，后者仅覆盖 `src/`。
+- 仓库没有 `lint`/ESLint 脚本；前端检查使用 TypeScript 和 Prettier，后者覆盖 `src/` 和 `tests/`。
 
 | 用途 | 从仓库根目录执行 |
 | --- | --- |
@@ -101,7 +101,7 @@
 - Codex：默认 `~/.codex/config.toml` 和 `auth.json`；供应商行使用 `{ auth, config }`，其中 `config` 是 TOML 字符串。
 - Codex 当前第三方路由投影到智枢独立的 `[model_providers.zhishu]`，Key 写入 `experimental_bearer_token`；上游 4.0.28 起有 ChatGPT 登录时路由/聚合改写为内置 openai 形态（不写选路、顶层 `openai_base_url` 指本地代理），无登录、统一历史开启或行内含内置表达不了的客户端设置时仍写智枢表，任何路径不写 `custom` 表。旧 `custom` 输入仍可解析，但原版表不自动清理，历史桶不批量改写。派生目录为 `zhishu-ccs-model-catalog.json`（上游 4.0.28 起绝对配置目录写绝对指针）；迁移、后台归属和共存边界见 [ADR-0009](docs/zhishu/adr/ADR-0009-product-coexistence.md) 与[共存说明](docs/zhishu/development/coexistence.md)。不要退回仅向 `auth.json.OPENAI_API_KEY` 写 Key 的旧方案。
 - Gemini：默认 `~/.gemini/.env` 和 `settings.json`；行结构为 `{ env, config }`，关注 `GEMINI_API_KEY`、`GOOGLE_GEMINI_BASE_URL`、`security.auth.selectedType`、`model.name`。
-- WorkBuddy（上游实现）：通过 `workbuddy_config::data_dir()` / `config_path()` 解析 `WORKBUDDY_CONFIG_DIR` 和默认 `~/.workbuddy`（无设置页目录覆盖），写入 `models.json`；兼容模型数组和含 `models` 数组的对象，条目用 `ccSwitchProviderId` 标记归属，无归属条目与 `availableModels` 白名单按上游规则保留；同一模型 ID 只能属于一张卡。平台 WorkBuddy 行的 `url` 是完整 `/chat/completions` 地址。
+- WorkBuddy（上游实现 + 共存补丁）：`workbuddy_config::data_dir()` 依次解析设置页目录覆盖（`settings::get_override_dir(&AppType::WorkBuddy)`）、`WORKBUDDY_CONFIG_DIR` 和默认 `~/.workbuddy`，`config_path()` 指向其中的 `models.json`；兼容模型数组和含 `models` 数组的对象。智枢写入的条目用 `zhishuCcsProviderId` 标记归属，原版 CC Switch 的 `ccSwitchProviderId` 条目和无标记的用户条目不接管，`availableModels` 白名单按上游规则维护；同一模型 ID 只能属于一张卡。平台 WorkBuddy 行的 `url` 是完整 `/chat/completions` 地址；平台同步会把旧版智枢（0.0.x）写入、无标记但 `url`/`apiKey` 与当前账号平台供应商一致的条目认领为 `zhishuCcsProviderId`。
 - 所有路径必须调用已有路径函数，保留设置覆盖和隔离环境的优先级；不要把上述默认路径硬编码进新逻辑。
 - 要改先做什么：读对应 `*_config.rs`、`live/floor.rs`、`live/project/` 和 `live/patch/`，补充格式往返、未知字段保留及金标回归。
 
@@ -178,8 +178,8 @@
 - mutation 后按实际副作用失效缓存：本地供应商同步刷新对应应用列表、相关原生配置/代理状态和 `configChangeHistory`，不刷新 `platformUsage`；平台目录更新只更新对应账户的目录查询。沿用调用方现有范围，不用全局失效把本地同步变成隐式平台请求。
 - 上游 IPC 封装在 `src/lib/api/`，自有 IPC 位于 `src/zhishu/api/` 或对应功能子目录，再由 query/hook 调用；平台 HTTP 认证和供应商协调继续由 Rust 处理。
 - 普通错误按现有场景使用 `extractErrorMessage` 和国际化兜底；平台错误使用 `platformAuthError`，不展示任意 IPC 异常或服务端原始响应。
-- 通用通知使用 `src/lib/toast.ts` 的去重封装；用户文案使用 i18n，修改共享翻译键时检查 `zh`、`zh-TW`、`en`、`ja`、`tr`、`ko`、`ru`、`de`（上游 v4.0.31 起八语，一致性测试要求键齐全）。
-- Rust 业务层沿用 `Result<T, AppError>`，通过 `?` 传播并附带路径/上下文；多数 command 映射为字符串错误，平台 command 保留 `PlatformAuthError`。
+- 通用通知使用 `src/lib/toast.ts` 的去重封装；用户文案使用 i18n，修改共享翻译键时检查 `zh`、`zh-TW`、`en`、`ja`、`tr`、`ko`、`ru`、`de`。
+- Rust 业务层沿用 `Result<T, AppError>`，通过 `?` 传播并附带路径/上下文；上游 command 多数直接返回可序列化的 `AppError`，平台 command 保留 `PlatformAuthError`，既有智枢兼容入口按原契约处理。
 - Rust 使用 `log`；前端已有 `reportFrontendError`、`logFrontendInfo` 和 Tauri 日志插件。平台 HTTP 诊断沿用 `platform_http_log::RequestLog`，先脱敏再截断，只记录可解析的安全摘要；不直接记录密码、token、完整认证头、原始响应或含 Key 的配置。
 - 新 command 流程：实现 `#[tauri::command]` → 在 `commands/mod.rs` 声明/导出 → 加入 `lib.rs` 的 `generate_handler!` → 添加前端 wrapper、类型及相关测试。
 - 只有 `#[tauri::command]` 标记不代表已暴露；新增共享状态还需在启动阶段注册，参数命名按现有 camelCase IPC 约定核对。
@@ -204,6 +204,7 @@
 
 - 先读相关实现、调用方和测试，再修改；开始前检查工作区，保留用户已有未提交改动。
 - **禁止删除上游代码**：品牌、数据目录和功能扩展可以做必要适配，但必须保留上游文件、组件、函数、类型、API、兼容入口及其依赖；不得以未使用、冗余、重构或清理为由删除。整理提交时发现既有的上游清理删除，应恢复后验证，不能直接压入新历史。品牌相关文件改名须保留对应实现，不视为删除功能。
+- 2026-11-21 的 v4.0.37 同步已获用户明确允许采纳官方未使用代码删除，同时保留智枢所需兼容；仅限本次范围，见 [ADR-0015](docs/zhishu/adr/ADR-0015-merge-4.0.37.md)（主线记录；本分支 2026-11-24 合并 v4.0.40 时按同一结论对齐主线取舍），不改变其他任务的一般禁止删除要求。
 - 每次变更只解决一个明确问题，小步提交；不要把无关格式化、重命名或用户改动混入提交。
 - 不手改 `dist/`、`src-tauri/target/` 等构建产物；锁文件随依赖工具更新，金标快照通过测试提供的更新入口生成并逐项审查。
 - 改 Tauri command 必须同步前后端契约、注册、类型和测试，不以“前端暂时没报错”替代验证。
@@ -213,8 +214,8 @@
 
 ## 待人工确认项
 
-- 截至 2026-11-17，分支 `reorg/upstream-4.0.33` 以上游 v4.0.33 / 提交 `86e23b6331b9ce2cee314d1ebb5b186da0de645a`（tag 对象 `ee5b0d39`）为基点线性重建，见代码基线、当日同步报告与 ADR-0015；`ccs-dev` 仍停在 v4.0.29 合并后的历史，是否替换产品主线须另行确认。主数据库 schema 为 26（上游新增 `enabled_workbuddy`）；Copilot CLI 未加入平台同步白名单。官方 remote 为 `upstream`，不能仅凭目录判断文件归属。注意上游自 4.0.28 起在有 ChatGPT 登录时把 Codex 第三方路由写成内置 openai 形态；本分支无登录等分支仍投影智枢 `zhishu` 表，任何路径不写 `custom` 表。
+- 截至 2026-11-24，分支 `reorg/upstream-4.0.40` = `reorg/upstream-4.0.33`（以上游 v4.0.33 为基点线性重建）+ 合并上游 v4.0.40（提交 `f19a9d4f4f08bda03106a7be87c77cbcdf55b019`，tag 对象 `3da554da`）+ WorkBuddy 共存修复，见代码基线、ADR-0017/0018 与同步报告；`ccs-dev` 仍保留二开 WorkBuddy 适配，两条线的代码差异只在 WorkBuddy。主数据库 schema 为 27；Copilot CLI 未加入平台同步白名单。官方 remote 为 `upstream`，不能仅凭目录判断文件归属。注意上游自 4.0.28 起在有 ChatGPT 登录时把 Codex 第三方路由写成内置 openai 形态；本分支无登录等分支仍投影智枢 `zhishu` 表，任何路径不写 `custom` 表。
 - 当前登录失效返回登录页，恢复暂时失败进入重试页；未实现未经验证的离线入口。若改变产品策略须另行确认与评审。
 - 客户端协议以 `docs/zhishu/api/client-api.md` 和 ADR-0004 为准；真实多设备共享 Key、系统凭据库和 CLI 端到端验收仍待执行。
-- TODO：补充上游 WorkBuddy 实现下真实 `models.json` 与平台同步的运行验收，包括二开旧条目（无 `ccSwitchProviderId`）与新条目同名模型的冲突处理；平台同步已实现，不能再列为尚未接入。
+- TODO：补充上游 WorkBuddy 实现下真实 `models.json` 与平台同步的运行验收，包括旧版智枢未标记条目的认领、与原版 CC Switch（`ccSwitchProviderId`）共用同一 `models.json` 时的同名模型冲突；平台同步已实现，不能再列为尚未接入。
 - TODO：补充 macOS、Windows、Linux 上系统凭据库与七天会话恢复的实际验收记录；已有模拟测试不替代真实系统、断网和重启验证。

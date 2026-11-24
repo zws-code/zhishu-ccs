@@ -1,4 +1,6 @@
-# ADR-0015：合并上游 v4.0.33，改用上游 WorkBuddy，并在 v4.0.33 上线性重建历史
+# ADR-0017：合并上游 v4.0.33，改用上游 WorkBuddy，并在 v4.0.33 上线性重建历史
+
+> 编号说明：本记录在 `reorg/upstream-4.0.33` 上原为 ADR-0015；主线 `ccs-dev` 已用 ADR-0015（v4.0.37）、ADR-0016（v4.0.40），2026-11-24 起改为 ADR-0017，内容不变。后续 v4.0.40 合并与 WorkBuddy 共存补丁见 [ADR-0018](ADR-0018-merge-4.0.40-upstream-workbuddy-coexistence.md)。
 
 - 日期：2026-11-17
 - 状态：已在新分支 `reorg/upstream-4.0.33` 实施，本机自动验证逐提交通过；`ccs-dev` 未改动，不构成合并或发布批准

@@ -17,7 +17,10 @@
 | [ADR-0011：合并上游 v4.0.25](ADR-0011-merge-4.0.25.md) | 4.0.23 → v4.0.25，代理/MCP/投影/用量更新与智枢身份、共存边界 |
 | [ADR-0012：合并上游 v4.0.26](ADR-0012-merge-4.0.26.md) | v4.0.25 → v4.0.26，DAO/后台 IPC/窗口查询/代理/DSH 与平台边界 |
 | [ADR-0013：合并上游 v4.0.28](ADR-0013-merge-4.0.28.md) | v4.0.26 → v4.0.28，Codex 路由新形态、会话迁入、切分提示与智枢投影边界 |
+| [ADR-0018：重建分支合并 v4.0.40 与 WorkBuddy 共存补丁](ADR-0018-merge-4.0.40-upstream-workbuddy-coexistence.md) | `reorg/upstream-4.0.40`：对齐主线的非 WorkBuddy 取舍，上游 WorkBuddy 加归属字段与目录覆盖补丁，认领旧版智枢条目 |
+| [ADR-0017：合并上游 v4.0.33 并改用上游 WorkBuddy](ADR-0017-merge-4.0.33-upstream-workbuddy.md) | `reorg/upstream-4.0.33` 线性重建（原编号 ADR-0015，与主线冲突后改号） |
+| [ADR-0016：合并上游 v4.0.40](ADR-0016-merge-4.0.40.md) | WAL/一致性备份、安全加固、Skills 拆分与智枢兼容 |
+| [ADR-0015：合并上游 v4.0.37](ADR-0015-merge-4.0.37.md) | WorkBuddy、schema 27、代理/Skills/更新、DAO 重构与官方删除授权 |
 | [ADR-0014：合并上游 v4.0.29](ADR-0014-merge-4.0.29.md) | Copilot CLI、schema 25、七语与 Codex 路由修复；保留简易模式、平台和共存边界 |
-| [ADR-0015：合并上游 v4.0.33 并改用上游 WorkBuddy](ADR-0015-merge-4.0.33-upstream-workbuddy.md) | 删除二开 WorkBuddy、平台同步改走上游实现、schema 26，并在 v4.0.33 上线性重建可逐提交构建的历史 |
 
 ADR 保留做出决策时的事实；当前代码能力见 [基线](../development/baseline.md)，实际执行结果见 [验证记录](../history/validation.md)。

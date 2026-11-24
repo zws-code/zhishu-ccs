@@ -30,7 +30,7 @@
 | 目录、订阅、供应商同步与删除 | `src/zhishu/models/`、`src/zhishu/onboarding/`、`src/zhishu/api/platformModels.ts`、`platformUsage.ts` | `src-tauri/src/zhishu/services/platform_models/`、`platform_cleanup.rs`、`client_api.rs` |
 | 上游能力适配 | `src/zhishu/integrations/ccswitch/` | `src-tauri/src/zhishu/integrations/ccswitch/` |
 | 配置历史、差异与还原 | `src/zhishu/config-history/` | `src-tauri/src/zhishu/storage/config_history.rs`、`src-tauri/src/zhishu/commands/config_history.rs` |
-| WorkBuddy（上游实现，自 v4.0.33 起不再有二开代码） | 上游 `src/components/providers/forms/WorkBuddyProviderForm.tsx` 等 | 上游 `src-tauri/src/workbuddy_config.rs`；平台同步格式见 `src-tauri/src/zhishu/integrations/ccswitch/platform_models.rs` |
+| WorkBuddy（上游实现 + 归属字段/目录覆盖共存补丁，无二开适配器） | 上游 `src/components/providers/forms/WorkBuddyProviderForm.tsx` 等 | 上游 `src-tauri/src/workbuddy_config.rs`；平台同步格式见 `src-tauri/src/zhishu/integrations/ccswitch/platform_models.rs`，旧版智枢条目认领见同目录 `workbuddy_migration.rs` |
 | 应用导航与品牌 | `src/zhishu/app/`、`src/zhishu/assets/` | `src-tauri/src/lib.rs` 薄注册 |
 | 自有测试 | `tests/zhishu/` | 自有模块同文件测试，以及 `src-tauri/tests/` 集成测试 |
 | 开发与发行 | `scripts/zhishu/`、`package.json` | Tauri 工具链与 `.github/workflows/` |

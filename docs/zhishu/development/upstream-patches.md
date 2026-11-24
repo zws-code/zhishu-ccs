@@ -2,9 +2,52 @@
 
 > 这是按基线/事件累积的补丁台账。222 项清单针对 2026-10-29 的 4.0.21 快照，后续变更按事件追加；旧路径、版本和分支描述仅适用于该段，不是当前 4.0.22 的完整重新统计。当前现状见 [代码基线](baseline.md)。
 
+## 2026-11-24：重建分支合并 v4.0.40 与 WorkBuddy 共存补丁（`reorg/upstream-4.0.40`）
+
+依据 [ADR-0018](../adr/ADR-0018-merge-4.0.40-upstream-workbuddy-coexistence.md)。本分支在 `reorg/upstream-4.0.33` 上合并官方 v4.0.40：非 WorkBuddy 的冲突与补丁对齐主线（见下面两节 SYNC-20261124-*、SYNC-20261121-*，其中涉及二开 WorkBuddy Adapter 的部分在本分支不适用），WorkBuddy 只用上游实现。明细见 [同步报告](../upstream-sync/2026-11-24-reorg.md)。
+
+| ID | 文件 / 范围 | 原因与不能仅包装的依据 | 等级 | 验证 |
+| --- | --- | --- | --- | --- |
+| REORG-20261124-01 | 上游 `src-tauri/src/workbuddy_config.rs` 的 `OWNER_FIELD` | 改为 `zhishuCcsProviderId`（与主线相同），智枢不再替换/删除原版 CC Switch 以 `ccSwitchProviderId` 标记的条目；归属常量被上游读写逻辑内部使用，外层包装无法改变 | L3 | 上游 WorkBuddy 集成测试（断言改为新字段）、深链测试、平台同步测试 |
+| REORG-20261124-02 | 上游 `workbuddy_config::data_dir()`，`settings.rs` 的 `workbuddy_config_dir` 与 `get_override_dir`、`directoryApps.ts`、`types.ts`、八语三个目录文案、目录设置测试 | 先读设置页目录覆盖，再读 `WORKBUDDY_CONFIG_DIR`、默认 `~/.workbuddy`（与主线相同）；路径函数是上游内部固定入口 | L2 | 目录设置测试、Rust 全量 |
+| REORG-20261124-03 | 新增 `src-tauri/src/zhishu/integrations/ccswitch/workbuddy_migration.rs`，`zhishu/services/platform_models/mod.rs` 调用 | 平台同步前认领旧版智枢写入的未标记平台条目；自有模块，不改上游文件 | L0 | 认领单测 5 项、同步+启用端到端 1 项 |
+| REORG-20261124-04 | 上游测试 `tests/integration/workbuddy_commands.rs` | 归属字段断言随 01 调整；保留主线新增的“同端点两张卡分开、保留逐模型覆盖”回归 | L0 测试 | Rust 全量 |
+
+退役（相对主线）：二开 `workbuddy.rs`/`workbuddy_config.rs` Adapter、`import_workbuddy_providers_from_live`/`get_workbuddy_installed` IPC、`services/provider` 旧适配分派、`stream_check` 分支、`workbuddy_account` 归属桥接、前端失败补刷与二开表单文案，均回到上游实现。
+
+## 2026-11-24：合并上游 v4.0.40
+
+依据 [ADR-0016](../adr/ADR-0016-merge-4.0.40.md)，从 0.0.11/v4.0.37 合入官方 v4.0.40，保留祖先及智枢业务边界。结果见 [同步报告](../upstream-sync/2026-11-24.md)。
+
+| ID | 文件 / 范围 | 原因与不能仅包装的依据 | 等级 | 验证 |
+| --- | --- | --- | --- | --- |
+| SYNC-20261124-01 | package/Cargo/锁、tauri.conf、CI、CONTRIBUTING | 保留版本/身份/更新源与发布模拟；合并 objc2 0.6 所需 NSData/NSImage/NSApplication 特性；固定入口和编译特性不能外部包装。CI 吸收上游分组并行，保留既有不将 Knip 作为兼容导出门禁的策略 | L1 | 清单、frozen install、Clippy、发布模拟 |
+| SYNC-20261124-02 | lib/tray、panic_hook、commands/misc、env_manager/backup_storage | 复用上游全屏窗口、checkpoint、host_open，保留智枢设备备份路径、崩溃目录和下载去向；均为内部固定入口 | L1/L3 | Rust 全量、备份及路径回归 |
+| SYNC-20261124-03 | services/skill 的 sync/update/backup 子模块及迁移测试 | 原共存保护随上游模块拆分迁入，保留部署指纹、其他产品目标保护和 copy_to_app；必须在内部写入/删除前执行，外层包装不足 | L3 | Skills、共存、更新/备份回归 |
+| SYNC-20261124-04 | database/backup、codex_config、mode/controller、proxy/providers/codex 测试子模块 | 原智枢回归与品牌期望迁入上游新测试文件，生产逻辑保留自动合并补丁并接入 WAL/缓存和安全修复 | L3/L0 | 数据库、路由、金标、Rust 全量 |
+| SYNC-20261124-05 | App、ProviderCard、query/mutations | 保留 useTauriEvent、平台额度优先与 WorkBuddy 失败后刷新，同时加入 Grok 登录缓存失效；依赖现有组件内部状态 | L2 | 前端全量、平台和账号缓存回归 |
+| SYNC-20261124-06 | lib.rs 公共导出、providerConfigUtils、types/usage、deeplink 测试、claude.yml | 保留原公开入口/导入路径、智枢及旧深链兼容、原工作流；Codex 工具函数重新导出上游新模块；旧用量 helper 兼容新 freshInputTokens，防止二次扣减 | L2/L0 | 类型、注册契约、深链与新旧 token 语义回归 |
+
+未改变平台白名单或真实凭据，没有复用此前只限 v4.0.37 的删除授权；格式检查按上游扩大到 tests，七个存量/冲突文件按 Prettier 修正。
+
+## 2026-11-21：合并上游 v4.0.37
+
+依据 [ADR-0015](../adr/ADR-0015-merge-4.0.37.md)，保留产品 0.0.11 与双方祖先；用户明确允许本次采纳官方未使用代码清理，保留智枢仍依赖的兼容能力。实际验证见 [同步报告](../upstream-sync/2026-11-21.md)。
+
+| ID | 文件 / 范围 | 原因与不能仅包装的依据 | 等级 | 验证 |
+| --- | --- | --- | --- | --- |
+| SYNC-20261121-01 | package/Cargo/锁、tauri.conf、CI | 固定入口保留智枢版本、身份、命令、1420/25721 端口、更新源与 COS 模拟步骤；两个旧更新兼容 IPC 保留注册、wrapper、自有下载去向和可达性检查白名单；保留向导使用的 checkbox 和平台详情使用的 Tabs 组件/依赖 | L1 | frozen install、清单核对、发布模拟 |
+| SYNC-20261121-02 | app_config、settings、appSpecs/appConfig、directoryApps、目录 Hook | 接入上游能力表及 WorkBuddy MCP/Skills，兼容原 appConfig 导出与 WorkBuddy 设置覆盖；固定内部表不能由外部 Adapter 扩展 | L2/L3 | 类型、能力镜像、目录测试 |
+| SYNC-20261121-03 | services/provider、workbuddy_config、既有 zhishu WorkBuddy Adapter | 官方账号和普通新卡走上游链路；平台卡/旧配置写入与回滚保持，新增外层锁进入 Adapter 前释放；独立模型归属与目录覆盖桥接；内部锁/写入无法在 UI 包装解决 | L3 | WorkBuddy 配置/官方卡/平台与并发回归 |
+| SYNC-20261121-04 | database/schema、平台 Adapter/服务及配置历史调用 | schema 27 保留旧分支协调；平台 DAO 调用改 AppType，审计及账户隔离不变；迁移/DAO 在内部执行 | L3 | 迁移、失败恢复、平台与历史回归 |
+| SYNC-20261121-05 | proxy/forwarder/headers、mode、live/project/claude、dsh_config | 上游抽取后保留双方占位符拦截、智枢 Stack 命名及 DSH 回执；保持共享工具配置归属边界 | L3 | 代理出口、Stack、共存与金标 |
+| SYNC-20261121-06 | App、ProviderCard、query mutations、简易模式与平台展示 | 保留简易模式/配置历史入口、平台额度优先及变更后局部缓存刷新，同时接入自动更新提示；依赖原组件内部状态 | L2 | App/平台/接入/缓存/更新测试 |
+| SYNC-20261121-07 | 八语 JSON、AppsPage/更新测试、CONTRIBUTING | 保留智枢扩展与身份路径；WorkBuddy 从手动应用升级为可检测桌面应用；更新测试显式启用智枢构建更新开关 | L1/L0 | locale parity、组件测试、格式 |
+
+没有扩展平台同步白名单、改写用户真实数据、推送或发布。德语智枢文案的英语回退、跨平台和真实工具验收限制须在交付中保留。
 ## 2026-11-17：合并上游 v4.0.33、改用上游 WorkBuddy、线性重建
 
-依据 [ADR-0015](../adr/ADR-0015-merge-4.0.33-upstream-workbuddy.md)，参考树由 `ccs-dev`（0.0.11）合并官方 v4.0.33 得到，再在 `reorg/upstream-4.0.33` 上以 v4.0.33 为基点线性重建。二开 WorkBuddy 整体删除，上游 WorkBuddy 文件与 v4.0.33 字节一致；平台同步改走上游实现。冲突明细见 [同步报告](../upstream-sync/2026-11-17.md)。
+依据 [ADR-0017](../adr/ADR-0017-merge-4.0.33-upstream-workbuddy.md)，参考树由 `ccs-dev`（0.0.11）合并官方 v4.0.33 得到，再在 `reorg/upstream-4.0.33` 上以 v4.0.33 为基点线性重建。二开 WorkBuddy 整体删除，上游 WorkBuddy 文件与 v4.0.33 字节一致；平台同步改走上游实现。冲突明细见 [同步报告](../upstream-sync/2026-11-17.md)。
 
 ### 退役的补丁
 

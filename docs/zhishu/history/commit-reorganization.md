@@ -123,7 +123,7 @@
 
 ## v4.0.33 线性重建（2026-11-17）
 
-- 背景：上游 v4.0.33 原生支持 WorkBuddy（同一应用 ID、同一 `models.json`），与二开 WorkBuddy 冲突；同时 2026-11-03 的整理只按文件拆分、中间提交未构建。用户确认：在新分支重建，`ccs-dev`、其他分支、所有 tag 与远程不动、不推送；二开 WorkBuddy 从历史中整体移除，平台同步改接上游 WorkBuddy；每个提交都要通过全部检查。决策见 [ADR-0015](../adr/ADR-0015-merge-4.0.33-upstream-workbuddy.md)。
+- 背景：上游 v4.0.33 原生支持 WorkBuddy（同一应用 ID、同一 `models.json`），与二开 WorkBuddy 冲突；同时 2026-11-03 的整理只按文件拆分、中间提交未构建。用户确认：在新分支重建，`ccs-dev`、其他分支、所有 tag 与远程不动、不推送；二开 WorkBuddy 从历史中整体移除，平台同步改接上游 WorkBuddy；每个提交都要通过全部检查。决策见 [ADR-0017](../adr/ADR-0017-merge-4.0.33-upstream-workbuddy.md)。
 - 第一阶段（参考树）：`reorg/target-4.0.33` = `ccs-dev`（`56cba5065`，0.0.11）三方合并 v4.0.33，删除二开 WorkBuddy、改用上游实现并完成适配，合并提交 `785abdda6`，树 T = `38dc3d057cce9ad77b4f440234a1f6c13f0d9c93`。冲突处理见 [同步报告](../upstream-sync/2026-11-17.md)。
 - 第二阶段（重建）：`reorg/upstream-4.0.33` 以 v4.0.33（提交 `86e23b63`）为唯一父基点，线性叠加 8 个提交，无 merge 提交。第 7 个提交与 T 的差异只在文档类文件（`docs/`、`AGENTS.md`、`CONTRIBUTING.md`、`README*.md`）；第 8 个提交补齐这些文件后，与 T 的差异仅剩本轮新增/更新的文档（`git diff reorg/target-4.0.33 reorg/upstream-4.0.33 -- . ':!docs' ':!AGENTS.md'` 无输出）。
 - 拆分方式：以 v4.0.33..T 的 `-U0` 差异为单位逐块归属；少数块内混合（例如 `lib.rs` 的命令注册、`App.tsx` 页头按钮、`main.tsx` 门禁）用精确文本编辑拆到对应提交；平台登录提交中的 `platform_auth.rs`、`client_api.rs`、`PlatformAuthContext.tsx`、`PlatformLogin.tsx` 与其测试是去掉目录同步/额度/账号清理后的中间版本；简易模式之前的接入向导使用 `1c86ce632^` 的版本并做同样的 WorkBuddy/`appHas` 适配；`Cargo.lock` 在身份提交只改包名，在平台登录提交加入 keyring。
@@ -140,7 +140,7 @@
 | 5 | `94ef51651` | 平台 OAuth2 登录、会话恢复与门禁（含 OAuth 302 修复） | `9ed00954`（登录/会话部分）、`e0808eae`、`024c5543` 的接线、`531c43b8` 的测试 |
 | 6 | `8d1df2423` | 平台目录、供应商同步（含经上游实现的 WorkBuddy 与 DSH）、订阅额度、接入向导、供应商删除与账号清理 | `fa413344`、`9ed00954`（清理/额度部分）、`90406df5` 中的 `platformManaged`/元数据更新、`024c5543` 的接线、`531c43b8` 的测试，本轮 WorkBuddy 适配 |
 | 7 | `757da618e` | 简易模式 | `1c86ce63` |
-| 8 | 本提交 | 二开规范、ADR、补丁登记、用户文档与本轮记录 | `90720960`、`07ebdac7`、`2781c941`、`e9f1a2d4`，以及本轮 ADR-0015、同步报告和各台账更新 |
+| 8 | `617b92497` | 二开规范、ADR、补丁登记、用户文档与本轮记录 | `90720960`、`07ebdac7`、`2781c941`、`e9f1a2d4`，以及本轮 ADR-0015（2026-11-24 改号为 ADR-0017）、同步报告和各台账更新 |
 
 已移除：`fdfe7847`（二开 WorkBuddy）及 `90406df5`/`024c5543`/`531c43b8` 中的全部二开 WorkBuddy 接线与测试。逐提交检查结果见 [验证记录](validation.md)。
 
@@ -149,3 +149,11 @@
 - 每个提交 `git ls-tree -r` 均不含 `zhishu/integrations/ccswitch/workbuddy*`、`src/zhishu/tools/workbuddy`、`WorkBuddyProviderForm.test.tsx`（二开版）或 `useWorkBuddyMutationRefresh.test.tsx`。
 - 每个提交中，v4.0.33 里路径含 `workbuddy` 的上游文件与 v4.0.33 字节一致。
 - v4.0.33..重建分支没有删除上游文件（flatpak 三个文件为改名）；被替换的上游函数仅有 `App.tsx` 的手写事件订阅（改用 `useTauriEvent`）、侧栏顶栏组件（移到 `src/zhishu/app/SidebarTopBar.tsx` 换品牌）和两个按 `zhishu` 表改名的 Codex 测试。
+
+## v4.0.40 合并与 WorkBuddy 共存修复（2026-11-24）
+
+- 分支 `reorg/upstream-4.0.40` 从 `reorg/upstream-4.0.33`（`617b92497`）出发，在其上追加三个提交，不 rebase、不改写前 8 个提交；`reorg/upstream-4.0.33`、`ccs-dev`、tag 与远程不变，未推送。
+- 提交：merge `c9cd25150`（`git merge v4.0.40`，第一父 `617b92497`、第二父 v4.0.40 `f19a9d4f4`）→ `fix(workbuddy)` `d11904f90` → 本文档提交。
+- 冲突处理、与 `ccs-dev` 的差异清单及原因见 [同步报告](../upstream-sync/2026-11-24-reorg.md)，决策见 [ADR-0018](../adr/ADR-0018-merge-4.0.40-upstream-workbuddy-coexistence.md)；本分支原 ADR-0015（v4.0.33）改号为 [ADR-0017](../adr/ADR-0017-merge-4.0.33-upstream-workbuddy.md)，主线 ADR-0015/0016 原样收录。
+- 校验：v4.0.33..本分支每个提交都不含二开 WorkBuddy 路径；上游 WorkBuddy 源文件相对 v4.0.40 只有 `OWNER_FIELD` 与 `data_dir()` 两处补丁（上游测试 `workbuddy_commands.rs` 另有归属断言适配与主线新增的一项回归）。
+

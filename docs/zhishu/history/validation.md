@@ -2,6 +2,46 @@
 
 > 本页保留各次任务的执行结果和未验证项；测试数量、代码路径、分支状态及临时资料均属于当时快照。本次文档整理没有重跑这些历史测试。当前行为以 [代码基线](../development/baseline.md)、功能说明和源码为准。
 
+## 重建分支合并 v4.0.40 与 WorkBuddy 共存修复（2026-11-24，`reorg/upstream-4.0.40`）
+
+每个提交在同一 worktree 中执行：`pnpm install --frozen-lockfile`、`pnpm build:renderer`（构建期变量 `VITE_ZHISHU_UPDATES_ENABLED=false` 与占位的非示例 HTTPS 平台地址，仅满足构建校验）、`pnpm typecheck`、`pnpm format:check`（覆盖 src 与 tests）、`pnpm test:unit`、`cargo fmt --check`、`cargo clippy -- -D warnings`、`CC_SWITCH_TEST_HOME=$(mktemp -d) no_proxy=127.0.0.1 NO_PROXY=127.0.0.1 cargo test --no-fail-fast`（库与 `tests/integration` 两个目标）、`pnpm test:release`、`pnpm test:release-cos`。检查后工作区无改动。
+
+| 提交 | install | renderer | typecheck | format | vitest | cargo fmt | clippy | cargo test | test:release | test:release-cos |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| merge `c9cd25150` | ✅ | ✅ | ✅ | ✅ | ✅ 353 文件 / 4633 项 | ✅ | ✅ | ✅ 5577 通过 / 0 失败 / 12 忽略 | ✅ 57 项 | ✅ 23 项（21 通过、2 跳过） |
+| fix(workbuddy) `d11904f90` | ✅ | ✅ | ✅ | ✅ | ✅ 353 文件 / 4634 项 | ✅ | ✅ | ✅ 5583 通过 / 0 失败 / 12 忽略 | ✅ 57 项 | ✅ 23 项（21 通过、2 跳过） |
+
+文档提交只改文档，代码与 fix 提交相同，另行复跑同一套检查，结果见交付报告。另用 `cargo clippy --all-targets -- -D warnings` 检查过 merge 结果，通过。
+
+过程记录：merge 提交首轮 Rust 库测试 1 项失败——取自主线的 `deeplink::tests::test_workbuddy_link_is_added_to_models_json` 期望 `zhishuCcsProviderId`，而 merge 提交的上游 WorkBuddy 仍用 `ccSwitchProviderId`；改回上游断言并 amend 该 merge 提交后全量复跑通过（上表），fix 提交随归属字段补丁再改为 `zhishuCcsProviderId`。未修改其他测试。
+
+新增回归：`zhishu::integrations::ccswitch::workbuddy_migration` 5 项（旧未标记条目、用户条目与原版 `ccSwitchProviderId` 条目不动、已归属条目不改、重复模型 ID、凭据缺失不认领），`workbuddy_sync_claims_legacy_zhishu_entries_and_keeps_foreign_ones` 1 项（同步认领后启用，旧条目与重复项收敛为一条新格式条目，用户条目、原版条目与 `availableModels` 保持）。12 项 ignored 为真实 keychain/S3/联网等手动用例，不计为通过。
+
+未执行：真实 WorkBuddy 桌面端读取 `models.json`、与原版 CC Switch 实机共存、真实平台账号同步、系统 keyring、应用启动、打包/签名/升级。
+
+## 合并上游 v4.0.40（2026-11-24）
+
+从产品 `12cfb27a9` / 0.0.11 合入官方 v4.0.40 / `f19a9d4f`，独立同步分支保留祖先。最高 L3，WAL/一致性快照、模块拆分与兼容决策见 [ADR-0016](../adr/ADR-0016-merge-4.0.40.md)，22 个冲突及完整结果见 [同步报告](../upstream-sync/2026-11-24.md)。
+
+前端全量 355 文件/4645 项、类型/格式、renderer、frozen install 与 cargo check 通过；发布 Node 模拟 57 通过，COS 模拟 21 通过/2 跳过。Rust fmt/Clippy 与静态核对通过；Rust 库 5360 通过/12 忽略、集成 226 通过，合计 5586 通过。首轮原版路径/标识期望及锁中毒的失败和复测见同步报告。
+
+schema 保持27但启用 WAL，回退需一致性备份/checkpoint，不能丢失 WAL。未运行真实应用、操作真实账号配置、推送或发布；跨平台/真实凭据库、CLI、安装升级与全屏托盘交互仍未验收。
+
+## 合并上游 v4.0.37（2026-11-21）
+
+从产品 `56cba5065` / 0.0.11 合入官方 v4.0.37 / `a8ca5e83`，独立同步分支保留双方祖先。L3 决策、官方删除的本次用户授权见 [ADR-0015](../adr/ADR-0015-merge-4.0.37.md)，52 个冲突及逐项处理见 [同步报告](../upstream-sync/2026-11-21.md)。
+
+| 本轮实际执行 | 结果 |
+| --- | --- |
+| frozen install、TypeScript、Prettier、renderer 构建 | 通过；renderer 仍有大 chunk 提示 |
+| 前端全量 | 343 文件、4493 项通过，含八语、平台、简易模式、更新与兼容 IPC |
+| Rust fmt、locked/offline Clippy all-targets | 通过 |
+| 临时 CC_SWITCH_TEST_HOME 下 Rust 全量 | 5496 通过（5271 库 + 225 集成），0 失败、10 忽略；回环模拟不走外部代理 |
+| WorkBuddy 新增回归 | 同地址多卡独立、逐模型连接覆盖、官方卡不写模型、MCP、提示词、原版归属保护通过 |
+| 发布脚本 / COS 模拟 | Node 57 通过；Python 21 通过、2 跳过 |
+| 静态核对 | 智枢 0.0.11 与锁一致、JSON 无重复键、工作流 YAML、文档链接、平台认证/会话与白名单保留 |
+
+首轮失败、修复与复测均记在同步报告，未修改金标快照掩盖失败。schema 27 的旧版本回退需要升级前数据库备份，不能只回退 Git。未启动真实应用、写真实配置或凭据、推送或发布；真实 OAuth/keyring、CLI/WorkBuddy 调用、跨平台编译及安装升级、共存实机和德语人工验收未执行。德语新增智枢/历史兼容键暂用英语回退。ignored 不等于通过。
 ## v4.0.33 线性重建逐提交检查（2026-11-17）
 
 分支 `reorg/upstream-4.0.33`（基点 v4.0.33 / `86e23b63`）。每个代码提交在同一 worktree 中 `git reset --hard` 后依次执行：`pnpm install --frozen-lockfile`、`pnpm build:renderer`（构建期变量 `VITE_ZHISHU_UPDATES_ENABLED=false`，`VITE_PLATFORM_API_URL`/`VITE_PLATFORM_WEB_URL` 用占位的非示例 HTTPS 域名，仅满足构建校验，不联网）、`pnpm typecheck`、`pnpm format:check`、`pnpm test:unit`、`cargo fmt --check`、`cargo clippy -- -D warnings`、`CC_SWITCH_TEST_HOME=$(mktemp -d) no_proxy=127.0.0.1 cargo test --no-fail-fast`（均带 `--manifest-path src-tauri/Cargo.toml`，共用临时 `CARGO_TARGET_DIR`）。每次检查结束后工作区无改动（锁文件未被 cargo 改写）。
