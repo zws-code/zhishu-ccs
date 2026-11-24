@@ -1308,6 +1308,9 @@
       "summaryFiles": "涉及文件",
       "summaryNoFiles": "本次没有修改任何配置文件。"
     },
+    "workbuddyConfigDir": "WorkBuddy 配置目录",
+    "workbuddyConfigDirDescription": "覆盖 WorkBuddy 配置目录（models.json）。",
+    "browsePlaceholderWorkbuddy": "例如：/home/<你的用户名>/.workbuddy",
     "ompConfigDir": "Oh My Pi 配置目录"
   },
   "apps": {

@@ -73,6 +73,7 @@ describe("useDirectorySettings", () => {
       if (app === "opencode") return "/remote/opencode";
       if (app === "openclaw") return "/remote/openclaw";
       if (app === "pi") return "/remote/pi";
+      if (app === "workbuddy") return "/remote/workbuddy";
       if (app === "omp") return "/remote/omp";
       if (app === "dsh") return "/remote/dsh";
       return "/remote/hermes";
@@ -100,6 +101,7 @@ describe("useDirectorySettings", () => {
       openclaw: "/remote/openclaw",
       hermes: "/remote/hermes",
       pi: "/remote/pi",
+      workbuddy: "/remote/workbuddy",
       omp: "/remote/omp",
       dsh: "/remote/dsh",
     });
@@ -114,6 +116,7 @@ describe("useDirectorySettings", () => {
     ["openclaw", "openclawConfigDir"],
     ["hermes", "hermesConfigDir"],
     ["pi", "piConfigDir"],
+    ["workbuddy", "workbuddyConfigDir"],
     ["omp", "ompConfigDir"],
     ["dsh", "dshConfigDir"],
   ] as const)(

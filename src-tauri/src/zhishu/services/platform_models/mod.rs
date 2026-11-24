@@ -491,6 +491,10 @@ fn sync_agent_providers(
         );
     }
 
+    if *app == crate::app_config::AppType::WorkBuddy {
+        claim_legacy_workbuddy_entries(&existing, &desired, discovery, &mut warnings);
+    }
+
     // 先添加再删除，让删除当前旧供应商时有机会选择刚同步的安全备用项。
     let mut added = 0;
     let mut attempted_adds = HashSet::new();
@@ -694,6 +698,39 @@ fn sync_agent_providers(
         warnings.push(format!("服务供应商 {id} 未能加入列表"));
     }
     Ok((added, removed, skipped, warnings))
+}
+
+/// 旧版智枢写入的 WorkBuddy 平台条目没有归属标记；按当前账号平台供应商的端点和 Key 认领，
+/// 之后的上游写入会按归属替换它们。认领失败只记警告，不阻塞本次同步。
+fn claim_legacy_workbuddy_entries(
+    existing: &indexmap::IndexMap<String, Provider>,
+    desired: &HashMap<String, DesiredProvider>,
+    discovery: &GroupDiscovery,
+    warnings: &mut Vec<String>,
+) {
+    use crate::zhishu::integrations::ccswitch::workbuddy_migration::{
+        claim_legacy_platform_entries, LegacyClaim,
+    };
+    let account_rows = existing.values().filter(|provider| {
+        provider
+            .meta
+            .as_ref()
+            .and_then(|meta| meta.platform_managed.as_ref())
+            .is_some_and(|managed| {
+                managed.origin == discovery.account.base_url
+                    && managed.user_id == discovery.account.user.id
+            })
+    });
+    let claims: Vec<_> = desired
+        .values()
+        .map(|desired| &desired.provider)
+        .chain(account_rows)
+        .filter_map(|provider| LegacyClaim::from_settings(&provider.id, &provider.settings_config))
+        .collect();
+    if let Err(err) = claim_legacy_platform_entries(&claims) {
+        log::warn!("Failed to claim legacy WorkBuddy entries: {err}");
+        warnings.push("无法认领旧版智枢写入的 WorkBuddy 模型条目，已保留原文件".into());
+    }
 }
 
 fn delete_managed_provider(
@@ -2587,6 +2624,93 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    #[serial_test::serial]
+    fn workbuddy_sync_claims_legacy_zhishu_entries_and_keeps_foreign_ones() {
+        use crate::database::Database;
+        use std::sync::Arc;
+
+        let _home = SyncTestHome::new();
+        let state = AppState::new(Arc::new(Database::memory().unwrap()));
+        let app = crate::app_config::AppType::WorkBuddy;
+        let group = crate::zhishu::services::platform_auth::AvailableGroup {
+            id: 42,
+            name: "OpenAI 主力".into(),
+            platform: "openai".into(),
+            status: "active".into(),
+            subscription_type: "standard".into(),
+        };
+        let mut discovery = test_discovery(vec![group]);
+        discovery.catalogs[0].models = vec![json!({
+            "id": "model-a",
+            "display_name": "Model A",
+            "supported_endpoint_types": ["chat"],
+            "supports_tools": true,
+            "supports_streaming": true
+        })];
+        // 旧版智枢（二开适配器）写入：没有归属标记，条目自带 url/apiKey，同一模型写了两次。
+        let path = crate::workbuddy_config::config_path();
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &path,
+            serde_json::to_vec(&json!({
+                "models": [
+                    {"id": "model-a", "url": "https://platform.test/v1", "apiKey": "key-42"},
+                    {"id": "model-a", "url": "https://platform.test/v1", "apiKey": "key-42"},
+                    {"id": "mine", "url": "https://platform.test/v1", "apiKey": "user-key"},
+                    {"id": "cc-model", "url": "https://cc.test/v1/chat/completions",
+                     "apiKey": "cc-key", "ccSwitchProviderId": "cc-card"}
+                ],
+                "availableModels": ["model-a", "mine", "cc-model"]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
+        let (added, _, _, warnings) = sync_agent_providers(&state, &app, &discovery).unwrap();
+        assert_eq!(added, 1);
+        assert!(warnings.is_empty(), "{warnings:?}");
+        let id =
+            adapter::service_provider_id("workbuddy", 42, "openai", "https://platform.test", 1);
+        let owned = |document: &Value| {
+            document["models"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|entry| entry["zhishuCcsProviderId"] == json!(id))
+                .cloned()
+                .collect::<Vec<_>>()
+        };
+        let claimed: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(
+            owned(&claimed).len(),
+            2,
+            "legacy entries are claimed in place"
+        );
+
+        // 启用时上游按归属整体替换：旧条目（含重复的同名模型）只剩一条新格式条目。
+        ProviderService::switch(&state, app.clone(), &id).unwrap();
+        let after: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let owned = owned(&after);
+        assert_eq!(owned.len(), 1);
+        assert_eq!(owned[0]["id"], "model-a");
+        assert_eq!(owned[0]["url"], "https://platform.test/v1/chat/completions");
+        let models = after["models"].as_array().unwrap();
+        let mine = models.iter().find(|entry| entry["id"] == "mine").unwrap();
+        assert!(mine.get("zhishuCcsProviderId").is_none());
+        assert_eq!(mine["apiKey"], "user-key");
+        let cc = models
+            .iter()
+            .find(|entry| entry["id"] == "cc-model")
+            .unwrap();
+        assert_eq!(cc["ccSwitchProviderId"], "cc-card");
+        assert!(cc.get("zhishuCcsProviderId").is_none());
+        assert_eq!(
+            after["availableModels"],
+            json!(["model-a", "mine", "cc-model"])
+        );
     }
 
     #[test]

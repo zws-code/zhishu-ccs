@@ -2641,7 +2641,7 @@ fn test_workbuddy_link_is_added_to_models_json() {
             "url": "https://api.example.com/v1",
             "apiKey": "sk-test",
             "supportsToolCall": true,
-            "ccSwitchProviderId": id,
+            "zhishuCcsProviderId": id,
         }])
     );
 }

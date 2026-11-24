@@ -1308,6 +1308,9 @@
       "summaryFiles": "Affected files",
       "summaryNoFiles": "No configuration files were changed."
     },
+    "workbuddyConfigDir": "WorkBuddy Configuration Directory",
+    "workbuddyConfigDirDescription": "Override the WorkBuddy configuration directory (models.json).",
+    "browsePlaceholderWorkbuddy": "e.g., /home/<your-username>/.workbuddy",
     "ompConfigDir": "Oh My Pi Configuration Directory"
   },
   "apps": {

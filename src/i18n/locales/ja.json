@@ -1308,6 +1308,9 @@
       "summaryFiles": "対象ファイル",
       "summaryNoFiles": "今回変更された設定ファイルはありません。"
     },
+    "workbuddyConfigDir": "WorkBuddy 設定ディレクトリ",
+    "workbuddyConfigDirDescription": "WorkBuddy の設定ディレクトリ（models.json）を上書きします。",
+    "browsePlaceholderWorkbuddy": "例: /home/<your-username>/.workbuddy",
     "ompConfigDir": "Oh My Pi 設定ディレクトリ"
   },
   "apps": {

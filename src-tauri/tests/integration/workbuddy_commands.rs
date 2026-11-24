@@ -56,7 +56,7 @@ fn workbuddy_providers_are_written_to_models_json_and_removed_cleanly() {
         "https://api.deepseek.com/v1/chat/completions"
     );
     assert_eq!(models[1]["apiKey"], "test-key");
-    assert_eq!(models[1]["ccSwitchProviderId"], "ds");
+    assert_eq!(models[1]["zhishuCcsProviderId"], "ds");
     assert_eq!(doc["availableModels"], json!(["mine", "deepseek-chat"]));
     let saved = state
         .db

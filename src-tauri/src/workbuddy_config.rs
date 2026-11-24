@@ -27,7 +27,7 @@ use std::{
 };
 
 /// 条目归属标记：值是 CC Switch 的供应商 id。WorkBuddy 不校验未知字段，会原样保留。
-pub(crate) const OWNER_FIELD: &str = "ccSwitchProviderId";
+pub(crate) const OWNER_FIELD: &str = "zhishuCcsProviderId";
 
 /// 供应商层面的字段，写入时复制到每个模型条目（条目自己的同名字段优先）。
 const SHARED_FIELDS: [&str; 4] = ["vendor", "url", "apiKey", "api"];
@@ -40,7 +40,8 @@ pub(crate) fn is_official_provider(provider: &crate::provider::Provider) -> bool
 }
 
 pub(crate) fn data_dir() -> PathBuf {
-    explicit_data_dir(std::env::var("WORKBUDDY_CONFIG_DIR").ok().as_deref())
+    crate::settings::get_override_dir(&crate::AppType::WorkBuddy)
+        .or_else(|| explicit_data_dir(std::env::var("WORKBUDDY_CONFIG_DIR").ok().as_deref()))
         .unwrap_or_else(|| get_home_dir().join(".workbuddy"))
 }
 

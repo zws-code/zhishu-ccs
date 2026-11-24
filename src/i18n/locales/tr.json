@@ -1308,6 +1308,9 @@
       "summaryFiles": "Etkilenen dosyalar",
       "summaryNoFiles": "Hiçbir yapılandırma dosyası değiştirilmedi."
     },
+    "workbuddyConfigDir": "WorkBuddy Yapılandırma Dizini",
+    "workbuddyConfigDirDescription": "WorkBuddy yapılandırma dizinini (models.json) geçersiz kılın.",
+    "browsePlaceholderWorkbuddy": "ör. /home/<your-username>/.workbuddy",
     "ompConfigDir": "Oh My Pi Yapılandırma Dizini"
   },
   "apps": {

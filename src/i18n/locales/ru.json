@@ -1308,7 +1308,10 @@
       "summaryRemoved": "Удалено: {{names}}",
       "summaryFiles": "Затронутые файлы",
       "summaryNoFiles": "Файлы конфигурации не изменены."
-    }
+    },
+    "workbuddyConfigDir": "Каталог конфигурации WorkBuddy",
+    "workbuddyConfigDirDescription": "Переопределить каталог конфигурации WorkBuddy (models.json).",
+    "browsePlaceholderWorkbuddy": "Например, /home/<your-username>/.workbuddy"
   },
   "apps": {
     "claude": "Claude",

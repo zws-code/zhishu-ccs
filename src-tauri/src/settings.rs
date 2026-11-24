@@ -650,6 +650,8 @@ pub struct AppSettings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pi_config_dir: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workbuddy_config_dir: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub omp_config_dir: Option<String>,
     /// DeepSeek Harness 主目录（相当于 `DSH_HOME`，优先于环境变量）
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -805,6 +807,7 @@ impl Default for AppSettings {
             openclaw_config_dir: None,
             hermes_config_dir: None,
             pi_config_dir: None,
+            workbuddy_config_dir: None,
             omp_config_dir: None,
             dsh_config_dir: None,
             current_provider_claude: None,
@@ -853,6 +856,7 @@ impl AppSettings {
             &mut self.openclaw_config_dir,
             &mut self.hermes_config_dir,
             &mut self.pi_config_dir,
+            &mut self.workbuddy_config_dir,
             &mut self.omp_config_dir,
             &mut self.dsh_config_dir,
         ] {
@@ -1321,14 +1325,14 @@ pub fn get_override_dir(app: &AppType) -> Option<PathBuf> {
         AppType::OpenClaw => &settings.openclaw_config_dir,
         AppType::Hermes => &settings.hermes_config_dir,
         AppType::Pi => &settings.pi_config_dir,
+        AppType::WorkBuddy => &settings.workbuddy_config_dir,
         AppType::Omp => &settings.omp_config_dir,
         AppType::Dsh => &settings.dsh_config_dir,
         AppType::ClaudeDesktop
         | AppType::Mcode
         | AppType::Kimi
         | AppType::Agy
-        | AppType::Copilot
-        | AppType::WorkBuddy => return None,
+        | AppType::Copilot => return None,
     };
     dir.as_deref().map(resolve_override_path)
 }

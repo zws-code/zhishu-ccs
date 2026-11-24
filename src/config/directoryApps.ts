@@ -64,6 +64,13 @@ export const DIRECTORY_APPS = [
     syncsLive: false,
   },
   {
+    app: "workbuddy",
+    field: "workbuddyConfigDir",
+    defaultFolder: ".workbuddy",
+    placeholderKey: "settings.browsePlaceholderWorkbuddy",
+    syncsLive: true,
+  },
+  {
     app: "omp",
     field: "ompConfigDir",
     defaultFolder: ".omp/agent",

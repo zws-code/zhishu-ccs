@@ -524,6 +524,8 @@ export interface Settings {
   hermesConfigDir?: string;
   // 覆盖 Pi agent 配置目录（可选）
   piConfigDir?: string;
+  // 覆盖 WorkBuddy 配置目录（可选）
+  workbuddyConfigDir?: string;
   // 覆盖 Oh My Pi agent 配置目录（可选）
   ompConfigDir?: string;
   // 覆盖 DeepSeek Harness 主目录（相当于 DSH_HOME，可选）

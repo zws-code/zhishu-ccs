@@ -1308,7 +1308,10 @@
       "summaryRemoved": "제거됨: {{names}}",
       "summaryFiles": "관련 파일",
       "summaryNoFiles": "변경된 설정 파일이 없습니다."
-    }
+    },
+    "workbuddyConfigDir": "WorkBuddy 설정 폴더",
+    "workbuddyConfigDirDescription": "WorkBuddy 설정 폴더(models.json)를 재정의합니다.",
+    "browsePlaceholderWorkbuddy": "예: /home/<your-username>/.workbuddy"
   },
   "apps": {
     "claude": "Claude",
